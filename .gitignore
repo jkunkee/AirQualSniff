@@ -1,3 +1,4 @@
 .vscode
 AirQualSniff.cpp
 *.bin
+examples
