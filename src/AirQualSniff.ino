@@ -54,7 +54,7 @@ PhotonVBAT vbat(A0);
 #if OLD_DISPLAY
 #else
 // FUll U8G2, SSD1327 controller, EA_128128 display, full framebuffer, First Arduino Hardware I2C, not rotated
-U8G2_SSD1327_EA_W128128_F_HW_I2C u8g2(U8G2_R0, /* reset=*/ U8X8_PIN_NONE);
+U8G2_SSD1327_EA_W128128_F_HW_I2C u8g2(U8G2_R0, U8X8_PIN_NONE, U8X8_PIN_NONE, U8X8_PIN_NONE);
 #endif
 
 void setup() {
@@ -99,7 +99,11 @@ void setup() {
     ssd1327Power(true);
     ssd1327Fill(TEXT_BACKGROUND);
 #else
-    u8g2.begin();
+    //u8g2.setBusClock(CLOCK_SPEED_100KHZ);
+    //u8g2.setI2CAddress(0x3c);
+    u8g2.beginSimple();
+    //u8g2.clearDisplay();
+    //u8g2.setPowerSave(0);
 #endif
 
     Time.zone(-8.0);
