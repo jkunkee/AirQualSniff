@@ -14,7 +14,12 @@
 #include "SparkFun_SGP30_Arduino_Library.h"
 
 // This #include statement was automatically added by the Particle IDE.
+#define OLD_DISPLAY 1
+#if OLD_DISPLAY
 #include "ssd1327.h"
+#else
+#include "U8g2lib.h"
+#endif
 
 // This #include statement was automatically added by the Particle IDE.
 #include <SparkFun_LPS25HB_Arduino_Library.h>
@@ -46,8 +51,11 @@ bool pmSensorPresent;
 
 PhotonVBAT vbat(A0);
 
-//Adafruit_SSD1327 display(128, 128, &Wire, -1, 400000, 400000);
-//U8G2_SSD1327_EA_W128128_1_HW_I2C u8g2(U8G2_R0, /* reset=*/ U8X8_PIN_NONE);
+#if OLD_DISPLAY
+#else
+// FUll U8G2, SSD1327 controller, EA_128128 display, full framebuffer, First Arduino Hardware I2C, not rotated
+U8G2_SSD1327_EA_W128128_F_HW_I2C u8g2(U8G2_R0, /* reset=*/ U8X8_PIN_NONE);
+#endif
 
 void setup() {
     Wire.begin();
@@ -85,11 +93,14 @@ void setup() {
         pmSensor.start_measuring(SPS30_FORMAT_UINT16);
     }
 
+#if OLD_DISPLAY
     // int iType, int iAddr, int bFlip, int bInvert, int iSDAPin, int iSCLPin, int32_t iSpeed
     ssd1327Init(OLED_128x128, 0x3c, 0, 0, -1, -1, 100000L);
     ssd1327Power(true);
     ssd1327Fill(TEXT_BACKGROUND);
-    //display.begin();
+#else
+    u8g2.begin();
+#endif
 
     Time.zone(-8.0);
     Time.setDSTOffset(+1.0);
@@ -127,11 +138,22 @@ float pressure_to_est_altitude(float pressurehPa) {
 
 #define C_TO_F(C) ((C) * 9.0 / 5.0 + 32)
 
+#if OLD_DISPLAY
 // uint8_t x, uint8_t y, char *szMsg, uint8_t iSize, int ucFGColor, int ucBGColor
 #define PRINTLN(cstr) ssd1327WriteString(0, 0+(lineNo++)*(TEXT_HEIGHT+TEXT_LINE_SPACING), cstr, FONT_SMALL, TEXT_FOREGROUND, TEXT_BACKGROUND);
+#else
+//#define PRINTLN(cstr) u8g2.print(cstr);
+#define PRINTLN(cstr)
+#endif
 
 void loop() {
     static bool ledState = false;
+
+#if OLD_DISPLAY
+#else
+    //u8g2.clearBuffer();
+    //u8g2.home();
+#endif
 
     int lineNo = 0;
 
@@ -351,9 +373,13 @@ void loop() {
     // Since the SSD1327 requires a type byte first and pixels are 4 bits, this means we can only send 62-pixel chunks at a time.
     // This library already splits the transmission per y value, so it's just the x value that is limited.
     unsigned long drawStart = millis();
+#if OLD_DISPLAY
     ssd1327ShowBitmap(NULL, 0, 0, 0, 62, 128);
     ssd1327ShowBitmap(NULL, 0, 62, 0, 62, 128);
     ssd1327ShowBitmap(NULL, 0, 124, 0, 4, 128);
+#else
+    //u8g2.updateDisplayArea(0, 0, u8g2.getBufferTileWidth()-1, u8g2.getBufferTileHeight()-1);
+#endif
     unsigned long drawTime = millis() - drawStart;
     if (drawTime < 1000) {
         delay(1000 - drawTime);
