@@ -16,6 +16,7 @@ typedef struct _DeltaClockEntry {
 class DeltaClock {
 public:
     DeltaClock();
+    void begin();
     void update();
     void insert(DeltaClockEntry* entry);
 private:

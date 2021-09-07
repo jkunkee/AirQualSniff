@@ -3,6 +3,8 @@
 
 DeltaClock::DeltaClock() : head(NULL), lastUpdate(0) {}
 
+void DeltaClock::begin() {}
+
 void DeltaClock::update() {
     // Establish amount of time passed, accounting for millis() rollover
     unsigned long now = millis();

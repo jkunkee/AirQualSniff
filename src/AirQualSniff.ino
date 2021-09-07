@@ -1,5 +1,6 @@
-// This #include statement was automatically added by the Particle IDE.
+
 #include "decimator.h"
+#include "DeltaClock.h"
 
 // This #include statement was automatically added by the Particle IDE.
 #include <photon-vbat.h>
@@ -29,6 +30,8 @@ static const int LED = D7;
 #define TEXT_BACKGROUND 0x0
 #define TEXT_HEIGHT 8
 #define TEXT_LINE_SPACING 1
+
+DeltaClock deltaClock;
 
 LPS25HB pressureSensor;
 bool pressureSensorPresent;
@@ -63,7 +66,21 @@ PhotonVBAT vbat(A0);
 U8G2_SSD1327_EA_W128128_F_HW_I2C u8g2(U8G2_R0, U8X8_PIN_NONE, U8X8_PIN_NONE, U8X8_PIN_NONE);
 #endif
 
+void BlinkActionFunc(void) {
+    static bool ledState = false;
+    ledState = !ledState;
+    digitalWrite(LED, ledState ? HIGH : LOW);
+}
+
+DeltaClockEntry BlinkAction = { 0 };
+
 void setup() {
+    deltaClock.begin();
+    BlinkAction.action = &BlinkActionFunc;
+    BlinkAction.interval = 1000;
+    BlinkAction.repeating = true;
+    deltaClock.insert(&BlinkAction);
+
     Wire.begin();
     Wire.setSpeed(CLOCK_SPEED_100KHZ); // SPS30 only supports 100KHz
 
@@ -157,7 +174,7 @@ float pressure_to_est_altitude(float pressurehPa) {
 #endif
 
 void loop() {
-    static bool ledState = false;
+    deltaClock.update();
 
 #if OLD_DISPLAY
 #else
@@ -166,9 +183,6 @@ void loop() {
 #endif
 
     int lineNo = 0;
-
-    //ledState = !ledState;
-    digitalWrite(LED, ledState ? HIGH : LOW);
 
     // Measured values from LPS25HB (pressure sensor)
     float pressurehPa;
