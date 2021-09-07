@@ -2,3 +2,7 @@
 AirQualSniff.cpp
 *.bin
 examples
+# Workbench requires libraries to be installed locally for autocompletion and local build
+SparkFun_SCD30_Arduino_Library
+SparkFun_LPS25HB_Arduino_Library
+photon-vbat
