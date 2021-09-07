@@ -1,7 +1,12 @@
 .vscode
+# Build system intermediate (Wiring preprocessor output)
 AirQualSniff.cpp
+# Cloud Build output
 *.bin
+# Make it easier to check in libraries
 examples
+# local build folder
+target
 # Workbench requires libraries to be installed locally for autocompletion and local build
 SparkFun_SCD30_Arduino_Library
 SparkFun_LPS25HB_Arduino_Library
