@@ -35,7 +35,7 @@ static const int LED = D7;
 DeltaClock deltaClock;
 
 LPS25HB pressureSensor;
-bool pressureSensorPresent;
+bool pressureSensorPresent = false;
 // Device returns 83.2 deg F, TemporalScanner returns 80.3
 // Offset is added
 // 70 deg F in actively cooled airstream was -5 deg F
@@ -43,13 +43,13 @@ const float pressureSensorTempFOffset = 80.3 - 83.2; // actual - measured
 
 // https://github.com/sparkfun/SparkFun_SGP30_Arduino_Library/tree/main/src
 SGP30 vocSensor;
-bool vocSensorPresent;
+bool vocSensorPresent = false;
 const int VOC_START_DELAY_MILLIS = 15*1000;
-unsigned long vocSensorInitStart;
-bool vocSensorInitDone;
+unsigned long vocSensorInitStart = 0;
+bool vocSensorInitDone = false;
 
 SCD30 co2Sensor;
-bool co2SensorPresent;
+bool co2SensorPresent = false;
 // Device returns 79.0 deg F, TemporalScanner returns 80.1
 // Offset is added
 // 70 deg F in actively cooled airstream was -1 deg F
@@ -57,7 +57,7 @@ const float co2SensorTempFOffset = 80.1 - 79.0;
 Decimator co2Decimator(3, 3, 3);
 
 SPS30 pmSensor;
-bool pmSensorPresent;
+bool pmSensorPresent = false;
 
 PhotonVBAT vbat(A0);
 
@@ -171,7 +171,7 @@ void loop() {
     static float tempC_SCD30;
     static uint16_t co2ppm;
     // Calculated values from SCD30
-    float tempOffsetC_SCD30;
+    float tempOffsetC_SCD30; // TODO: figure out difference between input air and sensor temps as input for SCD30 correction
 
     // Composite calculated value
     uint16_t absoluteHumidity_g_m3_8_8 = 0xF80; // default value in SGP30
@@ -180,8 +180,8 @@ void loop() {
     SPS30_DATA_INT pmData;
     
     // Measured values from SGP30 (VOC sensor)
-    uint16_t TVOCppb;
-    uint16_t eCO2ppm;
+    uint16_t TVOCppb = 0;
+    uint16_t eCO2ppm = 0;
 
     PRINTLN("Air Quality Sniffer"); // 1
 
