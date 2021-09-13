@@ -8,8 +8,8 @@ typedef void (*DeltaClockAction)(void);
 typedef struct _DeltaClockEntry {
     DeltaClockAction action;
     unsigned long interval;
-    unsigned long remaining;
     boolean repeating;
+    unsigned long remaining;
     struct _DeltaClockEntry* next;
 } DeltaClockEntry;
 
