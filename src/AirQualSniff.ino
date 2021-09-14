@@ -75,45 +75,12 @@ void BlinkActionFunc(void) {
 
 DeltaClockEntry BlinkAction = { 0 };
 
-#define TEST_DELTACLOCK 1
-#if TEST_DELTACLOCK
-void TestOne(void) {
-    Serial.println("One");
-}
-void TestTwo(void) {
-    Serial.println("Two");
-}
-void TestThree(void) {
-    Serial.println("Three");
-}
-DeltaClockEntry One = {
-    &TestOne,
-    1000,
-    false,
-};
-DeltaClockEntry Two = {
-    &TestTwo,
-    1000,
-    false,
-};
-DeltaClockEntry Three = {
-    &TestThree,
-    1000,
-    false,
-};
-#endif
-
 void setup() {
     deltaClock.begin();
     BlinkAction.action = &BlinkActionFunc;
     BlinkAction.interval = 1000;
     BlinkAction.repeating = true;
     deltaClock.insert(&BlinkAction);
-#if TEST_DELTACLOCK
-    deltaClock.insert(&One);
-    deltaClock.insert(&Two);
-    deltaClock.insert(&Three);
-#endif
 
     Wire.begin();
     Wire.setSpeed(CLOCK_SPEED_100KHZ); // SPS30 only supports 100KHz

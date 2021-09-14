@@ -3,6 +3,8 @@
 
 #include <Arduino.h>
 
+//#define DC_TEST 1
+
 typedef void (*DeltaClockAction)(void);
 
 typedef struct _DeltaClockEntry {
@@ -17,9 +19,19 @@ class DeltaClock {
 public:
     DeltaClock();
     void begin();
+    // mark the passage of time, call expired events, and requeue repeating events
     void update();
+    // insert a new entry into the delta clock
+    // This follows a FIFO pattern: if two events are queued that expire at the same time,
+    // the first event happens first.
+    // If an entry expires multiple times, it will run the expected number of times all at once.
     void insert(DeltaClockEntry* entry);
+    // dequeue all events
+    void clear();
 private:
     DeltaClockEntry* head;
     unsigned long lastUpdate;
+#if DC_TEST
+    void printToSerial();
+#endif
 };
