@@ -271,7 +271,7 @@ void loop() {
         if (sgperr == SGP30_SUCCESS) {
             val = "H2:";
             val += String(vocSensor.H2, HEX);
-            val += " CH4:";
+            val += " C2H6O:";
             val += String(vocSensor.ethanol, HEX);
             PRINTLN(val.c_str()); // 7
         } else {
