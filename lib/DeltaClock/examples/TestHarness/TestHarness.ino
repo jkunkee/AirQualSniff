@@ -9,15 +9,6 @@
 
 DeltaClock deltaClock;
 
-void TestOne(void) {
-    Serial.println(__func__);
-}
-void TestTwo(void) {
-    Serial.println(__func__);
-}
-void TestThree(void) {
-    Serial.println(__func__);
-}
 void TestRepOne(void) {
     static int calls = 1;
     Serial.printlnf("%s: %d calls so far", __func__, calls++);
@@ -27,17 +18,17 @@ void TestRepTwo(void) {
     Serial.printlnf("%s: %d calls so far", __func__, calls++);
 }
 DeltaClockEntry One = {
-    &TestOne,
+    [] (void) { Serial.println("One"); },
     10,
     false,
 };
 DeltaClockEntry Two = {
-    &TestTwo,
+    [] (void) { Serial.println("Two"); },
     10,
     false,
 };
 DeltaClockEntry Three = {
-    &TestThree,
+    [] (void) { Serial.println("Three"); },
     20,
     false,
 };
