@@ -75,6 +75,66 @@ void BlinkActionFunc(void) {
 
 DeltaClockEntry BlinkAction = { 0 };
 
+// Data Collection Strategy
+//
+// What am I measuring?
+// * barometric pressure
+// * ambient temperature x2
+// * CO2 concentration
+// * tVOC concentration
+// * non-normalized H2 concentration
+// * non-normalized C2H6O concentration
+// * relative humidity
+//
+// What measurements depend on what others?
+// * tVOC, H2, and C2H6O depend on temperature, relative humidity and barometric pressure
+// * CO2 depends on barometric pressure
+//
+// How often can I measure what?
+// * barometric pressure - piezoelectric, 1, 7, 12.5, 25 Hz
+//     averaging can help reduce LPS25HB RMS noise from 0.15 hPa to 0.008 hPa
+// * ambient temperature x2
+//     LPS25HB temp is described the same way as the pressure sensor, but no FIFO.
+//      +/- 2 deg C accuracy across range, wow...
+//     SCD30 tau-63 is >2s
+// * CO2 concentration
+//     SCD30 tau-63 is 20s
+// * tVOC concentration
+// * non-normalized H2 concentration and non-normalized C2H6O concentration
+//     SGP30 can put out 40 Hz samples of H2/C2H6O, but tVOC/eCO2 is 1 Hz
+// * relative humidity
+//     SCD30 tau-63 is 8s
+//
+// How often shall I measure what?
+// https://www.pmel.noaa.gov/ocs/sampling-rates
+// * barometric pressure - every 10 min, take 2 min of 1 Hz samples
+// * ambient temperature - every 10 min, take 2 min of 2 Hz samples
+// * CO2 concentration - ALL GASSES - every 3 hours take 30 sec of 2 Hz samples
+// * tVOC concentration
+// * non-normalized H2 concentration
+// * non-normalized C2H6O concentration
+// * relative humidity - every 10 min, take 2 min of 1 Hz samples
+// My Own SWAG
+// I'm mostly interested in detecting and displaying changes in the weather
+// as they happen. This means I want to sample frequently enough to catch
+// the fastest changes, not necessarily as fast as the device can sample.
+// * barometric pressure
+//   https://sciencing.com/2-types-barometers-8524023.html
+//   range 32.01 in-Hg (Agata, Siberia, 1968) to 25.9 in-Hg (Pacific Ocean, 1979)
+//   "rapid" is .18 in-Hg per 3 h
+//   "slow" is .003 to .04 in-Hg per 3 h
+//   "steady" is <.003 in-Hg per 3 h
+// * ambient temperature
+//   world record change speed is +49 deg F in 2 min (Spearfish, SD)
+//   this swings daily
+//   I want to capture anything bigger than 0.5 deg C in, say, 5 min?
+//   USCRN https://www.ncdc.noaa.gov/crn/measurements.html#temp
+//   0.5 Hz samples -> 5 min avg -> hourly stats
+// * gas concentrations
+//   Breathing on it should produce a visible change, but most of the sensors are fairly slow
+//   SGP30 datasheet 1.1 says 0.3-30 ppm C2H6O and 0.5-3ppm H2 are expected indoor air quality ranges
+//
+
 void setup() {
     deltaClock.begin();
     BlinkAction.action = &BlinkActionFunc;
