@@ -1,8 +1,31 @@
 # AirQualSniff
 
-A Particle project named AirQualSniff
+Have you ever wondered what you're breathing?
 
-## Welcome to your project!
+I have, and this project aims to answer that question--at least in part.
+
+At it's core, it:
+
+1. Gathers data from various instruments
+2. Applies corrective factors and computes further useful data
+3. Displays it all locally
+4. Records and displays it all in the cloud
+
+I can think to myself, "What the habeas gaseous?!" then look down at my battery of sensors and get an idea of the answer.
+
+For various and mostly frivolous reasons, this project targets the Particle Photon microcontroller and a bevy of Sparkfun sensor breakout boards. More information on the bill of materials, wiring topology, and hardware design rationale can be found on the [Hackaday.io project page](https://hackaday.io/project/181918-airqualsniff).
+
+## Building
+
+### Compiling your project
+
+When you're ready to compile your project, make sure you have the correct Particle device target selected and run `particle compile <platform>` in the CLI or click the Compile button in the Desktop IDE. The following files in your project folder will be sent to the compile service:
+
+- Everything in the `/src` folder, including your `.ino` application file
+- The `project.properties` file for your project
+- Any libraries stored under `lib/<libraryname>/src`
+
+## Source File Structure
 
 Every new Particle project is composed of 3 important elements that you'll see have been created in your project directory for AirQualSniff.
 
@@ -26,10 +49,16 @@ If you would like add additional files to your application, they should be added
 #### Projects with external libraries
 If your project includes a library that has not been registered in the Particle libraries system, you should create a new folder named `/lib/<libraryname>/src` under `/<project dir>` and add the `.h`, `.cpp` & `library.properties` files for your library there. Read the [Firmware Libraries guide](https://docs.particle.io/guide/tools-and-features/libraries/) for more details on how to develop libraries. Note that all contents of the `/lib` folder and subfolders will also be sent to the Cloud for compilation.
 
-## Compiling your project
+### Modules
 
-When you're ready to compile your project, make sure you have the correct Particle device target selected and run `particle compile <platform>` in the CLI or click the Compile button in the Desktop IDE. The following files in your project folder will be sent to the compile service:
+## Code Structure
 
-- Everything in the `/src` folder, including your `.ino` application file
-- The `project.properties` file for your project
-- Any libraries stored under `lib/<libraryname>/src`
+### Data flow
+
+## Cloud Infrastructure
+
+### Fundamentals
+
+### Data Flow
+
+### Data Display
