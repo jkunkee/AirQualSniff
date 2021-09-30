@@ -55,6 +55,16 @@ If your project includes a library that has not been registered in the Particle 
 
 ### Data flow
 
+Each sensor produces data at some frequency. Some sensors require inputs from other sensors to provide more accurate values.
+
+These data are consumed a few different ways:
+
+1. Local display of the most recent value
+2. Local display of recent history
+3. Periodic summaries for remote storage and display
+
+This suggests an overall event-driven architecture might work well.
+
 ## Cloud Infrastructure
 
 ### Fundamentals
