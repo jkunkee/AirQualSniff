@@ -15,6 +15,9 @@
 // This #include statement was automatically added by the Particle IDE.
 #include "SparkFun_SGP30_Arduino_Library.h"
 
+// Split application execution into its own thread
+SYSTEM_MODE(AUTOMATIC);
+
 // This #include statement was automatically added by the Particle IDE.
 #define OLD_DISPLAY 1
 #if OLD_DISPLAY
