@@ -3,7 +3,7 @@
 
 #include <Arduino.h>
 
-//#define DC_TEST 1
+//#define DC_TEST
 
 typedef void (*DeltaClockAction)(void);
 
@@ -31,7 +31,7 @@ public:
 private:
     DeltaClockEntry* head;
     unsigned long lastUpdate;
-#if DC_TEST
+#ifdef DC_TEST
     void printToSerial();
 #endif
 };
