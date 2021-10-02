@@ -27,6 +27,8 @@
 #include <SparkFun_LPS25HB_Arduino_Library.h>
 
 #include <SparkFun_I2C_Mux_Arduino_Library.h>
+#include <SparkFun_Qwiic_Humidity_AHT20.h>
+#include <SparkFun_Qwiic_Joystick_Arduino_Library.h>
 
 // Split application execution into its own thread
 SYSTEM_MODE(AUTOMATIC);
@@ -53,6 +55,10 @@ bool pressureSensorPresent = false;
 // 70 deg F in actively cooled airstream was -5 deg F
 const float pressureSensorTempFOffset = 80.3 - 83.2; // actual - measured
 
+AHT20 humiditySensor;
+bool humiditySensorPresent = false;
+const float humiditySensorTempOffset = 0.0;
+
 // https://github.com/sparkfun/SparkFun_SGP30_Arduino_Library/tree/main/src
 SGP30 vocSensor;
 bool vocSensorPresent = false;
@@ -71,6 +77,9 @@ Decimator co2Decimator(3, 3, 3);
 SPS30 pmSensor;
 bool pmSensorPresent = false;
 const uint8_t PM_MUX_PORT = 7;
+
+JOYSTICK joystick;
+bool joystickPresent = false;
 
 PhotonVBAT vbat(A0);
 
@@ -176,6 +185,8 @@ void setup() {
         i2cMux.disablePort(SCREEN_MUX_PORT);
     }
 
+    joystickPresent = joystick.begin();
+
     pressureSensorPresent = pressureSensor.begin();
 
     co2SensorPresent = co2Sensor.begin();
@@ -183,6 +194,8 @@ void setup() {
         co2Sensor.setAutoSelfCalibration(true);
         co2Sensor.setMeasurementInterval(5);
     }
+
+    humiditySensorPresent = humiditySensor.begin();
 
     vocSensorPresent = vocSensor.begin();
     if (vocSensorPresent != false)
@@ -286,7 +299,23 @@ void loop() {
 
     PRINTLN("Air Quality Sniffer"); // 1
 
-    PRINTLN("02"); // 2
+    if (joystickPresent) {
+        uint16_t x = joystick.getHorizontal();
+        uint16_t y = joystick.getVertical();
+        byte button = joystick.checkButton();
+        String val;
+        val += "joy:";
+        val += "x=";
+        val += x;
+        val += ",y=";
+        val += y;
+        val += "b=";
+        val += button;
+        val += "         ";
+        PRINTLN(val.c_str()); // 2
+    } else {
+        PRINTLN("Joystick not found"); // 2
+    }
 
     if (pressureSensorPresent != false) {
         tempC = tempC_LPS25HB = pressureSensor.getTemperature_degC() + pressureSensorTempFOffset * 5 / 9;
@@ -339,6 +368,21 @@ void loop() {
 
     if (pressureSensorPresent != false && co2SensorPresent != false) {
         absoluteHumidity_g_m3_8_8 = atmospherics::rel_to_abs_humidity(tempC_LPS25HB, pressurehPa, relativeHumidityPercent);
+    }
+
+    if (humiditySensorPresent != false) {
+        humiditySensor.triggerMeasurement();
+        String val;
+        val += "hum:h=";
+        val += String(humiditySensor.getHumidity(), 0);
+        val += ",T=";
+        val += String(humiditySensor.getTemperature(), 0);
+        val += ",s=";
+        val += humiditySensor.getStatus();
+        val += humiditySensor.isCalibrated() ? ",c" : ",nc";
+        PRINTLN(val.c_str()); // ?
+    } else {
+        PRINTLN("AHT20 not found"); // ?
     }
 
     if (vocSensorPresent != false) {
@@ -479,9 +523,9 @@ void loop() {
     Serial.printlnf("scd: %0.3fF lps: %0.3fF CPU: %0.3fF", C_TO_F(tempC_SCD30), C_TO_F(tempC_LPS25HB), C_TO_F(vbat.readTempC()));
     Serial.printlnf("rH: %0.1f Pressure: %0.3fhPa", relativeHumidityPercent, pressurehPa);
 
-    lineNo = 12;
+    //lineNo = 12;
 
-    PRINTLN("Bld " __DATE__); // 13
+    //PRINTLN("Bld " __DATE__); // 13
     PRINTLN("Bld " __TIME__); // 14
 
     //Particle.publish("operating", NULL, 60, PRIVATE);
