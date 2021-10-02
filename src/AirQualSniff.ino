@@ -26,6 +26,8 @@
 // This #include statement was automatically added by the Particle IDE.
 #include <SparkFun_LPS25HB_Arduino_Library.h>
 
+#include <SparkFun_I2C_Mux_Arduino_Library.h>
+
 // Split application execution into its own thread
 SYSTEM_MODE(AUTOMATIC);
 
@@ -36,6 +38,13 @@ static const int LED = D7;
 #define TEXT_LINE_SPACING 1
 
 DeltaClock deltaClock;
+
+QWIICMUX i2cMux;
+bool i2cMuxPresent = false;
+
+// TODO: get the SPS30 and SSD1327 to play nice
+#define I2C_DEFAULT_SPEED CLOCK_SPEED_100KHZ
+#define I2C_SAFE_SPEED    CLOCK_SPEED_100KHZ
 
 LPS25HB pressureSensor;
 bool pressureSensorPresent = false;
@@ -61,6 +70,7 @@ Decimator co2Decimator(3, 3, 3);
 
 SPS30 pmSensor;
 bool pmSensorPresent = false;
+const uint8_t PM_MUX_PORT = 7;
 
 PhotonVBAT vbat(A0);
 
@@ -146,9 +156,25 @@ void setup() {
     deltaClock.insert(&BlinkAction);
 
     Wire.begin();
-    Wire.setSpeed(CLOCK_SPEED_100KHZ); // SPS30 only supports 100KHz
+    Wire.setSpeed(I2C_SAFE_SPEED);
 
     Serial.begin(115200);
+
+    i2cMuxPresent = i2cMux.begin();
+    if (i2cMuxPresent) {
+        i2cMux.setPortState(0
+            |0x1 // C02
+            |0x2 // Screen
+            //|0x4 // nc
+            //|0x8 // nc
+            |0x10 // AHT20/Humidity, LPS25Hb/Pressure
+            //|0x20 // nc
+            |0x40 // SGP30/VOC, joystick
+            //|0x80 // SCD30/PM
+            );
+        i2cMux.disablePort(PM_MUX_PORT);
+        i2cMux.disablePort(SCREEN_MUX_PORT);
+    }
 
     pressureSensorPresent = pressureSensor.begin();
 
@@ -166,7 +192,13 @@ void setup() {
         vocSensorInitDone = false;
         vocSensorInitStart = millis();
     }
-    
+
+    if (i2cMuxPresent) {
+        // Slow down I2C
+        Wire.setSpeed(I2C_SAFE_SPEED); // SPS30 only supports 100KHz
+        // Enable I2C mux
+        i2cMux.enablePort(PM_MUX_PORT);
+    }
     pmSensorPresent = pmSensor.begin();
     if (pmSensorPresent != false) {
         pmSensor.wake();
@@ -179,10 +211,16 @@ void setup() {
         }
         pmSensor.start_measuring(SPS30_FORMAT_UINT16);
     }
+    if (i2cMuxPresent) {
+        // Disable I2C mux
+        i2cMux.disablePort(PM_MUX_PORT);
+        // Speed up I2C
+        Wire.setSpeed(I2C_DEFAULT_SPEED); // Display really needs 400KHz
+    }
 
 #if OLD_DISPLAY
     // int iType, int iAddr, int bFlip, int bInvert, int iSDAPin, int iSCLPin, int32_t iSpeed
-    ssd1327Init(OLED_128x128, 0x3c, 0, 0, -1, -1, 100000L);
+    ssd1327Init(OLED_128x128, 0x3c, 0, 0, -1, -1, I2C_DEFAULT_SPEED);
     ssd1327Power(true);
     ssd1327Fill(TEXT_BACKGROUND);
 #else
@@ -368,6 +406,12 @@ void loop() {
     PRINTLN(decVal.c_str());
     Serial.println(decVal.c_str());
 
+    if (i2cMuxPresent) {
+        // Slow down I2C
+        Wire.setSpeed(I2C_SAFE_SPEED);
+        // Enable I2C mux
+        i2cMux.enablePort(PM_MUX_PORT);
+    }
     if (pmSensorPresent != false && pmSensor.is_data_ready() == SPS30_OK) {
         pmSensor.read_data_no_wait_int(&pmData);
         String val;
@@ -396,7 +440,22 @@ void loop() {
         PRINTLN(val.c_str()); // 10
     } else {
         PRINTLN("pm not present");
-        PRINTLN("10");
+        String val;
+        val += "10 ";
+        val += pmSensor.device_status;
+        val += " ";
+        val += pmSensor.firmware_version[0];
+        val += ".";
+        val += pmSensor.firmware_version[1];
+        val += " ";
+        val += pmSensor.is_data_ready();
+        PRINTLN(val.c_str());
+    }
+    if (i2cMuxPresent) {
+        // Disable I2C mux
+        i2cMux.disablePort(PM_MUX_PORT);
+        // Speed up I2C
+        Wire.setSpeed(I2C_DEFAULT_SPEED);
     }
 
     if (Time.isValid()) {
