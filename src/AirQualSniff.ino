@@ -142,7 +142,7 @@ DeltaClockEntry BlinkAction = { 0 };
 // the fastest changes, not necessarily as fast as the device can sample.
 // * barometric pressure
 //   https://sciencing.com/2-types-barometers-8524023.html
-//   range 32.01 in-Hg (Agata, Siberia, 1968) to 25.9 in-Hg (Pacific Ocean, 1979)
+//   range 32.01 in-Hg (Agata, Siberia, 1968) to 25.9 in-Hg (Pacific Ocean, 1979) (B.S.)
 //   "rapid" is .18 in-Hg per 3 h
 //   "slow" is .003 to .04 in-Hg per 3 h
 //   "steady" is <.003 in-Hg per 3 h
@@ -176,13 +176,12 @@ void setup() {
             |0x2 // Screen
             //|0x4 // nc
             //|0x8 // nc
-            |0x10 // AHT20/Humidity, LPS25Hb/Pressure
+            |0x10 // AHT20/Humidity, LPS25HB/Pressure
             //|0x20 // nc
             |0x40 // SGP30/VOC, joystick
             //|0x80 // SCD30/PM
             );
         i2cMux.disablePort(PM_MUX_PORT);
-        i2cMux.disablePort(SCREEN_MUX_PORT);
     }
 
     joystickPresent = joystick.begin();
@@ -237,7 +236,7 @@ void setup() {
     ssd1327Power(true);
     ssd1327Fill(TEXT_BACKGROUND);
 #else
-    //u8g2.setBusClock(CLOCK_SPEED_100KHZ);
+    //u8g2.setBusClock(I2C_DEFAULT_SPEED);
     //u8g2.setI2CAddress(0x3c);
     u8g2.beginSimple();
     //u8g2.clearDisplay();
@@ -483,7 +482,7 @@ void loop() {
         val += "            ";
         PRINTLN(val.c_str()); // 10
     } else {
-        PRINTLN("pm not present");
+        PRINTLN("pm not present"); // 9
         String val;
         val += "10 ";
         val += pmSensor.device_status;
@@ -493,7 +492,7 @@ void loop() {
         val += pmSensor.firmware_version[1];
         val += " ";
         val += pmSensor.is_data_ready();
-        PRINTLN(val.c_str());
+        PRINTLN(val.c_str()); // 10
     }
     if (i2cMuxPresent) {
         // Disable I2C mux
