@@ -4,7 +4,7 @@
 DeltaClock::DeltaClock() : head(NULL), lastUpdate(0) {}
 
 void DeltaClock::begin() {
-#if DC_TEST
+#ifdef DC_TEST
     Serial.begin();
     printToSerial();
 #endif
@@ -21,7 +21,7 @@ void DeltaClock::update() {
     } else {
         delta = now - lastUpdate;
     }
-#if DC_TEST
+#ifdef DC_TEST
     Serial.printf("Update delta: %d... ", delta);
 #endif
     // Update entries
@@ -46,7 +46,7 @@ void DeltaClock::update() {
         }
     }
     lastUpdate = now;
-#if DC_TEST
+#ifdef DC_TEST
     Serial.printf("Update complete. ");
     printToSerial();
 #endif
@@ -54,7 +54,7 @@ void DeltaClock::update() {
 
 void DeltaClock::insert(DeltaClockEntry* entry) {
     if (entry == NULL || entry->action == NULL || entry->interval == 0) {
-#if DC_TEST
+#ifdef DC_TEST
     Serial.printf("Insertion failed, bad argument(s). ");
 #endif
         return;
@@ -96,7 +96,7 @@ void DeltaClock::insert(DeltaClockEntry* entry) {
     }
 
 cleanup:
-#if DC_TEST
+#ifdef DC_TEST
     Serial.printf("Insertion complete. ");
     printToSerial();
 #endif
@@ -107,7 +107,7 @@ void DeltaClock::clear() {
     head = NULL;
 }
 
-#if DC_TEST
+#ifdef DC_TEST
 void printEntry(DeltaClockEntry* entry) {
     Serial.printf("this: %p ", entry);
     if (entry != NULL) {
