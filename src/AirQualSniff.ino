@@ -44,8 +44,7 @@ DeltaClock deltaClock;
 QWIICMUX i2cMux;
 bool i2cMuxPresent = false;
 
-// TODO: get the SPS30 and SSD1327 to play nice
-#define I2C_DEFAULT_SPEED CLOCK_SPEED_100KHZ
+#define I2C_DEFAULT_SPEED CLOCK_SPEED_400KHZ
 #define I2C_SAFE_SPEED    CLOCK_SPEED_100KHZ
 
 LPS25HB pressureSensor;
@@ -164,8 +163,10 @@ void setup() {
     BlinkAction.repeating = true;
     deltaClock.insert(&BlinkAction);
 
-    Wire.begin();
+    // setSpeed must be before begin()
+    // https://docs.staging.particle.io/cards/firmware/wire-i2c/setspeed/
     Wire.setSpeed(I2C_SAFE_SPEED);
+    Wire.begin();
 
     Serial.begin(115200);
 
@@ -207,7 +208,9 @@ void setup() {
 
     if (i2cMuxPresent) {
         // Slow down I2C
+        Wire.end();
         Wire.setSpeed(I2C_SAFE_SPEED); // SPS30 only supports 100KHz
+        Wire.begin();
         // Enable I2C mux
         i2cMux.enablePort(PM_MUX_PORT);
     }
@@ -227,7 +230,9 @@ void setup() {
         // Disable I2C mux
         i2cMux.disablePort(PM_MUX_PORT);
         // Speed up I2C
+        Wire.end();
         Wire.setSpeed(I2C_DEFAULT_SPEED); // Display really needs 400KHz
+        Wire.begin();
     }
 
 #if OLD_DISPLAY
@@ -451,7 +456,9 @@ void loop() {
 
     if (i2cMuxPresent) {
         // Slow down I2C
+        Wire.end();
         Wire.setSpeed(I2C_SAFE_SPEED);
+        Wire.begin();
         // Enable I2C mux
         i2cMux.enablePort(PM_MUX_PORT);
     }
@@ -498,7 +505,9 @@ void loop() {
         // Disable I2C mux
         i2cMux.disablePort(PM_MUX_PORT);
         // Speed up I2C
+        Wire.end();
         Wire.setSpeed(I2C_DEFAULT_SPEED);
+        Wire.begin();
     }
 
     if (Time.isValid()) {
