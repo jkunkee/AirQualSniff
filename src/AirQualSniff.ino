@@ -174,15 +174,14 @@ void setup() {
     if (i2cMuxPresent) {
         i2cMux.setPortState(0
             |0x1 // C02
-            |0x2 // Screen
+            //|0x2 // nc
             //|0x4 // nc
             //|0x8 // nc
-            |0x10 // AHT20/Humidity, LPS25HB/Pressure
+            //|0x10 // nc
             //|0x20 // nc
-            |0x40 // SGP30/VOC, joystick
-            //|0x80 // SCD30/PM
+            //|0x40 // nc
+            |0x80 // SCD30/PM
             );
-        i2cMux.disablePort(PM_MUX_PORT);
     }
 
     joystickPresent = joystick.begin();
@@ -451,6 +450,7 @@ void loop() {
         co2Decimator.coarse.peek(idx, &val);
         decVal += String(val, 0);
     }
+    decVal += "                    "; // ensure line gets blanked
     PRINTLN(decVal.c_str());
     Serial.println(decVal.c_str());
 
