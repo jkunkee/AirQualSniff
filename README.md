@@ -17,7 +17,15 @@ For various and mostly frivolous reasons, this project targets the Particle Phot
 
 ## Building
 
-### Compiling your project
+### Particle Workbench
+
+* Install VS Code
+* Install Particle Workbench
+* Install environment 3.1.0
+* Run `particle install <module>` for each module in `project.properties` (Note that they are masked out in .gitignore)
+* Cloud or local build to your heart's content
+
+### Cloud Compile
 
 When you're ready to compile your project, make sure you have the correct Particle device target selected and run `particle compile <platform>` in the CLI or click the Compile button in the Desktop IDE. The following files in your project folder will be sent to the compile service:
 
@@ -41,8 +49,6 @@ This file is the firmware that will run as the primary application on your Parti
 #### ```project.properties``` file:  
 This is the file that specifies the name and version number of the libraries that your project depends on. Dependencies are added automatically to your `project.properties` file when you add a library to a project using the `particle library add` command in the CLI or add a library in the Desktop IDE.
 
-## Adding additional files to your project
-
 #### Projects with multiple sources
 If you would like add additional files to your application, they should be added to the `/src` folder. All files in the `/src` folder will be sent to the Particle Cloud to produce a compiled binary.
 
@@ -50,6 +56,28 @@ If you would like add additional files to your application, they should be added
 If your project includes a library that has not been registered in the Particle libraries system, you should create a new folder named `/lib/<libraryname>/src` under `/<project dir>` and add the `.h`, `.cpp` & `library.properties` files for your library there. Read the [Firmware Libraries guide](https://docs.particle.io/guide/tools-and-features/libraries/) for more details on how to develop libraries. Note that all contents of the `/lib` folder and subfolders will also be sent to the Cloud for compilation.
 
 ### Modules
+
+#### Atmospherics
+
+Implementation of various useful gas chemistry operations useful for atmospheric analysis, like relative humidity to absolute humidity computation and pressure to altitude estimation.
+
+#### Decimator
+
+Library for storing and decimating time series data. Intended to be easy to read for graphing.
+
+#### Delta Clock
+
+Implementation of an Arduino-friendly DeltaClock, an efficient scheduling data structure and algorithm I learned at university.
+
+#### jkunkee-sps30
+
+Arduino-friendly driver for the SPS30 particulate matter sensor.
+
+#### others
+
+The Sparkfun SGP30, u8g2, and ssd1327 libraries are third-party libraries that are not available through the Particle installer.
+
+ssd1327 has been patched with [a fix for a problem in its address calculation logic](https://github.com/bitbank2/ssd1327/pull/8).
 
 ## Code Structure
 
