@@ -579,6 +579,8 @@ void loop() {
         str += ",v:";
         str += String(vbat.readVBAT(), 2);
         PRINTLN(str.c_str()); // 12
+    } else {
+        PRINTLN("no summary avail"); // 12
     }
     Serial.printlnf("scd: %0.3fF lps: %0.3fF CPU: %0.3fF", C_TO_F(tempC_SCD30), C_TO_F(tempC_LPS25HB), C_TO_F(vbat.readTempC()));
     Serial.printlnf("rH: %0.1f Pressure: %0.3fhPa", relativeHumidityPercent, pressurehPa);
