@@ -116,6 +116,8 @@ void watchdogHandler(void) {
     System.reset(RESET_NO_WAIT);
 }
 
+ApplicationWatchdog *wd = NULL;
+
 // Data Collection Strategy
 //
 // What am I measuring?
@@ -271,6 +273,8 @@ void setup() {
     Time.setDSTOffset(+1.0);
 
     pinMode(LED, OUTPUT);
+
+    wd = new ApplicationWatchdog(3000U, &watchdogHandler);
 }
 
 #if OLD_DISPLAY
@@ -282,6 +286,7 @@ void setup() {
 #endif
 
 void loop() {
+    ApplicationWatchdog::checkin();
     deltaClock.update();
 
 #if OLD_DISPLAY
