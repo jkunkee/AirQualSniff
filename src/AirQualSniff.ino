@@ -585,10 +585,17 @@ void loop() {
     Serial.printlnf("scd: %0.3fF lps: %0.3fF CPU: %0.3fF", C_TO_F(tempC_SCD30), C_TO_F(tempC_LPS25HB), C_TO_F(vbat.readTempC()));
     Serial.printlnf("rH: %0.1f Pressure: %0.3fhPa", relativeHumidityPercent, pressurehPa);
 
-    //lineNo = 12;
-
+    if (joystickPresent) {
+        String str = "joy x=";
+        str += String(joystick.getHorizontal());
+        str += ",y=";
+        str += String(joystick.getVertical());
+        str += "          ";
+        PRINTLN(str.c_str()); // 14
+    } else {
     //PRINTLN("Bld " __DATE__); // 13
     PRINTLN("Bld " __TIME__); // 14
+    }
 
     //Particle.publish("operating", NULL, 60, PRIVATE);
 
