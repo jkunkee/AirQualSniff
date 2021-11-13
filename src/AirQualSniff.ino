@@ -96,6 +96,26 @@ void BlinkActionFunc(void) {
 
 DeltaClockEntry BlinkAction = { 0 };
 
+// To use I2C buffers bigger than 32 bytes, we provide a function for allocating the buffers. Particle-specific.
+// https://docs.staging.particle.io/cards/firmware/wire-i2c/acquirewirebuffer/
+constexpr size_t I2C_BUFFER_SIZE = 512;
+
+HAL_I2C_Config acquireWireBuffer() {
+    HAL_I2C_Config config = {
+        .size = sizeof(HAL_I2C_Config),
+        .version = HAL_I2C_CONFIG_VERSION_1,
+        .rx_buffer = new (std::nothrow) uint8_t[I2C_BUFFER_SIZE],
+        .rx_buffer_size = I2C_BUFFER_SIZE,
+        .tx_buffer = new (std::nothrow) uint8_t[I2C_BUFFER_SIZE],
+        .tx_buffer_size = I2C_BUFFER_SIZE
+    };
+    return config;
+}
+
+void watchdogHandler(void) {
+    System.reset(RESET_NO_WAIT);
+}
+
 // Data Collection Strategy
 //
 // What am I measuring?
@@ -538,14 +558,16 @@ void loop() {
 
     //Particle.publish("operating", NULL, 60, PRIVATE);
 
+    unsigned long drawStart = millis();
+#if OLD_DISPLAY
     // Arduino's Wire library uses 32-byte buffers; anything longer is truncated.
     // Since the SSD1327 requires a type byte first and pixels are 4 bits, this means we can only send 62-pixel chunks at a time.
     // This library already splits the transmission per y value, so it's just the x value that is limited.
-    unsigned long drawStart = millis();
-#if OLD_DISPLAY
-    ssd1327ShowBitmap(NULL, 0, 0, 0, 62, 128);
-    ssd1327ShowBitmap(NULL, 0, 62, 0, 62, 128);
-    ssd1327ShowBitmap(NULL, 0, 124, 0, 4, 128);
+    //ssd1327ShowBitmap(NULL, 0, 0, 0, 62, 128);
+    //ssd1327ShowBitmap(NULL, 0, 62, 0, 62, 128);
+    //ssd1327ShowBitmap(NULL, 0, 124, 0, 4, 128);
+    // Particle provides a mechanism, acquireWireBuffer, for making it larger.
+    ssd1327ShowBitmap(NULL, 0, 0, 0, 128, 128);
 #else
     //u8g2.updateDisplayArea(0, 0, u8g2.getBufferTileWidth()-1, u8g2.getBufferTileHeight()-1);
 #endif
