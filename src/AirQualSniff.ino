@@ -178,6 +178,33 @@ ApplicationWatchdog *wd = NULL;
 //   SGP30 datasheet 1.1 says 0.3-30 ppm C2H6O and 0.5-3ppm H2 are expected indoor air quality ranges
 //
 
+//
+// Data Flow Design
+//
+// Setup
+// 1. Set up hardware (i2c config, device resets, etc.)
+// 2. Schedule initialization routines
+    // a. Initialize data-passing structs (events)
+// 3. Schedule data production routines
+// Loop
+// 1. Crank delta clock
+// 2. Crank event consumers
+// 3. Render resulting state
+//
+// This turns into
+// A bunch of structs to hold sensor events
+// A bunch of functions to schedule to produce sensor events
+// A bunch of 'if's to check for sensor events and process them
+// A bunch of structs to hold processed sensor events
+// A bunch of 'if's to check for processed sensor events and turn them into serial, network, and UI messages
+// A bunch of structs to represent the outputs
+// A bunch of 'if's to take those and process them
+//
+// This could be abstracted to be a bool pointer and a function pointer: if bool, call func.
+// This doesn't allow for marking the event as consumed by multiple consumers.
+// It requires void pointers and recasts to pass around all the different and potentially complex data types.
+//
+
 void setup() {
     deltaClock.begin();
     BlinkAction.action = &BlinkActionFunc;
