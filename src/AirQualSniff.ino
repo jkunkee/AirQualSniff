@@ -31,6 +31,8 @@
 #include <SparkFun_Qwiic_Joystick_Arduino_Library.h>
 
 // Split application execution into its own thread
+SYSTEM_THREAD(ENABLED);
+// Always connect and stay connected
 SYSTEM_MODE(AUTOMATIC);
 
 static const int LED = D7;
