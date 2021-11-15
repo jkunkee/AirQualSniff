@@ -87,7 +87,17 @@ PhotonVBAT vbat(A0);
 #if OLD_DISPLAY
 #else
 // FUll U8G2, SSD1327 controller, EA_128128 display, full framebuffer, First Arduino Hardware I2C, not rotated
-U8G2_SSD1327_EA_W128128_F_HW_I2C u8g2(U8G2_R0, U8X8_PIN_NONE, U8X8_PIN_NONE, U8X8_PIN_NONE);
+// Something about the C++ process causes lockups
+//U8G2_SSD1327_EA_W128128_F_HW_I2C u8g2(U8G2_R0, U8X8_PIN_NONE, U8X8_PIN_NONE, U8X8_PIN_NONE);
+u8g2_t u8g2 = { 0 };
+// Something about u8x8_gpio_and_delay_arduino causes lockups too
+// and I'm not sure why I have to declare it first; Wiring's generated declaration looks right
+uint8_t u8x8_gpio_and_delay_particle(u8x8_t *u8x8, uint8_t msg, uint8_t arg_int, void *arg_ptr);
+uint8_t u8x8_gpio_and_delay_particle(u8x8_t *u8x8, uint8_t msg, uint8_t arg_int, void *arg_ptr)
+{
+    // With hardware I2C and no GPIO interface controls, nothing in this function is useful
+    return 0;
+}
 #endif
 
 void BlinkActionFunc(void) {
@@ -291,11 +301,11 @@ void setup() {
     ssd1327Power(true);
     ssd1327Fill(TEXT_BACKGROUND);
 #else
-    //u8g2.setBusClock(I2C_DEFAULT_SPEED);
-    //u8g2.setI2CAddress(0x3c);
-    u8g2.beginSimple();
-    //u8g2.clearDisplay();
-    //u8g2.setPowerSave(0);
+    u8g2_Setup_ssd1327_i2c_ea_w128128_f(&u8g2, U8G2_R0, u8x8_byte_arduino_hw_i2c, u8x8_gpio_and_delay_particle);
+    u8g2_InitDisplay(&u8g2);
+    u8g2_SetPowerSave(&u8g2, 0);
+    u8g2_ClearBuffer(&u8g2);
+    u8g2_SendBuffer(&u8g2);
 #endif
 
     Time.zone(-8.0);
@@ -320,8 +330,7 @@ void loop() {
 
 #if OLD_DISPLAY
 #else
-    //u8g2.clearBuffer();
-    //u8g2.home();
+    u8g2_ClearBuffer(&u8g2);
 #endif
 
     int lineNo = 0;
@@ -612,7 +621,22 @@ void loop() {
     // Particle provides a mechanism, acquireWireBuffer, for making it larger.
     ssd1327ShowBitmap(NULL, 0, 0, 0, 128, 128);
 #else
-    //u8g2.updateDisplayArea(0, 0, u8g2.getBufferTileWidth()-1, u8g2.getBufferTileHeight()-1);
+    {
+        for (int n = 0; n < 128; n++) {
+            if (n % 5 == 0) {
+                u8g2_DrawPixel(&u8g2, n, 0);
+                u8g2_DrawPixel(&u8g2, 0, n);
+            }
+            if (n % 10 == 0) {
+                u8g2_DrawPixel(&u8g2, n, 1);
+                u8g2_DrawPixel(&u8g2, 1, n);
+            }
+        }
+        u8g2_DrawPixel(&u8g2, 126, 94);
+        u8g2_DrawPixel(&u8g2, 127, 95);
+        u8g2_DrawPixel(&u8g2, 128, 96);
+    }
+    u8g2_SendBuffer(&u8g2);
 #endif
     unsigned long drawTime = millis() - drawStart;
     if (drawTime < 1000) {
