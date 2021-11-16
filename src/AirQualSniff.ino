@@ -600,8 +600,8 @@ void loop() {
         str += "          ";
         PRINTLN(str.c_str()); // 14
     } else {
-    //PRINTLN("Bld " __DATE__); // 13
-    PRINTLN("Bld " __TIME__); // 14
+        //PRINTLN("Bld " __DATE__); // 13
+        PRINTLN("Bld " __TIME__); // 14
     }
 
     //Particle.publish("operating", NULL, 60, PRIVATE);
