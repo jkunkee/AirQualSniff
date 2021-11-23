@@ -608,6 +608,27 @@ void loop() {
     // Particle provides a mechanism, acquireWireBuffer, for making it larger.
     ssd1327ShowBitmap(NULL, 0, 0, 0, 128, 128);
 #else
+    if (joystick.getHorizontal() > 800) {
+        u8g2_ClearBuffer(&u8g2);
+
+        u8g2_uint_t text_x = 48;
+        u8g2_uint_t text_y = 48;
+        u8g2_uint_t text_width;
+
+        u8g2_SetFont(&u8g2, u8g2_font_osb29_tf);
+        u8g2_uint_t text_big_height = 29;
+
+        String numberStr = String(tempF, 0);
+        u8g2_DrawUTF8(&u8g2, text_x, text_y, numberStr.c_str());
+        text_width = u8g2_GetUTF8Width(&u8g2, numberStr.c_str());
+        Serial.printlnf("StrWidth: %u", text_width);
+        u8g2_SetFont(&u8g2, u8g2_font_osb18_tf);
+        u8g2_uint_t text_small_height = 18;
+        String unitStr = "\u00b0""F";
+        u8g2_DrawUTF8(&u8g2, text_x+text_width, text_y-(text_big_height-text_small_height), unitStr.c_str());
+
+        u8g2_SetFont(&u8g2, u8g2_font_nerhoe_tf);
+    }
     {
         for (int n = 0; n < 128; n++) {
             if (n % 5 == 0) {
