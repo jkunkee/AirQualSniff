@@ -16,7 +16,7 @@
 #include "SparkFun_SGP30_Arduino_Library.h"
 
 // This #include statement was automatically added by the Particle IDE.
-#define OLD_DISPLAY 1
+#define OLD_DISPLAY 0
 #if OLD_DISPLAY
 #include "ssd1327.h"
 #else
@@ -300,6 +300,7 @@ void setup() {
     u8g2_Setup_ssd1327_i2c_ws_128x128_f(&u8g2, U8G2_R0, u8x8_byte_arduino_hw_i2c, u8x8_gpio_and_delay_arduino);
     u8g2_InitDisplay(&u8g2);
     u8g2_SetPowerSave(&u8g2, 0);
+    u8g2_SetFont(&u8g2, u8g2_font_nerhoe_tf);
     u8g2_ClearBuffer(&u8g2);
     u8g2_SendBuffer(&u8g2);
 #endif
@@ -316,8 +317,7 @@ void setup() {
 // uint8_t x, uint8_t y, char *szMsg, uint8_t iSize, int ucFGColor, int ucBGColor
 #define PRINTLN(cstr) ssd1327WriteString(0, 0+(lineNo++)*(TEXT_HEIGHT+TEXT_LINE_SPACING), cstr, FONT_SMALL, TEXT_FOREGROUND, TEXT_BACKGROUND);
 #else
-//#define PRINTLN(cstr) u8g2.print(cstr);
-#define PRINTLN(cstr)
+#define PRINTLN(cstr) u8g2_DrawUTF8(&u8g2, 0, 0+(lineNo++)*(TEXT_HEIGHT+TEXT_LINE_SPACING), cstr);
 #endif
 
 void loop() {
