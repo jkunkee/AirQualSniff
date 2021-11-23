@@ -35,7 +35,7 @@ SYSTEM_THREAD(ENABLED);
 // Always connect and stay connected
 SYSTEM_MODE(AUTOMATIC);
 
-static const int LED = D7;
+static constexpr int LED = D7;
 #define TEXT_FOREGROUND 0x4
 #define TEXT_BACKGROUND 0x0
 #define TEXT_HEIGHT 8
@@ -54,16 +54,16 @@ bool pressureSensorPresent = false;
 // Device returns 83.2 deg F, TemporalScanner returns 80.3
 // Offset is added
 // 70 deg F in actively cooled airstream was -5 deg F
-const float pressureSensorTempFOffset = 80.3 - 83.2; // actual - measured
+constexpr float pressureSensorTempFOffset = 80.3 - 83.2; // actual - measured
 
 AHT20 humiditySensor;
 bool humiditySensorPresent = false;
-const float humiditySensorTempOffset = 0.0;
+constexpr float humiditySensorTempOffset = 0.0;
 
 // https://github.com/sparkfun/SparkFun_SGP30_Arduino_Library/tree/main/src
 SGP30 vocSensor;
 bool vocSensorPresent = false;
-const int VOC_START_DELAY_MILLIS = 15*1000;
+constexpr int VOC_START_DELAY_MILLIS = 15*1000;
 unsigned long vocSensorInitStart = 0;
 bool vocSensorInitDone = false;
 
@@ -72,12 +72,12 @@ bool co2SensorPresent = false;
 // Device returns 79.0 deg F, TemporalScanner returns 80.1
 // Offset is added
 // 70 deg F in actively cooled airstream was -1 deg F
-const float co2SensorTempFOffset = 80.1 - 79.0;
+constexpr float co2SensorTempFOffset = 80.1 - 79.0;
 Decimator co2Decimator(3, 3, 3);
 
 SPS30 pmSensor;
 bool pmSensorPresent = false;
-const uint8_t PM_MUX_PORT = 7;
+constexpr uint8_t PM_MUX_PORT = 7;
 
 JOYSTICK joystick;
 bool joystickPresent = false;
