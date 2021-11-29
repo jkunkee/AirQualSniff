@@ -211,6 +211,27 @@ ApplicationWatchdog *wd = NULL;
 // It requires void pointers and recasts to pass around all the different and potentially complex data types.
 //
 
+void display_init() {
+#if OLD_DISPLAY
+    // int iType, int iAddr, int bFlip, int bInvert, int iSDAPin, int iSCLPin, int32_t iSpeed
+    ssd1327Init(OLED_128x128, 0x3c, 0, 0, -1, -1, I2C_DEFAULT_SPEED);
+    ssd1327Power(true);
+    ssd1327Fill(TEXT_BACKGROUND);
+#else
+    // Docs say U8G2_SSD1327_EA_W128128_F_HW_I2C, but it chops off the top and bottom 16 rows.
+    // u8g2_Setup_ssd1327_i2c_ws_128x128_f seems to work well, at least empirically.
+    u8g2_Setup_ssd1327_i2c_ws_128x128_f(&u8g2, U8G2_R0, u8x8_byte_arduino_hw_i2c, u8x8_gpio_and_delay_arduino);
+    //u8g2_Setup_ssd1327_i2c_midas_128x128_f(&u8g2, U8G2_R0, u8x8_byte_arduino_hw_i2c, u8x8_gpio_and_delay_arduino);
+    //u8g2_Setup_ssd1327_i2c_ea_w128128_f(&u8g2, U8G2_R0, u8x8_byte_arduino_hw_i2c, u8x8_gpio_and_delay_arduino);
+    u8g2_InitDisplay(&u8g2);
+    u8g2_SetPowerSave(&u8g2, 0);
+    u8g2_SetFont(&u8g2, u8g2_font_nerhoe_tf);
+    //u8g2_SetDrawColor(&u8g2, 0x8);
+    u8g2_ClearBuffer(&u8g2);
+    u8g2_SendBuffer(&u8g2);
+#endif
+}
+
 void setup() {
     deltaClock.begin();
     BlinkAction.action = &BlinkActionFunc;
@@ -289,21 +310,7 @@ void setup() {
         Wire.begin();
     }
 
-#if OLD_DISPLAY
-    // int iType, int iAddr, int bFlip, int bInvert, int iSDAPin, int iSCLPin, int32_t iSpeed
-    ssd1327Init(OLED_128x128, 0x3c, 0, 0, -1, -1, I2C_DEFAULT_SPEED);
-    ssd1327Power(true);
-    ssd1327Fill(TEXT_BACKGROUND);
-#else
-    // Docs say U8G2_SSD1327_EA_W128128_F_HW_I2C, but it chops off the top and bottom 16 rows.
-    // u8g2_Setup_ssd1327_i2c_ws_128x128_f seems to work well, at least empirically.
-    u8g2_Setup_ssd1327_i2c_ws_128x128_f(&u8g2, U8G2_R0, u8x8_byte_arduino_hw_i2c, u8x8_gpio_and_delay_arduino);
-    u8g2_InitDisplay(&u8g2);
-    u8g2_SetPowerSave(&u8g2, 0);
-    u8g2_SetFont(&u8g2, u8g2_font_nerhoe_tf);
-    u8g2_ClearBuffer(&u8g2);
-    u8g2_SendBuffer(&u8g2);
-#endif
+    display_init();
 
     Time.zone(-8.0);
     Time.setDSTOffset(+1.0);
