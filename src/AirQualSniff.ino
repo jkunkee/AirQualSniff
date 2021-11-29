@@ -657,6 +657,9 @@ void loop() {
     // Particle provides a mechanism, acquireWireBuffer, for making it larger.
     ssd1327ShowBitmap(NULL, 0, 0, 0, 128, 128);
 #else
+
+    // Unlock the SSD1327
+    u8g2_SendF(&u8g2, "ca", 0xFD, 0x12 | (0<<2));
     switch (joyDir) {
     case Joystick::UP:
         display_init();
@@ -796,6 +799,11 @@ void loop() {
         u8g2_DrawPixel(&u8g2, 128, 128);
     }
     u8g2_SendBuffer(&u8g2);
+    // Lock the SSD1327
+    // At some point scrolling got enabled and it started overwriting the screen with gibberish
+    // after the first render. It was weird and actually suggests there's still something very
+    // broken somewhere else.
+    u8g2_SendF(&u8g2, "ca", 0xFD, 0x12 | (1<<2));
 #endif
     unsigned long drawTime = millis() - drawStart;
     if (drawTime < 1000) {
