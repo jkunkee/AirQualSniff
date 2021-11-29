@@ -658,6 +658,8 @@ void loop() {
     ssd1327ShowBitmap(NULL, 0, 0, 0, 128, 128);
 #else
 
+    // For convenience: https://github.com/olikraus/u8g2/wiki/u8g2reference
+
     // Unlock the SSD1327
     u8g2_SendF(&u8g2, "ca", 0xFD, 0x12 | (0<<2));
     switch (joyDir) {
