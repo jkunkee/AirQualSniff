@@ -809,5 +809,5 @@ void loop() {
     if (drawTime < 1000) {
         delay(1000 - drawTime);
     }
-    Serial.printlnf("draw latency: %u ms", drawTime);
+    Serial.printlnf("draw latency: %lu ms", drawTime);
 }
