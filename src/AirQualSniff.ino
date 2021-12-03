@@ -33,107 +33,89 @@ static constexpr int LED = D7;
 #define TEXT_HEIGHT 8
 #define TEXT_LINE_SPACING 1
 
-DeltaClock deltaClock;
+namespace infrastructure {
 
-QWIICMUX i2cMux;
-bool i2cMuxPresent = false;
+    DeltaClock deltaClock;
+    DeltaClockEntry BlinkAction = { 0 };
 
-#define I2C_DEFAULT_SPEED CLOCK_SPEED_400KHZ
-#define I2C_SAFE_SPEED    CLOCK_SPEED_100KHZ
+    void BlinkActionFunc(void) {
+        static bool ledState = false;
+        ledState = !ledState;
+        digitalWrite(LED, ledState ? HIGH : LOW);
+    }
 
-LPS25HB pressureSensor;
-bool pressureSensorPresent = false;
-// Device returns 83.2 deg F, TemporalScanner returns 80.3
-// Offset is added
-// 70 deg F in actively cooled airstream was -5 deg F
-constexpr float pressureSensorTempFOffset = 80.3 - 83.2; // actual - measured
+    void watchdogHandler(void) {
+        System.reset(RESET_NO_WAIT);
+    }
 
-AHT20 humiditySensor;
-bool humiditySensorPresent = false;
-constexpr float humiditySensorTempOffset = 0.0;
+    ApplicationWatchdog *wd = NULL;
 
-// https://github.com/sparkfun/SparkFun_SGP30_Arduino_Library/tree/main/src
-SGP30 vocSensor;
-bool vocSensorPresent = false;
-constexpr int VOC_START_DELAY_MILLIS = 15*1000;
-unsigned long vocSensorInitStart = 0;
-bool vocSensorInitDone = false;
+} // namespace infrastructure
 
-SCD30 co2Sensor;
-bool co2SensorPresent = false;
-// Device returns 79.0 deg F, TemporalScanner returns 80.1
-// Offset is added
-// 70 deg F in actively cooled airstream was -1 deg F
-constexpr float co2SensorTempFOffset = 80.1 - 79.0;
-Decimator co2Decimator(3, 3, 3);
+namespace peripherals {
 
-SPS30 pmSensor;
-bool pmSensorPresent = false;
-constexpr uint8_t PM_MUX_PORT = 7;
+    namespace Joystick {
+        JOYSTICK joystick;
+        bool joystickPresent = false;
+        typedef enum _JOYSTICK_DIRECTION {
+            UP,
+            DOWN,
+            LEFT,
+            RIGHT,
+            UP_RIGHT,
+            UP_LEFT,
+            DOWN_RIGHT,
+            DOWN_LEFT,
+            CENTER,
+        } JOYSTICK_DIRECTION;
+        constexpr uint16_t BOUNDARY_SIZE = 200;
+        constexpr uint16_t MAX = 1023;
+        constexpr uint16_t LEFT_THRESHOLD = BOUNDARY_SIZE;
+        constexpr uint16_t RIGHT_THRESHOLD = MAX - BOUNDARY_SIZE;
+        constexpr uint16_t UP_THRESHOLD = BOUNDARY_SIZE;
+        constexpr uint16_t DOWN_THRESHOLD = MAX - BOUNDARY_SIZE;
+    } // namespace Joystick
 
-JOYSTICK joystick;
-bool joystickPresent = false;
-namespace Joystick {
-typedef enum _JOYSTICK_DIRECTION {
-    UP,
-    DOWN,
-    LEFT,
-    RIGHT,
-    UP_RIGHT,
-    UP_LEFT,
-    DOWN_RIGHT,
-    DOWN_LEFT,
-    CENTER,
-} JOYSTICK_DIRECTION;
-constexpr uint16_t BOUNDARY_SIZE = 200;
-constexpr uint16_t MAX = 1023;
-constexpr uint16_t LEFT_THRESHOLD = BOUNDARY_SIZE;
-constexpr uint16_t RIGHT_THRESHOLD = MAX - BOUNDARY_SIZE;
-constexpr uint16_t UP_THRESHOLD = BOUNDARY_SIZE;
-constexpr uint16_t DOWN_THRESHOLD = MAX - BOUNDARY_SIZE;
-}; // namespace Joystick
-
-PhotonVBAT vbat(A0);
-
+    namespace Display {
 #if OLD_DISPLAY
 #else
-// FUll U8G2, SSD1327 controller, EA_128128 display, full framebuffer, First Arduino Hardware I2C, not rotated
-// Something about the C++ process causes lockups
-//U8G2_SSD1327_EA_W128128_F_HW_I2C u8g2(U8G2_R0, U8X8_PIN_NONE, U8X8_PIN_NONE, U8X8_PIN_NONE);
-u8g2_t u8g2 = { 0 };
-// I thought something about u8x8_gpio_and_delay_arduino caused lockups too;
-// replacing it with a do-nothing return 0; works too.
+        // FUll U8G2, SSD1327 controller, EA_128128 display, full framebuffer, First Arduino Hardware I2C, not rotated
+        // Something about the C++ process causes lockups
+        //U8G2_SSD1327_EA_W128128_F_HW_I2C u8g2(U8G2_R0, U8X8_PIN_NONE, U8X8_PIN_NONE, U8X8_PIN_NONE);
+        u8g2_t u8g2 = { 0 };
+        // I thought something about u8x8_gpio_and_delay_arduino caused lockups too;
+        // replacing it with a do-nothing return 0; works too.
 #endif
 
-void BlinkActionFunc(void) {
-    static bool ledState = false;
-    ledState = !ledState;
-    digitalWrite(LED, ledState ? HIGH : LOW);
-}
+        void display_init() {
+#if OLD_DISPLAY
+            // int iType, int iAddr, int bFlip, int bInvert, int iSDAPin, int iSCLPin, int32_t iSpeed
+            ssd1327Init(OLED_128x128, 0x3c, 0, 0, -1, -1, I2C_DEFAULT_SPEED);
+            ssd1327Power(true);
+            ssd1327Fill(TEXT_BACKGROUND);
+#else
+            // Docs say U8G2_SSD1327_EA_W128128_F_HW_I2C, but it chops off the top and bottom 16 rows.
+            // u8g2_Setup_ssd1327_i2c_ws_128x128_f seems to work well, at least empirically.
+            u8g2_Setup_ssd1327_i2c_ws_128x128_f(&u8g2, U8G2_R0, u8x8_byte_arduino_hw_i2c, u8x8_gpio_and_delay_arduino);
+            //u8g2_Setup_ssd1327_i2c_midas_128x128_f(&u8g2, U8G2_R0, u8x8_byte_arduino_hw_i2c, u8x8_gpio_and_delay_arduino);
+            //u8g2_Setup_ssd1327_i2c_ea_w128128_f(&u8g2, U8G2_R0, u8x8_byte_arduino_hw_i2c, u8x8_gpio_and_delay_arduino);
+            u8g2_InitDisplay(&u8g2);
+            u8g2_SetPowerSave(&u8g2, 0);
+            u8g2_SetFont(&u8g2, u8g2_font_nerhoe_tf);
+            //u8g2_SetDrawColor(&u8g2, 0x8);
+            u8g2_ClearBuffer(&u8g2);
+            u8g2_SendBuffer(&u8g2);
+#endif
+        }
+    } // namespace Display
 
-DeltaClockEntry BlinkAction = { 0 };
+    QWIICMUX i2cMux;
+    bool i2cMuxPresent = false;
 
-// To use I2C buffers bigger than 32 bytes, we provide a function for allocating the buffers. Particle-specific.
-// https://docs.staging.particle.io/cards/firmware/wire-i2c/acquirewirebuffer/
-constexpr size_t I2C_BUFFER_SIZE = 512;
+    #define I2C_DEFAULT_SPEED CLOCK_SPEED_400KHZ
+    #define I2C_SAFE_SPEED    CLOCK_SPEED_100KHZ
 
-hal_i2c_config_t acquireWireBuffer() {
-    hal_i2c_config_t config = {
-        .size = sizeof(hal_i2c_config_t),
-        .version = HAL_I2C_CONFIG_VERSION_1,
-        .rx_buffer = new (std::nothrow) uint8_t[I2C_BUFFER_SIZE],
-        .rx_buffer_size = I2C_BUFFER_SIZE,
-        .tx_buffer = new (std::nothrow) uint8_t[I2C_BUFFER_SIZE],
-        .tx_buffer_size = I2C_BUFFER_SIZE
-    };
-    return config;
-}
-
-void watchdogHandler(void) {
-    System.reset(RESET_NO_WAIT);
-}
-
-ApplicationWatchdog *wd = NULL;
+} // namespace peripherals
 
 // Data Collection Strategy
 //
@@ -222,33 +204,69 @@ ApplicationWatchdog *wd = NULL;
 // It requires void pointers and recasts to pass around all the different and potentially complex data types.
 //
 
-void display_init() {
-#if OLD_DISPLAY
-    // int iType, int iAddr, int bFlip, int bInvert, int iSDAPin, int iSCLPin, int32_t iSpeed
-    ssd1327Init(OLED_128x128, 0x3c, 0, 0, -1, -1, I2C_DEFAULT_SPEED);
-    ssd1327Power(true);
-    ssd1327Fill(TEXT_BACKGROUND);
-#else
-    // Docs say U8G2_SSD1327_EA_W128128_F_HW_I2C, but it chops off the top and bottom 16 rows.
-    // u8g2_Setup_ssd1327_i2c_ws_128x128_f seems to work well, at least empirically.
-    u8g2_Setup_ssd1327_i2c_ws_128x128_f(&u8g2, U8G2_R0, u8x8_byte_arduino_hw_i2c, u8x8_gpio_and_delay_arduino);
-    //u8g2_Setup_ssd1327_i2c_midas_128x128_f(&u8g2, U8G2_R0, u8x8_byte_arduino_hw_i2c, u8x8_gpio_and_delay_arduino);
-    //u8g2_Setup_ssd1327_i2c_ea_w128128_f(&u8g2, U8G2_R0, u8x8_byte_arduino_hw_i2c, u8x8_gpio_and_delay_arduino);
-    u8g2_InitDisplay(&u8g2);
-    u8g2_SetPowerSave(&u8g2, 0);
-    u8g2_SetFont(&u8g2, u8g2_font_nerhoe_tf);
-    //u8g2_SetDrawColor(&u8g2, 0x8);
-    u8g2_ClearBuffer(&u8g2);
-    u8g2_SendBuffer(&u8g2);
-#endif
+namespace sensors {
+
+    LPS25HB pressureSensor;
+    bool pressureSensorPresent = false;
+    // Device returns 83.2 deg F, TemporalScanner returns 80.3
+    // Offset is added
+    // 70 deg F in actively cooled airstream was -5 deg F
+    constexpr float pressureSensorTempFOffset = 80.3 - 83.2; // actual - measured
+
+    AHT20 humiditySensor;
+    bool humiditySensorPresent = false;
+    constexpr float humiditySensorTempOffset = 0.0;
+
+    // https://github.com/sparkfun/SparkFun_SGP30_Arduino_Library/tree/main/src
+    SGP30 vocSensor;
+    bool vocSensorPresent = false;
+    constexpr int VOC_START_DELAY_MILLIS = 15*1000;
+    unsigned long vocSensorInitStart = 0;
+    bool vocSensorInitDone = false;
+
+    SCD30 co2Sensor;
+    bool co2SensorPresent = false;
+    // Device returns 79.0 deg F, TemporalScanner returns 80.1
+    // Offset is added
+    // 70 deg F in actively cooled airstream was -1 deg F
+    constexpr float co2SensorTempFOffset = 80.1 - 79.0;
+
+    SPS30 pmSensor;
+    bool pmSensorPresent = false;
+    constexpr uint8_t PM_MUX_PORT = 7;
+
+    PhotonVBAT vbat(A0);
+
+} // namespace sensors
+
+namespace data {
+
+    Decimator co2Decimator(3, 3, 3);
+
+} // namespace data
+
+// To use I2C buffers bigger than 32 bytes, we provide a function for allocating the buffers. Particle-specific.
+// https://docs.staging.particle.io/cards/firmware/wire-i2c/acquirewirebuffer/
+constexpr size_t I2C_BUFFER_SIZE = 512;
+
+hal_i2c_config_t acquireWireBuffer() {
+    hal_i2c_config_t config = {
+        .size = sizeof(hal_i2c_config_t),
+        .version = HAL_I2C_CONFIG_VERSION_1,
+        .rx_buffer = new (std::nothrow) uint8_t[I2C_BUFFER_SIZE],
+        .rx_buffer_size = I2C_BUFFER_SIZE,
+        .tx_buffer = new (std::nothrow) uint8_t[I2C_BUFFER_SIZE],
+        .tx_buffer_size = I2C_BUFFER_SIZE
+    };
+    return config;
 }
 
 void setup() {
-    deltaClock.begin();
-    BlinkAction.action = &BlinkActionFunc;
-    BlinkAction.interval = 1000;
-    BlinkAction.repeating = true;
-    deltaClock.insert(&BlinkAction);
+    infrastructure::deltaClock.begin();
+    infrastructure::BlinkAction.action = &infrastructure::BlinkActionFunc;
+    infrastructure::BlinkAction.interval = 1000;
+    infrastructure::BlinkAction.repeating = true;
+    infrastructure::deltaClock.insert(&infrastructure::BlinkAction);
 
     // setSpeed must be before begin()
     // https://docs.staging.particle.io/cards/firmware/wire-i2c/setspeed/
@@ -257,9 +275,9 @@ void setup() {
 
     Serial.begin(115200);
 
-    i2cMuxPresent = i2cMux.begin();
-    if (i2cMuxPresent) {
-        i2cMux.setPortState(0
+    peripherals::i2cMuxPresent = peripherals::i2cMux.begin();
+    if (peripherals::i2cMuxPresent) {
+        peripherals::i2cMux.setPortState(0
             |0x1 // C02
             //|0x2 // nc
             //|0x4 // nc
@@ -271,80 +289,80 @@ void setup() {
             );
     }
 
-    joystickPresent = joystick.begin();
+    peripherals::Joystick::joystickPresent = peripherals::Joystick::joystick.begin();
 
-    pressureSensorPresent = pressureSensor.begin();
+    sensors::pressureSensorPresent = sensors::pressureSensor.begin();
 
-    co2SensorPresent = co2Sensor.begin();
-    if (co2SensorPresent != false) {
-        co2Sensor.setAutoSelfCalibration(true);
-        co2Sensor.setMeasurementInterval(5);
+    sensors::co2SensorPresent = sensors::co2Sensor.begin();
+    if (sensors::co2SensorPresent != false) {
+        sensors::co2Sensor.setAutoSelfCalibration(true);
+        sensors::co2Sensor.setMeasurementInterval(5);
     }
 
-    humiditySensorPresent = humiditySensor.begin();
+    sensors::humiditySensorPresent = sensors::humiditySensor.begin();
 
-    vocSensorPresent = vocSensor.begin();
-    if (vocSensorPresent != false)
+    sensors::vocSensorPresent = sensors::vocSensor.begin();
+    if (sensors::vocSensorPresent != false)
     {
-        vocSensor.setHumidity(0x0F80);
-        vocSensor.initAirQuality();
-        vocSensorInitDone = false;
-        vocSensorInitStart = millis();
+        sensors::vocSensor.setHumidity(0x0F80);
+        sensors::vocSensor.initAirQuality();
+        sensors::vocSensorInitDone = false;
+        sensors::vocSensorInitStart = millis();
     }
 
-    if (i2cMuxPresent) {
+    if (peripherals::i2cMuxPresent) {
         // Slow down I2C
         Wire.end();
         Wire.setSpeed(I2C_SAFE_SPEED); // SPS30 only supports 100KHz
         Wire.begin();
         // Enable I2C mux
-        i2cMux.enablePort(PM_MUX_PORT);
+        peripherals::i2cMux.enablePort(sensors::PM_MUX_PORT);
     }
-    pmSensorPresent = pmSensor.begin();
-    if (pmSensorPresent != false) {
-        pmSensor.wake();
-        pmSensor.reset();
+    sensors::pmSensorPresent = sensors::pmSensor.begin();
+    if (sensors::pmSensorPresent != false) {
+        sensors::pmSensor.wake();
+        sensors::pmSensor.reset();
         uint32_t interval;
-        pmSensor.read_fan_cleaning_interval(&interval);
+        sensors::pmSensor.read_fan_cleaning_interval(&interval);
         if (interval != 7 * 24 * 60 * 60) {
             interval = 7 * 24 * 60 * 60;
-            pmSensor.set_fan_cleaning_interval(interval);
+            sensors::pmSensor.set_fan_cleaning_interval(interval);
         }
-        pmSensor.start_measuring(SPS30_FORMAT_UINT16);
+        sensors::pmSensor.start_measuring(SPS30_FORMAT_UINT16);
     }
-    if (i2cMuxPresent) {
+    if (peripherals::i2cMuxPresent) {
         // Disable I2C mux
-        i2cMux.disablePort(PM_MUX_PORT);
+        peripherals::i2cMux.disablePort(sensors::PM_MUX_PORT);
         // Speed up I2C
         Wire.end();
         Wire.setSpeed(I2C_DEFAULT_SPEED); // Display really needs 400KHz
         Wire.begin();
     }
 
-    display_init();
+    peripherals::Display::display_init();
 
     Time.zone(-8.0);
     Time.setDSTOffset(+1.0);
 
     pinMode(LED, OUTPUT);
 
-    wd = new ApplicationWatchdog(3000U, &watchdogHandler);
+    infrastructure::wd = new ApplicationWatchdog(3000U, &infrastructure::watchdogHandler);
 }
 
 #if OLD_DISPLAY
 // uint8_t x, uint8_t y, char *szMsg, uint8_t iSize, int ucFGColor, int ucBGColor
 #define PRINTLN(cstr) ssd1327WriteString(0, 0+(lineNo++)*(TEXT_HEIGHT+TEXT_LINE_SPACING), cstr, FONT_SMALL, TEXT_FOREGROUND, TEXT_BACKGROUND);
 #else
-#define PRINTLN(cstr) u8g2_DrawUTF8(&u8g2, 0, 0+(lineNo++)*(TEXT_HEIGHT+TEXT_LINE_SPACING), cstr);
+#define PRINTLN(cstr) u8g2_DrawUTF8(&peripherals::Display::u8g2, 0, 0+(lineNo++)*(TEXT_HEIGHT+TEXT_LINE_SPACING), cstr);
 #endif
 
 void loop() {
     ApplicationWatchdog::checkin();
-    deltaClock.update();
+    infrastructure::deltaClock.update();
 
 #if OLD_DISPLAY
 #else
-    u8g2_ClearBuffer(&u8g2);
+    u8g2_ClearBuffer(&peripherals::Display::u8g2);
 #endif
 
     int lineNo = 0;
@@ -379,10 +397,10 @@ void loop() {
 
     PRINTLN("Air Quality Sniffer"); // 1
 
-    if (joystickPresent) {
-        uint16_t x = joystick.getHorizontal();
-        uint16_t y = joystick.getVertical();
-        byte button = joystick.checkButton();
+    if (peripherals::Joystick::joystickPresent) {
+        uint16_t x = peripherals::Joystick::joystick.getHorizontal();
+        uint16_t y = peripherals::Joystick::joystick.getVertical();
+        byte button = peripherals::Joystick::joystick.checkButton();
         String val;
         val += "joy:";
         val += "x=";
@@ -397,9 +415,9 @@ void loop() {
         PRINTLN("Joystick not found"); // 2
     }
 
-    if (pressureSensorPresent != false) {
-        tempC = tempC_LPS25HB = pressureSensor.getTemperature_degC() + pressureSensorTempFOffset * 5 / 9;
-        pressurehPa = pressureSensor.getPressure_hPa();
+    if (sensors::pressureSensorPresent != false) {
+        tempC = tempC_LPS25HB = sensors::pressureSensor.getTemperature_degC() + sensors::pressureSensorTempFOffset * 5 / 9;
+        pressurehPa = sensors::pressureSensor.getPressure_hPa();
 
         tempF = C_TO_F(tempC_LPS25HB);
         altitudem = atmospherics::pressure_to_est_altitude(pressurehPa);
@@ -415,24 +433,24 @@ void loop() {
         val += String(altitudem, 0);
         val += " m";
         PRINTLN(val.c_str()); // 4
-            co2Decimator.push(tempF);
-            if (co2Decimator.is_full()) {
+            data::co2Decimator.push(tempF);
+            if (data::co2Decimator.is_full()) {
                 float final_val;
-                co2Decimator.decimate_and_clear(&final_val);
-                Serial.printlnf("final_val: %0.1f, n=%d", final_val, co2Decimator.capacity());
+                data::co2Decimator.decimate_and_clear(&final_val);
+                Serial.printlnf("final_val: %0.1f, n=%d", final_val, data::co2Decimator.capacity());
             }
     } else {
         PRINTLN("LPS25HB not present");
     }
 
-    if (co2SensorPresent != false) {
-        co2Sensor.setAmbientPressure(pressurehPa /* 1.0 hPa/mb */);
+    if (sensors::co2SensorPresent != false) {
+        sensors::co2Sensor.setAmbientPressure(pressurehPa /* 1.0 hPa/mb */);
         // altitude ignored when ambient pressure set
 
-        if (co2Sensor.dataAvailable() != false) {
-            relativeHumidityPercent = co2Sensor.getHumidity();
-            tempC_SCD30 = co2Sensor.getTemperature() + co2SensorTempFOffset * 5 / 9;
-            co2ppm = co2Sensor.getCO2();
+        if (sensors::co2Sensor.dataAvailable() != false) {
+            relativeHumidityPercent = sensors::co2Sensor.getHumidity();
+            tempC_SCD30 = sensors::co2Sensor.getTemperature() + sensors::co2SensorTempFOffset * 5 / 9;
+            co2ppm = sensors::co2Sensor.getCO2();
         }
 
         String val;
@@ -446,42 +464,42 @@ void loop() {
         PRINTLN("SCD30 not present");
     }
 
-    if (pressureSensorPresent != false && co2SensorPresent != false) {
+    if (sensors::pressureSensorPresent != false && sensors::co2SensorPresent != false) {
         absoluteHumidity_g_m3_8_8 = atmospherics::rel_to_abs_humidity(tempC_LPS25HB, pressurehPa, relativeHumidityPercent);
     }
 
-    if (humiditySensorPresent != false) {
-        humiditySensor.triggerMeasurement();
+    if (sensors::humiditySensorPresent != false) {
+        sensors::humiditySensor.triggerMeasurement();
         String val;
         val += "hum:h=";
-        val += String(humiditySensor.getHumidity(), 0);
+        val += String(sensors::humiditySensor.getHumidity(), 0);
         val += ",T=";
-        val += String(humiditySensor.getTemperature(), 0);
+        val += String(sensors::humiditySensor.getTemperature(), 0);
         val += ",s=";
-        val += humiditySensor.getStatus();
-        val += humiditySensor.isCalibrated() ? ",c" : ",nc";
+        val += sensors::humiditySensor.getStatus();
+        val += sensors::humiditySensor.isCalibrated() ? ",c" : ",nc";
         PRINTLN(val.c_str()); // ?
     } else {
         PRINTLN("AHT20 not found"); // ?
     }
 
-    if (vocSensorPresent != false) {
+    if (sensors::vocSensorPresent != false) {
         String val = "";
 
-        vocSensor.setHumidity(absoluteHumidity_g_m3_8_8);
+        sensors::vocSensor.setHumidity(absoluteHumidity_g_m3_8_8);
 
-        SGP30ERR sgperr = vocSensor.measureAirQuality();
+        SGP30ERR sgperr = sensors::vocSensor.measureAirQuality();
         if (sgperr != SGP30_SUCCESS)
         {
-            vocSensorPresent = false;
+            sensors::vocSensorPresent = false;
             val = "SGP30 measurement failed: ";
             val += String(sgperr);
-        } else if (vocSensorInitDone == false) {
-            vocSensorInitDone = millis() - vocSensorInitStart > VOC_START_DELAY_MILLIS;
+        } else if (sensors::vocSensorInitDone == false) {
+            sensors::vocSensorInitDone = millis() - sensors::vocSensorInitStart > sensors::VOC_START_DELAY_MILLIS;
             val = "SGP30 initializing";
         } else {
-            uint16_t tvoc_ppb = vocSensor.TVOC;
-            uint16_t eCO2_ppm = vocSensor.CO2;
+            uint16_t tvoc_ppb = sensors::vocSensor.TVOC;
+            uint16_t eCO2_ppm = sensors::vocSensor.CO2;
             //Particle.publish("TVOC", String(tvoc_ppb));
             
             val = "TVOC:";
@@ -492,12 +510,12 @@ void loop() {
         }
         PRINTLN(val.c_str()); // 6
 
-        sgperr = vocSensor.measureRawSignals();
+        sgperr = sensors::vocSensor.measureRawSignals();
         if (sgperr == SGP30_SUCCESS) {
             val = "H2:";
-            val += String(vocSensor.H2, HEX);
+            val += String(sensors::vocSensor.H2, HEX);
             val += " C2H6O:";
-            val += String(vocSensor.ethanol, HEX);
+            val += String(sensors::vocSensor.ethanol, HEX);
             PRINTLN(val.c_str()); // 7
         } else {
             PRINTLN("SGP30 raw read failed");
@@ -507,40 +525,40 @@ void loop() {
     }
 
     String decVal = "08";
-    for (int idx = 0; idx < co2Decimator.fine.size(); idx++) {
+    for (int idx = 0; idx < data::co2Decimator.fine.size(); idx++) {
         float val;
         decVal += " ";
-        co2Decimator.fine.peek(idx, &val);
+        data::co2Decimator.fine.peek(idx, &val);
         decVal += String(val, 0);
     }
     decVal += ",";
-    for (int idx = 0; idx < co2Decimator.mid.size(); idx++) {
+    for (int idx = 0; idx < data::co2Decimator.mid.size(); idx++) {
         float val;
         decVal += " ";
-        co2Decimator.mid.peek(idx, &val);
+        data::co2Decimator.mid.peek(idx, &val);
         decVal += String(val, 0);
     }
     decVal += ",";
-    for (int idx = 0; idx < co2Decimator.coarse.size(); idx++) {
+    for (int idx = 0; idx < data::co2Decimator.coarse.size(); idx++) {
         float val;
         decVal += " ";
-        co2Decimator.coarse.peek(idx, &val);
+        data::co2Decimator.coarse.peek(idx, &val);
         decVal += String(val, 0);
     }
     decVal += "                    "; // ensure line gets blanked
     PRINTLN(decVal.c_str());
     Serial.println(decVal.c_str());
 
-    if (i2cMuxPresent) {
+    if (peripherals::i2cMuxPresent) {
         // Slow down I2C
         Wire.end();
         Wire.setSpeed(I2C_SAFE_SPEED);
         Wire.begin();
         // Enable I2C mux
-        i2cMux.enablePort(PM_MUX_PORT);
+        peripherals::i2cMux.enablePort(sensors::PM_MUX_PORT);
     }
-    if (pmSensorPresent != false && pmSensor.is_data_ready() == SPS30_OK) {
-        pmSensor.read_data_no_wait_int(&pmData);
+    if (sensors::pmSensorPresent != false && sensors::pmSensor.is_data_ready() == SPS30_OK) {
+        sensors::pmSensor.read_data_no_wait_int(&pmData);
         String val;
         val += String(pmData.pm_1_0_ug_m3);
         val += ",";
@@ -569,18 +587,18 @@ void loop() {
         PRINTLN("pm not present"); // 9
         String val;
         val += "10 ";
-        val += pmSensor.device_status;
+        val += sensors::pmSensor.device_status;
         val += " ";
-        val += pmSensor.firmware_version[0];
+        val += sensors::pmSensor.firmware_version[0];
         val += ".";
-        val += pmSensor.firmware_version[1];
+        val += sensors::pmSensor.firmware_version[1];
         val += " ";
-        val += pmSensor.is_data_ready();
+        val += sensors::pmSensor.is_data_ready();
         PRINTLN(val.c_str()); // 10
     }
-    if (i2cMuxPresent) {
+    if (peripherals::i2cMuxPresent) {
         // Disable I2C mux
-        i2cMux.disablePort(PM_MUX_PORT);
+        peripherals::i2cMux.disablePort(sensors::PM_MUX_PORT);
         // Speed up I2C
         Wire.end();
         Wire.setSpeed(I2C_DEFAULT_SPEED);
@@ -593,21 +611,21 @@ void loop() {
         PRINTLN("Time not ready");
     }
 
-    if (co2SensorPresent && pressureSensorPresent) {
+    if (sensors::co2SensorPresent && sensors::pressureSensorPresent) {
         String str;
         str += "s:";
         str += String(C_TO_F(tempC_SCD30), 2);
         str += ",l:";
         str += String(C_TO_F(tempC_LPS25HB), 2);
         str += ",c:";
-        str += String(C_TO_F(vbat.readTempC()), 0);
+        str += String(C_TO_F(sensors::vbat.readTempC()), 0);
         str += ",v:";
-        str += String(vbat.readVBAT(), 2);
+        str += String(sensors::vbat.readVBAT(), 2);
         PRINTLN(str.c_str()); // 12
     } else {
         PRINTLN("no summary avail"); // 12
     }
-    Serial.printlnf("scd: %0.3fF lps: %0.3fF CPU: %0.3fF", C_TO_F(tempC_SCD30), C_TO_F(tempC_LPS25HB), C_TO_F(vbat.readTempC()));
+    Serial.printlnf("scd: %0.3fF lps: %0.3fF CPU: %0.3fF", C_TO_F(tempC_SCD30), C_TO_F(tempC_LPS25HB), C_TO_F(sensors::vbat.readTempC()));
     Serial.printlnf("rH: %0.1f Pressure: %0.3fhPa", relativeHumidityPercent, pressurehPa);
 
     PRINTLN("Bld " __DATE__); // 13
@@ -615,27 +633,27 @@ void loop() {
 
     //Particle.publish("operating", NULL, 60, PRIVATE);
 
-    Joystick::JOYSTICK_DIRECTION joyDir;
-    uint16_t vert = joystick.getVertical();
-    uint16_t horiz = joystick.getHorizontal();
-    if (vert > Joystick::DOWN_THRESHOLD && horiz > Joystick::RIGHT_THRESHOLD) {
-        joyDir = Joystick::DOWN_RIGHT;
-    } else if (vert > Joystick::DOWN_THRESHOLD && horiz < Joystick::LEFT_THRESHOLD) {
-        joyDir = Joystick::DOWN_LEFT;
-    } else if (vert < Joystick::UP_THRESHOLD && horiz > Joystick::RIGHT_THRESHOLD) {
-        joyDir = Joystick::UP_RIGHT;
-    } else if (vert < Joystick::UP_THRESHOLD && horiz < Joystick::LEFT_THRESHOLD) {
-        joyDir = Joystick::UP_LEFT;
-    } else if (vert > Joystick::DOWN_THRESHOLD) {
-        joyDir = Joystick::DOWN;
-    } else if (vert < Joystick::UP_THRESHOLD) {
-        joyDir = Joystick::UP;
-    } else if (horiz < Joystick::LEFT_THRESHOLD) {
-        joyDir = Joystick::LEFT;
-    } else if (horiz > Joystick::RIGHT_THRESHOLD) {
-        joyDir = Joystick::RIGHT;
+    peripherals::Joystick::JOYSTICK_DIRECTION joyDir;
+    uint16_t vert = peripherals::Joystick::joystick.getVertical();
+    uint16_t horiz = peripherals::Joystick::joystick.getHorizontal();
+    if (vert > peripherals::Joystick::DOWN_THRESHOLD && horiz > peripherals::Joystick::RIGHT_THRESHOLD) {
+        joyDir = peripherals::Joystick::DOWN_RIGHT;
+    } else if (vert > peripherals::Joystick::DOWN_THRESHOLD && horiz < peripherals::Joystick::LEFT_THRESHOLD) {
+        joyDir = peripherals::Joystick::DOWN_LEFT;
+    } else if (vert < peripherals::Joystick::UP_THRESHOLD && horiz > peripherals::Joystick::RIGHT_THRESHOLD) {
+        joyDir = peripherals::Joystick::UP_RIGHT;
+    } else if (vert < peripherals::Joystick::UP_THRESHOLD && horiz < peripherals::Joystick::LEFT_THRESHOLD) {
+        joyDir = peripherals::Joystick::UP_LEFT;
+    } else if (vert > peripherals::Joystick::DOWN_THRESHOLD) {
+        joyDir = peripherals::Joystick::DOWN;
+    } else if (vert < peripherals::Joystick::UP_THRESHOLD) {
+        joyDir = peripherals::Joystick::UP;
+    } else if (horiz < peripherals::Joystick::LEFT_THRESHOLD) {
+        joyDir = peripherals::Joystick::LEFT;
+    } else if (horiz > peripherals::Joystick::RIGHT_THRESHOLD) {
+        joyDir = peripherals::Joystick::RIGHT;
     } else {
-        joyDir = Joystick::CENTER;
+        joyDir = peripherals::Joystick::CENTER;
     }
 
     unsigned long drawStart = millis();
@@ -653,47 +671,47 @@ void loop() {
     // For convenience: https://github.com/olikraus/u8g2/wiki/u8g2reference
 
     // Unlock the SSD1327
-    u8g2_SendF(&u8g2, "ca", 0xFD, 0x12 | (0<<2));
+    u8g2_SendF(&peripherals::Display::u8g2, "ca", 0xFD, 0x12 | (0<<2));
     switch (joyDir) {
-    case Joystick::UP:
-        display_init();
+    case peripherals::Joystick::UP:
+        peripherals::Display::display_init();
         break;
-    case Joystick::DOWN:
+    case peripherals::Joystick::DOWN:
         break;
-    case Joystick::LEFT:
+    case peripherals::Joystick::LEFT:
         // SSD1327 All Register Reset
         // Set Column Address
-        u8g2_SendF(&u8g2, "caa", 0x15, 0x00, 0x3F);
+        u8g2_SendF(&peripherals::Display::u8g2, "caa", 0x15, 0x00, 0x3F);
         // Set Row Address
-        u8g2_SendF(&u8g2, "caa", 0x75, 0x00, 0x7f);
+        u8g2_SendF(&peripherals::Display::u8g2, "caa", 0x75, 0x00, 0x7f);
         // Set Contrast Control
-        u8g2_SendF(&u8g2, "ca", 0x81, 0x7F);
+        u8g2_SendF(&peripherals::Display::u8g2, "ca", 0x81, 0x7F);
         // Set Re-map
         //u8g2_SendF(&u8g2, "ca", 0xA0, (0<<7)|(0<<6)|(0<<5)|(0<<4)|(0<<3)|(1<<2)|(0<<1)|(0<<0)); // screws it up more
         // Set Display Start Line
-        u8g2_SendF(&u8g2, "ca", 0xA1, 0x00);
+        u8g2_SendF(&peripherals::Display::u8g2, "ca", 0xA1, 0x00);
         // Set Display Offset
-        u8g2_SendF(&u8g2, "ca", 0xA2, 0x00);
+        u8g2_SendF(&peripherals::Display::u8g2, "ca", 0xA2, 0x00);
         // Set Display Mode
-        u8g2_SendF(&u8g2, "c", 0xA4);
+        u8g2_SendF(&peripherals::Display::u8g2, "c", 0xA4);
         // Set MUX Ratio
-        u8g2_SendF(&u8g2, "ca", 0xA8, 127);
+        u8g2_SendF(&peripherals::Display::u8g2, "ca", 0xA8, 127);
         // Function Selection A
         // Needs schematic analysis
         // Set Display ON/OFF
-        u8g2_SendF(&u8g2, "c", 0xAF);
+        u8g2_SendF(&peripherals::Display::u8g2, "c", 0xAF);
         // Set Phase Length
         // Needs datasheet analysis
         // Set Front Clock Divider/Oscillator Frequency
         // Needs datasheet analysis
         // GPIO
-        u8g2_SendF(&u8g2, "ca", 0xB5, (1<<1) | (1<<0));
+        u8g2_SendF(&peripherals::Display::u8g2, "ca", 0xB5, (1<<1) | (1<<0));
         // Set Second pre-charge Period (depends on 0xD5)
         // Needs datasheet analysis
         // Set Gray Scale Table
         //u8g2_SendF(&u8g2, "ca", 0xB8, ); // Needs datasheet analysis
         // Linear LUT
-        u8g2_SendF(&u8g2, "caaaaaaaaaaaaaaaa", 0xB9,
+        u8g2_SendF(&peripherals::Display::u8g2, "caaaaaaaaaaaaaaaa", 0xB9,
             0,
             0,
             2,
@@ -719,7 +737,7 @@ void loop() {
         // Set Command Lock
         //u8g2_SendF(&u8g2, "ca", 0xFD, 0x12 | (1<<2)); // lock isn't the issue
         // Continuous Horizontal Scroll Setup
-        u8g2_SendF(&u8g2, "caaaaaaa", 0xB9,
+        u8g2_SendF(&peripherals::Display::u8g2, "caaaaaaa", 0xB9,
             0, // dummy
             0, // start row
             0, // step freq
@@ -728,48 +746,48 @@ void loop() {
             0x3F, // end column
             0); // dummy
         // Deactivate scroll
-        u8g2_SendF(&u8g2, "c", 0x2E);
+        u8g2_SendF(&peripherals::Display::u8g2, "c", 0x2E);
         //u8g2_SendF(&u8g2, "c", 0x2F); // yup, that was it
 
         // blink inverted so I know things are working
-        u8g2_SendF(&u8g2, "c", 0xA7);
+        u8g2_SendF(&peripherals::Display::u8g2, "c", 0xA7);
         delay(500);
-        u8g2_SendF(&u8g2, "c", 0xA4);
+        u8g2_SendF(&peripherals::Display::u8g2, "c", 0xA4);
         break;
-    case Joystick::RIGHT: {
-            u8g2_ClearBuffer(&u8g2);
+    case peripherals::Joystick::RIGHT: {
+            u8g2_ClearBuffer(&peripherals::Display::u8g2);
             //u8g2_SetDrawColor(&u8g2, 0xF);
 
             constexpr u8g2_uint_t text_x = 48;
             constexpr u8g2_uint_t text_y = 48;
             u8g2_uint_t text_width;
 
-            u8g2_SetFont(&u8g2, u8g2_font_osb29_tf);
+            u8g2_SetFont(&peripherals::Display::u8g2, u8g2_font_osb29_tf);
             constexpr u8g2_uint_t text_big_height = 29;
 
             String numberStr = String(tempF, 0);
-            u8g2_DrawUTF8(&u8g2, text_x, text_y, numberStr.c_str());
-            text_width = u8g2_GetUTF8Width(&u8g2, numberStr.c_str());
+            u8g2_DrawUTF8(&peripherals::Display::u8g2, text_x, text_y, numberStr.c_str());
+            text_width = u8g2_GetUTF8Width(&peripherals::Display::u8g2, numberStr.c_str());
             Serial.printlnf("StrWidth: %u", text_width);
-            u8g2_SetFont(&u8g2, u8g2_font_osb18_tf);
-            //u8g2_SetDrawColor(&u8g2, 0x1);
+            u8g2_SetFont(&peripherals::Display::u8g2, u8g2_font_osb18_tf);
+            //u8g2_SetDrawColor(&peripherals::Display::u8g2, 0x1);
             u8g2_uint_t text_small_height = 18;
             String unitStr = "\u00b0""F";
-            u8g2_DrawUTF8(&u8g2, text_x+text_width, text_y-(text_big_height-text_small_height), unitStr.c_str());
+            u8g2_DrawUTF8(&peripherals::Display::u8g2, text_x+text_width, text_y-(text_big_height-text_small_height), unitStr.c_str());
 
-            u8g2_SetFont(&u8g2, u8g2_font_nerhoe_tf);
-            //u8g2_SetDrawColor(&u8g2, 0x8);
+            u8g2_SetFont(&peripherals::Display::u8g2, u8g2_font_nerhoe_tf);
+            //u8g2_SetDrawColor(&peripherals::Display::u8g2, 0x8);
         }
         break;
-    case Joystick::UP_LEFT:
+    case peripherals::Joystick::UP_LEFT:
         break;
-    case Joystick::UP_RIGHT:
+    case peripherals::Joystick::UP_RIGHT:
         break;
-    case Joystick::DOWN_LEFT:
+    case peripherals::Joystick::DOWN_LEFT:
         break;
-    case Joystick::DOWN_RIGHT:
+    case peripherals::Joystick::DOWN_RIGHT:
         break;
-    case Joystick::CENTER:
+    case peripherals::Joystick::CENTER:
         break;
     default:
         break;
@@ -777,27 +795,27 @@ void loop() {
     {
         for (int n = 0; n < 128; n++) {
             if (n % 5 == 0) {
-                u8g2_DrawPixel(&u8g2, n, 0);
-                u8g2_DrawPixel(&u8g2, 0, n);
+                u8g2_DrawPixel(&peripherals::Display::u8g2, n, 0);
+                u8g2_DrawPixel(&peripherals::Display::u8g2, 0, n);
             }
             if (n % 10 == 0) {
-                u8g2_DrawPixel(&u8g2, n, 1);
-                u8g2_DrawPixel(&u8g2, 1, n);
+                u8g2_DrawPixel(&peripherals::Display::u8g2, n, 1);
+                u8g2_DrawPixel(&peripherals::Display::u8g2, 1, n);
             }
         }
-        u8g2_DrawPixel(&u8g2, 126, 94);
-        u8g2_DrawPixel(&u8g2, 127, 95);
-        u8g2_DrawPixel(&u8g2, 128, 96);
-        u8g2_DrawPixel(&u8g2, 126, 126);
-        u8g2_DrawPixel(&u8g2, 127, 127);
-        u8g2_DrawPixel(&u8g2, 128, 128);
+        u8g2_DrawPixel(&peripherals::Display::u8g2, 126, 94);
+        u8g2_DrawPixel(&peripherals::Display::u8g2, 127, 95);
+        u8g2_DrawPixel(&peripherals::Display::u8g2, 128, 96);
+        u8g2_DrawPixel(&peripherals::Display::u8g2, 126, 126);
+        u8g2_DrawPixel(&peripherals::Display::u8g2, 127, 127);
+        u8g2_DrawPixel(&peripherals::Display::u8g2, 128, 128);
     }
-    u8g2_SendBuffer(&u8g2);
+    u8g2_SendBuffer(&peripherals::Display::u8g2);
     // Lock the SSD1327
     // At some point scrolling got enabled and it started overwriting the screen with gibberish
     // after the first render. It was weird and actually suggests there's still something very
     // broken somewhere else.
-    u8g2_SendF(&u8g2, "ca", 0xFD, 0x12 | (1<<2));
+    u8g2_SendF(&peripherals::Display::u8g2, "ca", 0xFD, 0x12 | (1<<2));
 #endif
     unsigned long drawTime = millis() - drawStart;
     if (drawTime < 1000) {
