@@ -83,8 +83,13 @@ namespace peripherals {
         // Something about the C++ process causes lockups
         //U8G2_SSD1327_EA_W128128_F_HW_I2C u8g2(U8G2_R0, U8X8_PIN_NONE, U8X8_PIN_NONE, U8X8_PIN_NONE);
         u8g2_t u8g2 = { 0 };
+
         // I thought something about u8x8_gpio_and_delay_arduino caused lockups too;
         // replacing it with a do-nothing return 0; works too.
+
+        constexpr u8g2_uint_t WIDTH = 128;
+        constexpr u8g2_uint_t HEIGHT = 128;
+
         void u8g2_ssd1327_register_reset() {
             // SSD1327 All Register Reset
             // Set Column Address
@@ -759,27 +764,42 @@ void loop() {
         break;
     case peripherals::Joystick::RIGHT: {
             u8g2_ClearBuffer(&peripherals::Display::u8g2);
-            //u8g2_SetDrawColor(&u8g2, 0xF);
 
-            constexpr u8g2_uint_t text_x = 48;
-            constexpr u8g2_uint_t text_y = 48;
-            u8g2_uint_t text_width;
-
-            u8g2_SetFont(&peripherals::Display::u8g2, u8g2_font_osb29_tf);
+            const uint8_t *big_font = u8g2_font_osb29_tf; // 0 is widest at 16px, 100 is 69px, -20 is 58
             constexpr u8g2_uint_t text_big_height = 29;
+            const uint8_t *small_font = u8g2_font_osb18_tf; // F is 18 px, C is 17
+            constexpr u8g2_uint_t text_small_height = 18;
 
-            String numberStr = String(tempF, 0);
-            u8g2_DrawUTF8(&peripherals::Display::u8g2, text_x, text_y, numberStr.c_str());
-            text_width = u8g2_GetUTF8Width(&peripherals::Display::u8g2, numberStr.c_str());
-            Serial.printlnf("StrWidth: %u", text_width);
-            u8g2_SetFont(&peripherals::Display::u8g2, u8g2_font_osb18_tf);
-            //u8g2_SetDrawColor(&peripherals::Display::u8g2, 0x1);
-            u8g2_uint_t text_small_height = 18;
-            String unitStr = "\u00b0""F";
-            u8g2_DrawUTF8(&peripherals::Display::u8g2, text_x+text_width, text_y-(text_big_height-text_small_height), unitStr.c_str());
+            String tempStr = String(tempF, 0);
+            String degStr = "\u00b0";
+            String unitStr = "F";
 
+            // everything works from bottom-left coordinates (for English UTF8, at least...)
+
+            constexpr u8g2_uint_t temp_y = text_big_height;
+            constexpr u8g2_uint_t unit_y = temp_y;
+            constexpr u8g2_uint_t deg_y = text_small_height;
+
+            u8g2_SetFont(&peripherals::Display::u8g2, small_font);
+            const u8g2_uint_t unit_width = u8g2_GetUTF8Width(&peripherals::Display::u8g2, unitStr.c_str());
+            const u8g2_uint_t unit_x = peripherals::Display::WIDTH - unit_width;
+            const u8g2_uint_t deg_x = unit_x;
+            u8g2_SetFont(&peripherals::Display::u8g2, big_font);
+            const u8g2_uint_t temp_width = u8g2_GetUTF8Width(&peripherals::Display::u8g2, tempStr.c_str());
+            const u8g2_uint_t temp_x = peripherals::Display::WIDTH - unit_width - temp_width;
+
+            // Write the numeric value
+            u8g2_SetFont(&peripherals::Display::u8g2, big_font);
+            u8g2_DrawUTF8(&peripherals::Display::u8g2, temp_x, temp_y, tempStr.c_str());
+            // Write the symbol labels
+            u8g2_SetFont(&peripherals::Display::u8g2, small_font);
+            u8g2_DrawUTF8(&peripherals::Display::u8g2, deg_x, deg_y, degStr.c_str());
+            u8g2_DrawUTF8(&peripherals::Display::u8g2, unit_x, unit_y, unitStr.c_str());
+
+            // Reset to global default
             u8g2_SetFont(&peripherals::Display::u8g2, u8g2_font_nerhoe_tf);
-            //u8g2_SetDrawColor(&peripherals::Display::u8g2, 0x8);
+            //Serial.printlnf("%u %u", u8g2_GetAscent(&peripherals::Display::u8g2), u8g2_GetDescent(&peripherals::Display::u8g2));
+            u8g2_DrawFrame(&peripherals::Display::u8g2, temp_x-2, 0, peripherals::Display::WIDTH - temp_x + 2, temp_y + 2);
         }
         break;
     case peripherals::Joystick::UP_LEFT:
