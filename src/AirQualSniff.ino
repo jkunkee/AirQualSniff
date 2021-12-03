@@ -739,7 +739,7 @@ void loop() {
         u8g2_SendF(&u8g2, "c", 0x2E);
         //u8g2_SendF(&u8g2, "c", 0x2F); // yup, that was it
 
-        // blink so I know things are working
+        // blink inverted so I know things are working
         u8g2_SendF(&u8g2, "c", 0xA7);
         delay(500);
         u8g2_SendF(&u8g2, "c", 0xA4);
