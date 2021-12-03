@@ -1,21 +1,12 @@
 
+// checked-in dependencies
 #include "decimator.h"
 #include "DeltaClock.h"
 #include "Atmospherics.h"
-
-// This #include statement was automatically added by the Particle IDE.
-#include <photon-vbat.h>
-
-// This #include statement was automatically added by the Particle IDE.
 #include "sps30.h"
-
-// This #include statement was automatically added by the Particle IDE.
-#include <SparkFun_SCD30_Arduino_Library.h>
-
-// This #include statement was automatically added by the Particle IDE.
+// checked in 
 #include "SparkFun_SGP30_Arduino_Library.h"
 
-// This #include statement was automatically added by the Particle IDE.
 #define OLD_DISPLAY 0
 #if OLD_DISPLAY
 #include "ssd1327.h"
@@ -23,9 +14,10 @@
 #include "U8g2lib.h"
 #endif
 
-// This #include statement was automatically added by the Particle IDE.
+// Particle-style dependencies
+#include <photon-vbat.h>
+#include <SparkFun_SCD30_Arduino_Library.h>
 #include <SparkFun_LPS25HB_Arduino_Library.h>
-
 #include <SparkFun_I2C_Mux_Arduino_Library.h>
 #include <SparkFun_Qwiic_Humidity_AHT20.h>
 #include <SparkFun_Qwiic_Joystick_Arduino_Library.h>
