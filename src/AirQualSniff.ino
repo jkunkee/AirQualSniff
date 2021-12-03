@@ -85,6 +85,82 @@ namespace peripherals {
         u8g2_t u8g2 = { 0 };
         // I thought something about u8x8_gpio_and_delay_arduino caused lockups too;
         // replacing it with a do-nothing return 0; works too.
+        void u8g2_ssd1327_register_reset() {
+            // SSD1327 All Register Reset
+            // Set Column Address
+            u8g2_SendF(&peripherals::Display::u8g2, "caa", 0x15, 0x00, 0x3F);
+            // Set Row Address
+            u8g2_SendF(&peripherals::Display::u8g2, "caa", 0x75, 0x00, 0x7f);
+            // Set Contrast Control
+            u8g2_SendF(&peripherals::Display::u8g2, "ca", 0x81, 0x7F);
+            // Set Re-map
+            //u8g2_SendF(&u8g2, "ca", 0xA0, (0<<7)|(0<<6)|(0<<5)|(0<<4)|(0<<3)|(1<<2)|(0<<1)|(0<<0)); // screws it up more
+            // Set Display Start Line
+            u8g2_SendF(&peripherals::Display::u8g2, "ca", 0xA1, 0x00);
+            // Set Display Offset
+            u8g2_SendF(&peripherals::Display::u8g2, "ca", 0xA2, 0x00);
+            // Set Display Mode
+            u8g2_SendF(&peripherals::Display::u8g2, "c", 0xA4);
+            // Set MUX Ratio
+            u8g2_SendF(&peripherals::Display::u8g2, "ca", 0xA8, 127);
+            // Function Selection A
+            // Needs schematic analysis
+            // Set Display ON/OFF
+            u8g2_SendF(&peripherals::Display::u8g2, "c", 0xAF);
+            // Set Phase Length
+            // Needs datasheet analysis
+            // Set Front Clock Divider/Oscillator Frequency
+            // Needs datasheet analysis
+            // GPIO
+            u8g2_SendF(&peripherals::Display::u8g2, "ca", 0xB5, (1<<1) | (1<<0));
+            // Set Second pre-charge Period (depends on 0xD5)
+            // Needs datasheet analysis
+            // Set Gray Scale Table
+            //u8g2_SendF(&u8g2, "ca", 0xB8, ); // Needs datasheet analysis
+            // Linear LUT
+            u8g2_SendF(&peripherals::Display::u8g2, "caaaaaaaaaaaaaaaa", 0xB9,
+                0,
+                0,
+                2,
+                4,
+                6,
+                8,
+                10,
+                12,
+                14,
+                16,
+                18,
+                20,
+                22,
+                24,
+                26,
+                28);
+            // Set Pre-charge voltage
+            // Needs schematic analysis
+            // Set Vcomh
+            // Needs schematic analysis
+            // Function Select B
+            // Needs datasheet analysis
+            // Set Command Lock
+            //u8g2_SendF(&u8g2, "ca", 0xFD, 0x12 | (1<<2)); // lock isn't the issue
+            // Continuous Horizontal Scroll Setup
+            u8g2_SendF(&peripherals::Display::u8g2, "caaaaaaa", 0xB9,
+                0, // dummy
+                0, // start row
+                0, // step freq
+                0x7F, // end row
+                0, // start column
+                0x3F, // end column
+                0); // dummy
+            // Deactivate scroll
+            u8g2_SendF(&peripherals::Display::u8g2, "c", 0x2E);
+            //u8g2_SendF(&u8g2, "c", 0x2F); // yup, that was it
+
+            // blink inverted so I know things are working
+            u8g2_SendF(&peripherals::Display::u8g2, "c", 0xA7);
+            delay(500);
+            u8g2_SendF(&peripherals::Display::u8g2, "c", 0xA4);
+        }
 #endif
 
         void display_init() {
@@ -679,80 +755,7 @@ void loop() {
     case peripherals::Joystick::DOWN:
         break;
     case peripherals::Joystick::LEFT:
-        // SSD1327 All Register Reset
-        // Set Column Address
-        u8g2_SendF(&peripherals::Display::u8g2, "caa", 0x15, 0x00, 0x3F);
-        // Set Row Address
-        u8g2_SendF(&peripherals::Display::u8g2, "caa", 0x75, 0x00, 0x7f);
-        // Set Contrast Control
-        u8g2_SendF(&peripherals::Display::u8g2, "ca", 0x81, 0x7F);
-        // Set Re-map
-        //u8g2_SendF(&u8g2, "ca", 0xA0, (0<<7)|(0<<6)|(0<<5)|(0<<4)|(0<<3)|(1<<2)|(0<<1)|(0<<0)); // screws it up more
-        // Set Display Start Line
-        u8g2_SendF(&peripherals::Display::u8g2, "ca", 0xA1, 0x00);
-        // Set Display Offset
-        u8g2_SendF(&peripherals::Display::u8g2, "ca", 0xA2, 0x00);
-        // Set Display Mode
-        u8g2_SendF(&peripherals::Display::u8g2, "c", 0xA4);
-        // Set MUX Ratio
-        u8g2_SendF(&peripherals::Display::u8g2, "ca", 0xA8, 127);
-        // Function Selection A
-        // Needs schematic analysis
-        // Set Display ON/OFF
-        u8g2_SendF(&peripherals::Display::u8g2, "c", 0xAF);
-        // Set Phase Length
-        // Needs datasheet analysis
-        // Set Front Clock Divider/Oscillator Frequency
-        // Needs datasheet analysis
-        // GPIO
-        u8g2_SendF(&peripherals::Display::u8g2, "ca", 0xB5, (1<<1) | (1<<0));
-        // Set Second pre-charge Period (depends on 0xD5)
-        // Needs datasheet analysis
-        // Set Gray Scale Table
-        //u8g2_SendF(&u8g2, "ca", 0xB8, ); // Needs datasheet analysis
-        // Linear LUT
-        u8g2_SendF(&peripherals::Display::u8g2, "caaaaaaaaaaaaaaaa", 0xB9,
-            0,
-            0,
-            2,
-            4,
-            6,
-            8,
-            10,
-            12,
-            14,
-            16,
-            18,
-            20,
-            22,
-            24,
-            26,
-            28);
-        // Set Pre-charge voltage
-        // Needs schematic analysis
-        // Set Vcomh
-        // Needs schematic analysis
-        // Function Select B
-        // Needs datasheet analysis
-        // Set Command Lock
-        //u8g2_SendF(&u8g2, "ca", 0xFD, 0x12 | (1<<2)); // lock isn't the issue
-        // Continuous Horizontal Scroll Setup
-        u8g2_SendF(&peripherals::Display::u8g2, "caaaaaaa", 0xB9,
-            0, // dummy
-            0, // start row
-            0, // step freq
-            0x7F, // end row
-            0, // start column
-            0x3F, // end column
-            0); // dummy
-        // Deactivate scroll
-        u8g2_SendF(&peripherals::Display::u8g2, "c", 0x2E);
-        //u8g2_SendF(&u8g2, "c", 0x2F); // yup, that was it
-
-        // blink inverted so I know things are working
-        u8g2_SendF(&peripherals::Display::u8g2, "c", 0xA7);
-        delay(500);
-        u8g2_SendF(&peripherals::Display::u8g2, "c", 0xA4);
+        peripherals::Display::u8g2_ssd1327_register_reset();
         break;
     case peripherals::Joystick::RIGHT: {
             u8g2_ClearBuffer(&peripherals::Display::u8g2);
