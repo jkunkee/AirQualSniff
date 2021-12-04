@@ -324,6 +324,16 @@ namespace data {
 
     Decimator co2Decimator(3, 3, 3);
 
+    // Measured values from LPS25HB (pressure sensor)
+    float pressurehPa = 0;
+    float tempC_LPS25HB = 0;
+    // Calculated values from LPS25HB
+    // using pressure to estimate altitude
+    //https://en.wikipedia.org/wiki/Barometric_formula
+    float tempC = 0;
+    float tempF = 0;
+    float altitudem = 0;
+
 } // namespace data
 
 // To use I2C buffers bigger than 32 bytes, we provide a function for allocating the buffers. Particle-specific.
@@ -448,16 +458,6 @@ void loop() {
 
     int lineNo = 0;
 
-    // Measured values from LPS25HB (pressure sensor)
-    float pressurehPa;
-    float tempC_LPS25HB;
-    // Calculated values from LPS25HB
-    // using pressure to estimate altitude
-    //https://en.wikipedia.org/wiki/Barometric_formula
-    float tempC;
-    float tempF;
-    float altitudem;
-    
     // Measured values from SCD30 (CO2 sensor)
     // requires pressure, (if available) altitude, and (need to read docs) temperature offset
     static float relativeHumidityPercent;
@@ -497,24 +497,24 @@ void loop() {
     }
 
     if (sensors::pressureSensorPresent != false) {
-        tempC = tempC_LPS25HB = sensors::pressureSensor.getTemperature_degC() + sensors::pressureSensorTempFOffset * 5 / 9;
-        pressurehPa = sensors::pressureSensor.getPressure_hPa();
+        data::tempC = data::tempC_LPS25HB = sensors::pressureSensor.getTemperature_degC() + sensors::pressureSensorTempFOffset * 5 / 9;
+        data::pressurehPa = sensors::pressureSensor.getPressure_hPa();
 
-        tempF = C_TO_F(tempC_LPS25HB);
-        altitudem = atmospherics::pressure_to_est_altitude(pressurehPa);
+        data::tempF = C_TO_F(data::tempC_LPS25HB);
+        data::altitudem = atmospherics::pressure_to_est_altitude(data::pressurehPa);
 
         String val;
-        val += String(tempC, 3);
+        val += String(data::tempC, 3);
         val += " C ";
-        val += String(pressurehPa, 3);
+        val += String(data::pressurehPa, 3);
         val += " hPa";
         PRINTLN(val.c_str()); // 3
-        val = String(tempF, 3);
+        val = String(data::tempF, 3);
         val += " F ";
-        val += String(altitudem, 0);
+        val += String(data::altitudem, 0);
         val += " m";
         PRINTLN(val.c_str()); // 4
-            data::co2Decimator.push(tempF);
+            data::co2Decimator.push(data::tempF);
             if (data::co2Decimator.is_full()) {
                 float final_val;
                 data::co2Decimator.decimate_and_clear(&final_val);
@@ -525,7 +525,7 @@ void loop() {
     }
 
     if (sensors::co2SensorPresent != false) {
-        sensors::co2Sensor.setAmbientPressure(pressurehPa /* 1.0 hPa/mb */);
+        sensors::co2Sensor.setAmbientPressure(data::pressurehPa /* 1.0 hPa/mb */);
         // altitude ignored when ambient pressure set
 
         if (sensors::co2Sensor.dataAvailable() != false) {
@@ -546,7 +546,7 @@ void loop() {
     }
 
     if (sensors::pressureSensorPresent != false && sensors::co2SensorPresent != false) {
-        absoluteHumidity_g_m3_8_8 = atmospherics::rel_to_abs_humidity(tempC_LPS25HB, pressurehPa, relativeHumidityPercent);
+        absoluteHumidity_g_m3_8_8 = atmospherics::rel_to_abs_humidity(data::tempC_LPS25HB, data::pressurehPa, relativeHumidityPercent);
     }
 
     if (sensors::humiditySensorPresent != false) {
@@ -697,7 +697,7 @@ void loop() {
         str += "s:";
         str += String(C_TO_F(tempC_SCD30), 2);
         str += ",l:";
-        str += String(C_TO_F(tempC_LPS25HB), 2);
+        str += String(C_TO_F(data::tempC_LPS25HB), 2);
         str += ",c:";
         str += String(C_TO_F(sensors::vbat.readTempC()), 0);
         str += ",v:";
@@ -706,8 +706,8 @@ void loop() {
     } else {
         PRINTLN("no summary avail"); // 12
     }
-    Serial.printlnf("scd: %0.3fF lps: %0.3fF CPU: %0.3fF", C_TO_F(tempC_SCD30), C_TO_F(tempC_LPS25HB), C_TO_F(sensors::vbat.readTempC()));
-    Serial.printlnf("rH: %0.1f Pressure: %0.3fhPa", relativeHumidityPercent, pressurehPa);
+    Serial.printlnf("scd: %0.3fF lps: %0.3fF CPU: %0.3fF", C_TO_F(tempC_SCD30), C_TO_F(data::tempC_LPS25HB), C_TO_F(sensors::vbat.readTempC()));
+    Serial.printlnf("rH: %0.1f Pressure: %0.3fhPa", relativeHumidityPercent, data::pressurehPa);
 
     PRINTLN("Bld " __DATE__); // 13
     PRINTLN("Bld " __TIME__); // 14
@@ -770,7 +770,7 @@ void loop() {
             const uint8_t *small_font = u8g2_font_osb18_tf; // F is 18 px, C is 17
             constexpr u8g2_uint_t text_small_height = 18;
 
-            String tempStr = String(tempF, 0);
+            String tempStr = String(data::tempF, 0);
             String degStr = "\u00b0";
             String unitStr = "F";
 
