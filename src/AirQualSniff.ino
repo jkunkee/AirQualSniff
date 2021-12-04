@@ -718,15 +718,18 @@ void loop() {
     // For convenience: https://github.com/olikraus/u8g2/wiki/u8g2reference
 
     // Unlock the SSD1327
-    u8g2_SendF(&peripherals::Display::u8g2, "ca", 0xFD, 0x12 | (0<<2));
     switch (joyDir) {
     case peripherals::Joystick::UP:
+        u8g2_SendF(&peripherals::Display::u8g2, "ca", 0xFD, 0x12 | (0<<2));
         peripherals::Display::display_init();
+        u8g2_SendF(&peripherals::Display::u8g2, "ca", 0xFD, 0x12 | (1<<2));
         break;
     case peripherals::Joystick::DOWN:
         break;
     case peripherals::Joystick::LEFT:
+        u8g2_SendF(&peripherals::Display::u8g2, "ca", 0xFD, 0x12 | (0<<2));
         peripherals::Display::u8g2_ssd1327_register_reset();
+        u8g2_SendF(&peripherals::Display::u8g2, "ca", 0xFD, 0x12 | (1<<2));
         break;
     case peripherals::Joystick::RIGHT: {
             u8g2_ClearBuffer(&peripherals::Display::u8g2);
@@ -799,6 +802,8 @@ void loop() {
         u8g2_DrawPixel(&peripherals::Display::u8g2, 127, 127);
         u8g2_DrawPixel(&peripherals::Display::u8g2, 128, 128);
     }
+    // Unlock the SSD1327
+    u8g2_SendF(&peripherals::Display::u8g2, "ca", 0xFD, 0x12 | (0<<2));
     u8g2_SendBuffer(&peripherals::Display::u8g2);
     // Lock the SSD1327
     // At some point scrolling got enabled and it started overwriting the screen with gibberish
