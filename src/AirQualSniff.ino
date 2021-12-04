@@ -4,15 +4,9 @@
 #include "DeltaClock.h"
 #include "Atmospherics.h"
 #include "sps30.h"
-// checked in 
+// checked-in 3p dependencies
 #include "SparkFun_SGP30_Arduino_Library.h"
-
-#define OLD_DISPLAY 0
-#if OLD_DISPLAY
-#include "ssd1327.h"
-#else
 #include "U8g2lib.h"
-#endif
 
 // Particle-style dependencies
 #include <photon-vbat.h>
@@ -77,8 +71,6 @@ namespace peripherals {
     } // namespace Joystick
 
     namespace Display {
-#if OLD_DISPLAY
-#else
         // FUll U8G2, SSD1327 controller, EA_128128 display, full framebuffer, First Arduino Hardware I2C, not rotated
         // Something about the C++ process causes lockups
         //U8G2_SSD1327_EA_W128128_F_HW_I2C u8g2(U8G2_R0, U8X8_PIN_NONE, U8X8_PIN_NONE, U8X8_PIN_NONE);
@@ -166,15 +158,8 @@ namespace peripherals {
             delay(500);
             u8g2_SendF(&peripherals::Display::u8g2, "c", 0xA4);
         }
-#endif
 
         void display_init() {
-#if OLD_DISPLAY
-            // int iType, int iAddr, int bFlip, int bInvert, int iSDAPin, int iSCLPin, int32_t iSpeed
-            ssd1327Init(OLED_128x128, 0x3c, 0, 0, -1, -1, I2C_DEFAULT_SPEED);
-            ssd1327Power(true);
-            ssd1327Fill(TEXT_BACKGROUND);
-#else
             // Docs say U8G2_SSD1327_EA_W128128_F_HW_I2C, but it chops off the top and bottom 16 rows.
             // u8g2_Setup_ssd1327_i2c_ws_128x128_f seems to work well, at least empirically.
             u8g2_Setup_ssd1327_i2c_ws_128x128_f(&u8g2, U8G2_R0, u8x8_byte_arduino_hw_i2c, u8x8_gpio_and_delay_arduino);
@@ -186,7 +171,6 @@ namespace peripherals {
             //u8g2_SetDrawColor(&u8g2, 0x8);
             u8g2_ClearBuffer(&u8g2);
             u8g2_SendBuffer(&u8g2);
-#endif
         }
     } // namespace Display
 
@@ -440,21 +424,13 @@ void setup() {
     infrastructure::wd = new ApplicationWatchdog(3000U, &infrastructure::watchdogHandler);
 }
 
-#if OLD_DISPLAY
-// uint8_t x, uint8_t y, char *szMsg, uint8_t iSize, int ucFGColor, int ucBGColor
-#define PRINTLN(cstr) ssd1327WriteString(0, 0+(lineNo++)*(TEXT_HEIGHT+TEXT_LINE_SPACING), cstr, FONT_SMALL, TEXT_FOREGROUND, TEXT_BACKGROUND);
-#else
 #define PRINTLN(cstr) u8g2_DrawUTF8(&peripherals::Display::u8g2, 0, 0+(lineNo++)*(TEXT_HEIGHT+TEXT_LINE_SPACING), cstr);
-#endif
 
 void loop() {
     ApplicationWatchdog::checkin();
     infrastructure::deltaClock.update();
 
-#if OLD_DISPLAY
-#else
     u8g2_ClearBuffer(&peripherals::Display::u8g2);
-#endif
 
     int lineNo = 0;
 
@@ -738,16 +714,6 @@ void loop() {
     }
 
     unsigned long drawStart = millis();
-#if OLD_DISPLAY
-    // Arduino's Wire library uses 32-byte buffers; anything longer is truncated.
-    // Since the SSD1327 requires a type byte first and pixels are 4 bits, this means we can only send 62-pixel chunks at a time.
-    // This library already splits the transmission per y value, so it's just the x value that is limited.
-    //ssd1327ShowBitmap(NULL, 0, 0, 0, 62, 128);
-    //ssd1327ShowBitmap(NULL, 0, 62, 0, 62, 128);
-    //ssd1327ShowBitmap(NULL, 0, 124, 0, 4, 128);
-    // Particle provides a mechanism, acquireWireBuffer, for making it larger.
-    ssd1327ShowBitmap(NULL, 0, 0, 0, 128, 128);
-#else
 
     // For convenience: https://github.com/olikraus/u8g2/wiki/u8g2reference
 
@@ -839,7 +805,7 @@ void loop() {
     // after the first render. It was weird and actually suggests there's still something very
     // broken somewhere else.
     u8g2_SendF(&peripherals::Display::u8g2, "ca", 0xFD, 0x12 | (1<<2));
-#endif
+
     unsigned long drawTime = millis() - drawStart;
     if (drawTime < 1000) {
         delay(1000 - drawTime);
