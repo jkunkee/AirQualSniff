@@ -29,8 +29,8 @@ static constexpr int LED = D7;
 
 namespace infrastructure {
 
-    DeltaClock deltaClock;
-    DeltaClockEntry BlinkAction = { 0 };
+    static DeltaClock deltaClock;
+    static DeltaClockEntry BlinkAction = { 0 };
 
     void BlinkActionFunc(void) {
         static bool ledState = false;
@@ -42,15 +42,15 @@ namespace infrastructure {
         System.reset(RESET_NO_WAIT);
     }
 
-    ApplicationWatchdog *wd = NULL;
+    static ApplicationWatchdog *wd = NULL;
 
 } // namespace infrastructure
 
 namespace peripherals {
 
     namespace Joystick {
-        JOYSTICK joystick;
-        bool joystickPresent = false;
+        static JOYSTICK joystick;
+        static bool joystickPresent = false;
         typedef enum _JOYSTICK_DIRECTION {
             UP,
             DOWN,
@@ -62,25 +62,25 @@ namespace peripherals {
             DOWN_LEFT,
             CENTER,
         } JOYSTICK_DIRECTION;
-        constexpr uint16_t BOUNDARY_SIZE = 200;
-        constexpr uint16_t MAX = 1023;
-        constexpr uint16_t LEFT_THRESHOLD = BOUNDARY_SIZE;
-        constexpr uint16_t RIGHT_THRESHOLD = MAX - BOUNDARY_SIZE;
-        constexpr uint16_t UP_THRESHOLD = BOUNDARY_SIZE;
-        constexpr uint16_t DOWN_THRESHOLD = MAX - BOUNDARY_SIZE;
+        static constexpr uint16_t BOUNDARY_SIZE = 200;
+        static constexpr uint16_t MAX = 1023;
+        static constexpr uint16_t LEFT_THRESHOLD = BOUNDARY_SIZE;
+        static constexpr uint16_t RIGHT_THRESHOLD = MAX - BOUNDARY_SIZE;
+        static constexpr uint16_t UP_THRESHOLD = BOUNDARY_SIZE;
+        static constexpr uint16_t DOWN_THRESHOLD = MAX - BOUNDARY_SIZE;
     } // namespace Joystick
 
     namespace Display {
         // FUll U8G2, SSD1327 controller, EA_128128 display, full framebuffer, First Arduino Hardware I2C, not rotated
         // Something about the C++ process causes lockups
         //U8G2_SSD1327_EA_W128128_F_HW_I2C u8g2(U8G2_R0, U8X8_PIN_NONE, U8X8_PIN_NONE, U8X8_PIN_NONE);
-        u8g2_t u8g2 = { 0 };
+        static u8g2_t u8g2 = { 0 };
 
         // I thought something about u8x8_gpio_and_delay_arduino caused lockups too;
         // replacing it with a do-nothing return 0; works too.
 
-        constexpr u8g2_uint_t WIDTH = 128;
-        constexpr u8g2_uint_t HEIGHT = 128;
+        static constexpr u8g2_uint_t WIDTH = 128;
+        static constexpr u8g2_uint_t HEIGHT = 128;
 
         void u8g2_ssd1327_register_reset() {
             // SSD1327 All Register Reset
@@ -159,7 +159,7 @@ namespace peripherals {
             u8g2_SendF(&peripherals::Display::u8g2, "c", 0xA4);
         }
 
-        void display_init() {
+        void init() {
             // Docs say U8G2_SSD1327_EA_W128128_F_HW_I2C, but it chops off the top and bottom 16 rows.
             // u8g2_Setup_ssd1327_i2c_ws_128x128_f seems to work well, at least empirically.
             u8g2_Setup_ssd1327_i2c_ws_128x128_f(&u8g2, U8G2_R0, u8x8_byte_arduino_hw_i2c, u8x8_gpio_and_delay_arduino);
@@ -174,11 +174,11 @@ namespace peripherals {
         }
     } // namespace Display
 
-    QWIICMUX i2cMux;
-    bool i2cMuxPresent = false;
+    static QWIICMUX i2cMux;
+    static bool i2cMuxPresent = false;
 
-    #define I2C_DEFAULT_SPEED CLOCK_SPEED_400KHZ
-    #define I2C_SAFE_SPEED    CLOCK_SPEED_100KHZ
+    static constexpr uint32_t I2C_DEFAULT_SPEED = CLOCK_SPEED_400KHZ;
+    static constexpr uint32_t I2C_SAFE_SPEED    = CLOCK_SPEED_100KHZ;
 
 } // namespace peripherals
 
@@ -271,58 +271,76 @@ namespace peripherals {
 
 namespace sensors {
 
-    LPS25HB pressureSensor;
-    bool pressureSensorPresent = false;
+    static LPS25HB pressureSensor;
+    static bool pressureSensorPresent = false;
     // Device returns 83.2 deg F, TemporalScanner returns 80.3
     // Offset is added
     // 70 deg F in actively cooled airstream was -5 deg F
-    constexpr float pressureSensorTempFOffset = 80.3 - 83.2; // actual - measured
+    static constexpr float pressureSensorTempFOffset = 80.3 - 83.2; // actual - measured
 
-    AHT20 humiditySensor;
-    bool humiditySensorPresent = false;
-    constexpr float humiditySensorTempOffset = 0.0;
+    static AHT20 humiditySensor;
+    static bool humiditySensorPresent = false;
+    static constexpr float humiditySensorTempOffset = 0.0;
 
     // https://github.com/sparkfun/SparkFun_SGP30_Arduino_Library/tree/main/src
-    SGP30 vocSensor;
-    bool vocSensorPresent = false;
-    constexpr int VOC_START_DELAY_MILLIS = 15*1000;
-    unsigned long vocSensorInitStart = 0;
-    bool vocSensorInitDone = false;
+    static SGP30 vocSensor;
+    static bool vocSensorPresent = false;
+    static constexpr int VOC_START_DELAY_MILLIS = 15*1000;
+    static unsigned long vocSensorInitStart = 0;
+    static bool vocSensorInitDone = false;
 
-    SCD30 co2Sensor;
-    bool co2SensorPresent = false;
+    static SCD30 co2Sensor;
+    static bool co2SensorPresent = false;
     // Device returns 79.0 deg F, TemporalScanner returns 80.1
     // Offset is added
     // 70 deg F in actively cooled airstream was -1 deg F
-    constexpr float co2SensorTempFOffset = 80.1 - 79.0;
+    static constexpr float co2SensorTempFOffset = 80.1 - 79.0;
 
-    SPS30 pmSensor;
-    bool pmSensorPresent = false;
-    constexpr uint8_t PM_MUX_PORT = 7;
+    static SPS30 pmSensor;
+    static bool pmSensorPresent = false;
+    static constexpr uint8_t PM_MUX_PORT = 7;
 
-    PhotonVBAT vbat(A0);
+    static PhotonVBAT vbat(A0);
 
 } // namespace sensors
 
 namespace data {
 
-    Decimator co2Decimator(3, 3, 3);
+    static Decimator co2Decimator(3, 3, 3);
 
     // Measured values from LPS25HB (pressure sensor)
-    float pressurehPa = 0;
-    float tempC_LPS25HB = 0;
+    static float pressurehPa = 0;
+    static float tempC_LPS25HB = 0;
     // Calculated values from LPS25HB
     // using pressure to estimate altitude
     //https://en.wikipedia.org/wiki/Barometric_formula
-    float tempC = 0;
-    float tempF = 0;
-    float altitudem = 0;
+    static float tempC = 0;
+    static float tempF = 0;
+    static float altitudem = 0;
+
+    // Measured values from SCD30 (CO2 sensor)
+    // requires pressure, (if available) altitude, and (need to read docs) temperature offset
+    static float relativeHumidityPercent = 0;
+    static float tempC_SCD30 = 0;
+    static uint16_t co2ppm = 0;
+    // Calculated values from SCD30
+    //static float tempOffsetC_SCD30 = 0; // TODO: figure out difference between input air and sensor temps as input for SCD30 correction
+
+    // Composite calculated value
+    static uint16_t absoluteHumidity_g_m3_8_8 = 0xF80; // default value in SGP30
+
+    // Measured values from SPS30 (particulate sensor)
+    static SPS30_DATA_INT pmData;
+
+    // Measured values from SGP30 (VOC sensor)
+    //static uint16_t TVOCppb = 0; // currently only read into locals
+    //static uint16_t eCO2ppm = 0; // currently only read into locals
 
 } // namespace data
 
 // To use I2C buffers bigger than 32 bytes, we provide a function for allocating the buffers. Particle-specific.
 // https://docs.staging.particle.io/cards/firmware/wire-i2c/acquirewirebuffer/
-constexpr size_t I2C_BUFFER_SIZE = 512;
+static constexpr size_t I2C_BUFFER_SIZE = 512;
 
 hal_i2c_config_t acquireWireBuffer() {
     hal_i2c_config_t config = {
@@ -345,7 +363,7 @@ void setup() {
 
     // setSpeed must be before begin()
     // https://docs.staging.particle.io/cards/firmware/wire-i2c/setspeed/
-    Wire.setSpeed(I2C_SAFE_SPEED);
+    Wire.setSpeed(peripherals::I2C_SAFE_SPEED);
     Wire.begin();
 
     Serial.begin(115200);
@@ -388,7 +406,7 @@ void setup() {
     if (peripherals::i2cMuxPresent) {
         // Slow down I2C
         Wire.end();
-        Wire.setSpeed(I2C_SAFE_SPEED); // SPS30 only supports 100KHz
+        Wire.setSpeed(peripherals::I2C_SAFE_SPEED); // SPS30 only supports 100KHz
         Wire.begin();
         // Enable I2C mux
         peripherals::i2cMux.enablePort(sensors::PM_MUX_PORT);
@@ -410,11 +428,11 @@ void setup() {
         peripherals::i2cMux.disablePort(sensors::PM_MUX_PORT);
         // Speed up I2C
         Wire.end();
-        Wire.setSpeed(I2C_DEFAULT_SPEED); // Display really needs 400KHz
+        Wire.setSpeed(peripherals::I2C_DEFAULT_SPEED); // Display really needs 400KHz
         Wire.begin();
     }
 
-    peripherals::Display::display_init();
+    peripherals::Display::init();
 
     Time.zone(-8.0);
     Time.setDSTOffset(+1.0);
@@ -433,24 +451,6 @@ void loop() {
     u8g2_ClearBuffer(&peripherals::Display::u8g2);
 
     int lineNo = 0;
-
-    // Measured values from SCD30 (CO2 sensor)
-    // requires pressure, (if available) altitude, and (need to read docs) temperature offset
-    static float relativeHumidityPercent;
-    static float tempC_SCD30;
-    static uint16_t co2ppm;
-    // Calculated values from SCD30
-    float tempOffsetC_SCD30; // TODO: figure out difference between input air and sensor temps as input for SCD30 correction
-
-    // Composite calculated value
-    uint16_t absoluteHumidity_g_m3_8_8 = 0xF80; // default value in SGP30
-
-    // Measured values from SPS30 (particulate sensor)
-    SPS30_DATA_INT pmData;
-    
-    // Measured values from SGP30 (VOC sensor)
-    uint16_t TVOCppb = 0;
-    uint16_t eCO2ppm = 0;
 
     PRINTLN("Air Quality Sniffer"); // 1
 
@@ -505,16 +505,16 @@ void loop() {
         // altitude ignored when ambient pressure set
 
         if (sensors::co2Sensor.dataAvailable() != false) {
-            relativeHumidityPercent = sensors::co2Sensor.getHumidity();
-            tempC_SCD30 = sensors::co2Sensor.getTemperature() + sensors::co2SensorTempFOffset * 5 / 9;
-            co2ppm = sensors::co2Sensor.getCO2();
+            data::relativeHumidityPercent = sensors::co2Sensor.getHumidity();
+            data::tempC_SCD30 = sensors::co2Sensor.getTemperature() + sensors::co2SensorTempFOffset * 5 / 9;
+            data::co2ppm = sensors::co2Sensor.getCO2();
         }
 
         String val;
         val += "co2:";
-        val += String(co2ppm);
+        val += String(data::co2ppm);
         val += "ppm rh:";
-        val += String(relativeHumidityPercent, 0);
+        val += String(data::relativeHumidityPercent, 0);
         val += "%       ";
         PRINTLN(val.c_str()); // 5
     } else {
@@ -522,7 +522,7 @@ void loop() {
     }
 
     if (sensors::pressureSensorPresent != false && sensors::co2SensorPresent != false) {
-        absoluteHumidity_g_m3_8_8 = atmospherics::rel_to_abs_humidity(data::tempC_LPS25HB, data::pressurehPa, relativeHumidityPercent);
+        data::absoluteHumidity_g_m3_8_8 = atmospherics::rel_to_abs_humidity(data::tempC_LPS25HB, data::pressurehPa, data::relativeHumidityPercent);
     }
 
     if (sensors::humiditySensorPresent != false) {
@@ -543,7 +543,7 @@ void loop() {
     if (sensors::vocSensorPresent != false) {
         String val = "";
 
-        sensors::vocSensor.setHumidity(absoluteHumidity_g_m3_8_8);
+        sensors::vocSensor.setHumidity(data::absoluteHumidity_g_m3_8_8);
 
         SGP30ERR sgperr = sensors::vocSensor.measureAirQuality();
         if (sgperr != SGP30_SUCCESS)
@@ -609,35 +609,35 @@ void loop() {
     if (peripherals::i2cMuxPresent) {
         // Slow down I2C
         Wire.end();
-        Wire.setSpeed(I2C_SAFE_SPEED);
+        Wire.setSpeed(peripherals::I2C_SAFE_SPEED);
         Wire.begin();
         // Enable I2C mux
         peripherals::i2cMux.enablePort(sensors::PM_MUX_PORT);
     }
     if (sensors::pmSensorPresent != false && sensors::pmSensor.is_data_ready() == SPS30_OK) {
-        sensors::pmSensor.read_data_no_wait_int(&pmData);
+        sensors::pmSensor.read_data_no_wait_int(&data::pmData);
         String val;
-        val += String(pmData.pm_1_0_ug_m3);
+        val += String(data::pmData.pm_1_0_ug_m3);
         val += ",";
-        val += String(pmData.pm_2_5_ug_m3);
+        val += String(data::pmData.pm_2_5_ug_m3);
         val += ",";
-        val += String(pmData.pm_4_0_ug_m3);
+        val += String(data::pmData.pm_4_0_ug_m3);
         val += ",";
-        val += String(pmData.pm_10_ug_m3);
+        val += String(data::pmData.pm_10_ug_m3);
         val += ",";
-        val += String(pmData.typical_size_nm);
+        val += String(data::pmData.typical_size_nm);
         val += "            ";
         PRINTLN(val.c_str()); // 9
         val = "";
-        val += String(pmData.pm_0_5_n_cm3);
+        val += String(data::pmData.pm_0_5_n_cm3);
         val += ",";
-        val += String(pmData.pm_1_0_n_cm3);
+        val += String(data::pmData.pm_1_0_n_cm3);
         val += ",";
-        val += String(pmData.pm_2_5_n_cm3);
+        val += String(data::pmData.pm_2_5_n_cm3);
         val += ",";
-        val += String(pmData.pm_4_0_n_cm3);
+        val += String(data::pmData.pm_4_0_n_cm3);
         val += ",";
-        val += String(pmData.pm_10_n_cm3);
+        val += String(data::pmData.pm_10_n_cm3);
         val += "            ";
         PRINTLN(val.c_str()); // 10
     } else {
@@ -658,7 +658,7 @@ void loop() {
         peripherals::i2cMux.disablePort(sensors::PM_MUX_PORT);
         // Speed up I2C
         Wire.end();
-        Wire.setSpeed(I2C_DEFAULT_SPEED);
+        Wire.setSpeed(peripherals::I2C_DEFAULT_SPEED);
         Wire.begin();
     }
 
@@ -671,7 +671,7 @@ void loop() {
     if (sensors::co2SensorPresent && sensors::pressureSensorPresent) {
         String str;
         str += "s:";
-        str += String(C_TO_F(tempC_SCD30), 2);
+        str += String(C_TO_F(data::tempC_SCD30), 2);
         str += ",l:";
         str += String(C_TO_F(data::tempC_LPS25HB), 2);
         str += ",c:";
@@ -682,8 +682,8 @@ void loop() {
     } else {
         PRINTLN("no summary avail"); // 12
     }
-    Serial.printlnf("scd: %0.3fF lps: %0.3fF CPU: %0.3fF", C_TO_F(tempC_SCD30), C_TO_F(data::tempC_LPS25HB), C_TO_F(sensors::vbat.readTempC()));
-    Serial.printlnf("rH: %0.1f Pressure: %0.3fhPa", relativeHumidityPercent, data::pressurehPa);
+    Serial.printlnf("scd: %0.3fF lps: %0.3fF CPU: %0.3fF", C_TO_F(data::tempC_SCD30), C_TO_F(data::tempC_LPS25HB), C_TO_F(sensors::vbat.readTempC()));
+    Serial.printlnf("rH: %0.1f Pressure: %0.3fhPa", data::relativeHumidityPercent, data::pressurehPa);
 
     PRINTLN("Bld " __DATE__); // 13
     PRINTLN("Bld " __TIME__); // 14
@@ -721,7 +721,7 @@ void loop() {
     switch (joyDir) {
     case peripherals::Joystick::UP:
         u8g2_SendF(&peripherals::Display::u8g2, "ca", 0xFD, 0x12 | (0<<2));
-        peripherals::Display::display_init();
+        peripherals::Display::init();
         u8g2_SendF(&peripherals::Display::u8g2, "ca", 0xFD, 0x12 | (1<<2));
         break;
     case peripherals::Joystick::DOWN:
