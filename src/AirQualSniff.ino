@@ -182,6 +182,47 @@ namespace peripherals {
 
 } // namespace peripherals
 
+// Event System
+#define EVENTHUB_DEBUG
+#include "EventHub.h"
+
+static bool foo(EventHub::Event* event);
+static bool foo(EventHub::Event* event) {
+    Serial.printlnf("fired foo");
+    for (size_t input_idx = 0; input_idx < event->triggers_count; input_idx++) {
+        Serial.printlnf("  Rx'd #%d %f", input_idx, event->triggers[input_idx].data.fl);
+    }
+    return true;
+}
+
+static EventHub::EventHub event_hub_actual = {
+    .events_count = 3,
+    .events = {
+        {
+            .action = NULL,
+            .triggers_count = 0,
+            .triggers = {},
+        },
+        {
+            .action = NULL,
+            .triggers_count = 0,
+            .triggers = {},
+        },
+        {
+            .action = &foo,
+            .triggers_count = 2,
+            .triggers = {
+                {
+                    .source_event = &event_hub_actual.events[0],
+                },
+                {
+                    .source_event = &event_hub_actual.events[1],
+                },
+            },
+        },
+    },
+};
+
 // Data Collection Strategy
 //
 // What am I measuring?
@@ -455,6 +496,17 @@ void setup() {
 void loop() {
     ApplicationWatchdog::checkin();
     infrastructure::deltaClock.update();
+
+    {
+        EventHub::EventData dat;
+        dat.fl = 0.0;
+        EventHub::DumpStateOnSerial(&event_hub_actual);
+        EventHub::FireEvent(&event_hub_actual, &event_hub_actual.events[0], &dat);
+        EventHub::DumpStateOnSerial(&event_hub_actual);
+        dat.fl = 1.0;
+        EventHub::FireEvent(&event_hub_actual, &event_hub_actual.events[1], &dat);
+        EventHub::DumpStateOnSerial(&event_hub_actual);
+    }
 
     u8g2_ClearBuffer(&peripherals::Display::u8g2);
 
