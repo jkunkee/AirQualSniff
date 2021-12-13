@@ -336,6 +336,14 @@ namespace data {
     //static uint16_t TVOCppb = 0; // currently only read into locals
     //static uint16_t eCO2ppm = 0; // currently only read into locals
 
+    // Curated (and eventually averaged) values for display
+    namespace Display {
+        static float temperature_C = 0;
+        static float temperature_F = 0;
+        static bool temperature_set = false;
+        //static bool temperature_fresh = false;
+    }
+
 } // namespace data
 
 // To use I2C buffers bigger than 32 bytes, we provide a function for allocating the buffers. Particle-specific.
@@ -473,10 +481,11 @@ void loop() {
     }
 
     if (sensors::pressureSensorPresent != false) {
-        data::tempC = data::tempC_LPS25HB = sensors::pressureSensor.getTemperature_degC() + sensors::pressureSensorTempFOffset * 5 / 9;
+        data::Display::temperature_C = data::tempC = data::tempC_LPS25HB = sensors::pressureSensor.getTemperature_degC() + sensors::pressureSensorTempFOffset * 5 / 9;
         data::pressurehPa = sensors::pressureSensor.getPressure_hPa();
 
-        data::tempF = C_TO_F(data::tempC_LPS25HB);
+        data::Display::temperature_F = data::tempF = C_TO_F(data::tempC_LPS25HB);
+        data::Display::temperature_set = true;
         data::altitudem = atmospherics::pressure_to_est_altitude(data::pressurehPa);
 
         String val;
@@ -748,7 +757,7 @@ void loop() {
             const uint8_t *small_font = u8g2_font_osb18_tf; // F is 18 px, C is 17
             constexpr u8g2_uint_t text_small_height = 18;
 
-            String tempStr = String(data::tempF, 0);
+            String tempStr = data::Display::temperature_set ? String(data::Display::temperature_F, 0) : "NaN";
             String degStr = "\u00b0";
             String unitStr = "F";
 
