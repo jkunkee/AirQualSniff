@@ -122,7 +122,7 @@ public:
     bool Fire(Event* event, EventData* data) {
         bool trigger_found = false;
         for (size_t e_idx = 0; e_idx < events.count; e_idx++) {
-            trigger_found |= events.list[e_idx]->ProcessTrigger(event, data);
+            trigger_found = trigger_found || events.list[e_idx]->ProcessTrigger(event, data);
         }
         return trigger_found;
     }
