@@ -236,6 +236,7 @@ static DeltaClockEntry AHT20Timer = {
     .repeating = true,
 };
 
+/*
 bool CalculateAbsHum(Eventing::Event* event) {
     float tempC = -NAN;
     float pressurehPa = -NAN;
@@ -250,7 +251,7 @@ bool CalculateAbsHum(Eventing::Event* event) {
             } else if (trigger->source_event == &LPS25HB_TempC_Event) {
                 tempC = trigger->data.fl;
             } else {
-                Serial.printlnf("Unhandled event \"%s\" %0.2f/%u/%d/%x", trigger->source_event->name, trigger->data.fl, trigger->data.uin16, trigger->data.in16, trigger->data.uin16);
+                //Serial.printlnf("Unhandled event \"%s\" %0.2f/%u/%d/%x", trigger->source_event->name, trigger->data.fl, trigger->data.uin16, trigger->data.in16, trigger->data.uin16);
                 return false;
             }
         }
@@ -258,12 +259,13 @@ bool CalculateAbsHum(Eventing::Event* event) {
     Eventing::EventData absoluteHumidity_g_m3_8_8;
     absoluteHumidity_g_m3_8_8.uin16 = atmospherics::rel_to_abs_humidity(tempC, pressurehPa, rh);
     // This wasn't exactly intended, but it's very much needed
-    Serial.printlnf("Calculated abs hum %u \"%s\"", absoluteHumidity_g_m3_8_8.uin16, event->name);
+    //Serial.printlnf("Calculated abs hum %u \"%s\"", absoluteHumidity_g_m3_8_8.uin16, event->name);
 #warning Absolute Humidity self-firing event still broken
     return true;
     return infrastructure::event_hub.Fire(event, &absoluteHumidity_g_m3_8_8);
 }
 Eventing::Event AbsoluteHumidity_g_m3_8_8_Event(&CalculateAbsHum, "Calculate absolute humidity from relative humidity", Eventing::TRIGGER_ON_ALL);
+*/
 
 void init() {
     lps25hb_pressure_sensor_present = pressureSensor.begin();
@@ -386,10 +388,12 @@ void init() {
     infrastructure::event_hub.Add(&sensors::LPS25HB_TempF_Event);
     infrastructure::event_hub.Add(&sensors::SCD30_CO2_Event);
     infrastructure::event_hub.Add(&sensors::AHT20_Humidity_Event);
+/*
     infrastructure::event_hub.Add(&sensors::AbsoluteHumidity_g_m3_8_8_Event);
     sensors::AbsoluteHumidity_g_m3_8_8_Event.AddTrigger(&sensors::LPS25HB_TempC_Event);
     sensors::AbsoluteHumidity_g_m3_8_8_Event.AddTrigger(&sensors::LPS25HB_Pressure_Event);
     sensors::AbsoluteHumidity_g_m3_8_8_Event.AddTrigger(&sensors::AHT20_Humidity_Event);
+*/
     infrastructure::event_hub.Add(&UX::RenderSerialEvent);
     UX::RenderSerialEvent.AddTrigger(&sensors::LPS25HB_Pressure_Event);
     UX::RenderSerialEvent.AddTrigger(&sensors::LPS25HB_Altitude_Event);
@@ -397,8 +401,9 @@ void init() {
     UX::RenderSerialEvent.AddTrigger(&sensors::LPS25HB_TempF_Event);
     UX::RenderSerialEvent.AddTrigger(&sensors::SCD30_CO2_Event);
     UX::RenderSerialEvent.AddTrigger(&sensors::AHT20_Humidity_Event);
-#warning Absolute Humidity self-firing event still broken
+    /*
     //UX::RenderSerialEvent.AddTrigger(&sensors::AbsoluteHumidity_g_m3_8_8_Event);
+    */
 }
 
 } // namespace Flow
