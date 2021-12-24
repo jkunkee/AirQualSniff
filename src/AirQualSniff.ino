@@ -107,7 +107,118 @@ void SlowDownI2c() {
         Wire.begin();
         peripherals::i2cMux.enablePort(PM_MUX_PORT);
     }
-}
+
+namespace Display {
+    // FUll U8G2, SSD1327 controller, EA_128128 display, full framebuffer, First Arduino Hardware I2C, not rotated
+    // Something about the C++ process causes lockups
+    //U8G2_SSD1327_EA_W128128_F_HW_I2C u8g2(U8G2_R0, U8X8_PIN_NONE, U8X8_PIN_NONE, U8X8_PIN_NONE);
+    static u8g2_t u8g2 = { 0 };
+
+    // I thought something about u8x8_gpio_and_delay_arduino caused lockups too;
+    // replacing it with a do-nothing return 0; works too.
+
+    static constexpr u8g2_uint_t WIDTH = 128;
+    static constexpr u8g2_uint_t HEIGHT = 128;
+
+    void u8g2_ssd1327_lock() {
+        u8g2_SendF(&peripherals::Display::u8g2, "ca", 0xFD, 0x12 | (1<<2));
+    }
+
+    void u8g2_ssd1327_unlock() {
+        u8g2_SendF(&peripherals::Display::u8g2, "ca", 0xFD, 0x12 | (0<<2));
+    }
+
+    void u8g2_ssd1327_register_reset() {
+        // SSD1327 All Register Reset
+        // Set Column Address
+        u8g2_SendF(&peripherals::Display::u8g2, "caa", 0x15, 0x00, 0x3F);
+        // Set Row Address
+        u8g2_SendF(&peripherals::Display::u8g2, "caa", 0x75, 0x00, 0x7f);
+        // Set Contrast Control
+        u8g2_SendF(&peripherals::Display::u8g2, "ca", 0x81, 0x7F);
+        // Set Re-map
+        //u8g2_SendF(&u8g2, "ca", 0xA0, (0<<7)|(0<<6)|(0<<5)|(0<<4)|(0<<3)|(1<<2)|(0<<1)|(0<<0)); // screws it up more
+        // Set Display Start Line
+        u8g2_SendF(&peripherals::Display::u8g2, "ca", 0xA1, 0x00);
+        // Set Display Offset
+        u8g2_SendF(&peripherals::Display::u8g2, "ca", 0xA2, 0x00);
+        // Set Display Mode
+        u8g2_SendF(&peripherals::Display::u8g2, "c", 0xA4);
+        // Set MUX Ratio
+        u8g2_SendF(&peripherals::Display::u8g2, "ca", 0xA8, 127);
+        // Function Selection A
+        // Needs schematic analysis
+        // Set Display ON/OFF
+        u8g2_SendF(&peripherals::Display::u8g2, "c", 0xAF);
+        // Set Phase Length
+        // Needs datasheet analysis
+        // Set Front Clock Divider/Oscillator Frequency
+        // Needs datasheet analysis
+        // GPIO
+        u8g2_SendF(&peripherals::Display::u8g2, "ca", 0xB5, (1<<1) | (1<<0));
+        // Set Second pre-charge Period (depends on 0xD5)
+        // Needs datasheet analysis
+        // Set Gray Scale Table
+        //u8g2_SendF(&u8g2, "ca", 0xB8, ); // Needs datasheet analysis
+        // Linear LUT
+        u8g2_SendF(&peripherals::Display::u8g2, "caaaaaaaaaaaaaaaa", 0xB9,
+            0,
+            0,
+            2,
+            4,
+            6,
+            8,
+            10,
+            12,
+            14,
+            16,
+            18,
+            20,
+            22,
+            24,
+            26,
+            28);
+        // Set Pre-charge voltage
+        // Needs schematic analysis
+        // Set Vcomh
+        // Needs schematic analysis
+        // Function Select B
+        // Needs datasheet analysis
+        // Set Command Lock
+        //u8g2_SendF(&u8g2, "ca", 0xFD, 0x12 | (1<<2)); // lock isn't the issue
+        // Continuous Horizontal Scroll Setup
+        u8g2_SendF(&peripherals::Display::u8g2, "caaaaaaa", 0xB9,
+            0, // dummy
+            0, // start row
+            0, // step freq
+            0x7F, // end row
+            0, // start column
+            0x3F, // end column
+            0); // dummy
+        // Deactivate scroll
+        u8g2_SendF(&peripherals::Display::u8g2, "c", 0x2E);
+        //u8g2_SendF(&u8g2, "c", 0x2F); // yup, that was it
+
+        // blink inverted so I know things are working
+        u8g2_SendF(&peripherals::Display::u8g2, "c", 0xA7);
+        delay(500);
+        u8g2_SendF(&peripherals::Display::u8g2, "c", 0xA4);
+    }
+
+    void init() {
+        // Docs say U8G2_SSD1327_EA_W128128_F_HW_I2C, but it chops off the top and bottom 16 rows.
+        // u8g2_Setup_ssd1327_i2c_ws_128x128_f seems to work well, at least empirically.
+        //u8g2_Setup_ssd1327_i2c_ws_128x128_f(&u8g2, U8G2_R0, u8x8_byte_arduino_hw_i2c, u8x8_gpio_and_delay_arduino);
+        u8g2_Setup_ssd1327_i2c_midas_128x128_f(&u8g2, U8G2_R0, u8x8_byte_arduino_hw_i2c, u8x8_gpio_and_delay_arduino);
+        //u8g2_Setup_ssd1327_i2c_ea_w128128_f(&u8g2, U8G2_R0, u8x8_byte_arduino_hw_i2c, u8x8_gpio_and_delay_arduino);
+        u8g2_InitDisplay(&u8g2);
+        u8g2_SetPowerSave(&u8g2, 0);
+        u8g2_SetFont(&u8g2, u8g2_font_nerhoe_tf);
+        //u8g2_SetDrawColor(&u8g2, 0x8);
+        u8g2_ClearBuffer(&u8g2);
+        u8g2_SendBuffer(&u8g2);
+    }
+} // namespace Display
 
 void init() {
     peripherals::i2cMuxPresent = peripherals::i2cMux.begin();
@@ -123,6 +234,7 @@ void init() {
             //|0x80 // SCD30/PM
             );
     }
+    Display::init();
 }
 
 } // namespace peripherals
@@ -362,6 +474,101 @@ bool RenderSerial(Eventing::Event* event) {
 }
 Eventing::Event RenderSerialEvent(&RenderSerial, "RenderSerialEvent", Eventing::EventTriggerType::TRIGGER_ON_ANY);
 
+typedef enum _OledMode {
+    HOME,
+} OledMode;
+
+bool RenderOled(Eventing::Event* event) {
+    static OledMode mode = HOME;
+    Serial.println("Hello OLED");
+    infrastructure::event_hub.DumpStateOnSerial();
+
+    static float press = -NAN, tempF = -NAN;
+    static uint16_t co2ppm = -1;
+    static float rh = -NAN;
+    for (size_t evt_idx = 0; evt_idx < event->triggers.count; evt_idx++) {
+        Eventing::EventTrigger* trigger = event->triggers.list[evt_idx];
+        if (trigger->data_ready) {
+            if (trigger->source_event == &sensors::LPS25HB_Pressure_Event) {
+                press = trigger->data.fl;
+            } else if (trigger->source_event == &sensors::LPS25HB_TempF_Event) {
+                tempF = trigger->data.fl;
+            } else if (trigger->source_event == &sensors::SCD30_CO2_Event) {
+                co2ppm = trigger->data.uin16;
+            } else if (trigger->source_event == &sensors::AHT20_Humidity_Event) {
+                rh = trigger->data.fl;
+            } else {
+                Serial.printlnf("Unhandled event \"%s\" %0.2f/%u/%d/%x", trigger->source_event->name, trigger->data.fl, trigger->data.uin16, trigger->data.in16, trigger->data.uin16);
+            }
+        }
+    }
+
+    u8g2_ClearBuffer(&peripherals::Display::u8g2);
+    if (0) { // debugging reticle
+        for (int n = 0; n < 128; n++) {
+            if (n % 5 == 0) {
+                u8g2_DrawPixel(&peripherals::Display::u8g2, n, 0);
+                u8g2_DrawPixel(&peripherals::Display::u8g2, 0, n);
+            }
+            if (n % 10 == 0) {
+                u8g2_DrawPixel(&peripherals::Display::u8g2, n, 1);
+                u8g2_DrawPixel(&peripherals::Display::u8g2, 1, n);
+            }
+        }
+        u8g2_DrawPixel(&peripherals::Display::u8g2, 126, 94);
+        u8g2_DrawPixel(&peripherals::Display::u8g2, 127, 95);
+        u8g2_DrawPixel(&peripherals::Display::u8g2, 128, 96);
+        u8g2_DrawPixel(&peripherals::Display::u8g2, 126, 126);
+        u8g2_DrawPixel(&peripherals::Display::u8g2, 127, 127);
+        u8g2_DrawPixel(&peripherals::Display::u8g2, 128, 128);
+    }
+
+    unsigned long drawStart = millis();
+    switch (mode) {
+    default:
+    case HOME: {
+        const uint8_t *big_font = u8g2_font_osb29_tf; // 0 is widest at 16px, 100 is 69px, -20 is 58
+        constexpr u8g2_uint_t text_big_height = 29;
+        const uint8_t *small_font = u8g2_font_osb18_tf; // F is 18 px, C is 17
+        constexpr u8g2_uint_t text_small_height = 18;
+        u8g2_SetFont(&peripherals::Display::u8g2, small_font);
+        char buf[20];
+        u8g2_uint_t temp_bottom_left_x = 0, temp_bottom_left_y = peripherals::Display::HEIGHT * 1 / 4;
+        u8g2_uint_t hum_bottom_left_x = 0, hum_bottom_left_y = peripherals::Display::HEIGHT * 2 / 4;
+        u8g2_uint_t co2_bottom_left_x = 0, co2_bottom_left_y = peripherals::Display::HEIGHT * 3 / 4;
+        u8g2_uint_t press_bottom_left_x = 0, press_bottom_left_y = peripherals::Display::HEIGHT * 4 / 4;
+        if (sensors::lps25hb_pressure_sensor_present) {
+            snprintf(buf, sizeof(buf), "%0.1fhPa", press);
+            u8g2_DrawUTF8(&peripherals::Display::u8g2, press_bottom_left_x, press_bottom_left_y, buf);
+            snprintf(buf, sizeof(buf), "%0.1f\u00b0F", tempF);
+            u8g2_DrawUTF8(&peripherals::Display::u8g2, temp_bottom_left_x, temp_bottom_left_y, buf);
+        } else {
+            u8g2_DrawUTF8(&peripherals::Display::u8g2, press_bottom_left_x, press_bottom_left_y, "-hPa");
+            u8g2_DrawUTF8(&peripherals::Display::u8g2, temp_bottom_left_x, temp_bottom_left_y, "-\u00b0F");
+        }
+        if (sensors::co2SensorPresent) {
+            snprintf(buf, sizeof(buf), "%uppm CO2", co2ppm);
+            u8g2_DrawUTF8(&peripherals::Display::u8g2, co2_bottom_left_x, co2_bottom_left_y, buf);
+        } else {
+            u8g2_DrawUTF8(&peripherals::Display::u8g2, co2_bottom_left_x, co2_bottom_left_y, "-ppm CO2");
+        }
+        if (sensors::humiditySensorPresent) {
+            snprintf(buf, sizeof(buf), "%0.1f%% rh", rh);
+            u8g2_DrawUTF8(&peripherals::Display::u8g2, hum_bottom_left_x, hum_bottom_left_y, buf);
+        } else {
+            u8g2_DrawUTF8(&peripherals::Display::u8g2, hum_bottom_left_x, hum_bottom_left_y, "-% rh");
+        }
+    }
+    }
+    peripherals::Display::u8g2_ssd1327_unlock();
+    u8g2_SendBuffer(&peripherals::Display::u8g2);
+    peripherals::Display::u8g2_ssd1327_lock();
+    unsigned long drawEnd = millis();
+    Serial.printlnf("draw latency: %lu ms", drawEnd - drawStart);
+    return true;
+}
+Eventing::Event RenderOledEvent(&RenderOled, "RenderOledEvent", Eventing::EventTriggerType::TRIGGER_ON_ALL);
+
 } // namespace UX
 
 /*****************************************************************************/
@@ -394,6 +601,7 @@ void init() {
     sensors::AbsoluteHumidity_g_m3_8_8_Event.AddTrigger(&sensors::LPS25HB_Pressure_Event);
     sensors::AbsoluteHumidity_g_m3_8_8_Event.AddTrigger(&sensors::AHT20_Humidity_Event);
 */
+/* multiple consumer scenario is broken
     infrastructure::event_hub.Add(&UX::RenderSerialEvent);
     UX::RenderSerialEvent.AddTrigger(&sensors::LPS25HB_Pressure_Event);
     UX::RenderSerialEvent.AddTrigger(&sensors::LPS25HB_Altitude_Event);
@@ -401,9 +609,15 @@ void init() {
     UX::RenderSerialEvent.AddTrigger(&sensors::LPS25HB_TempF_Event);
     UX::RenderSerialEvent.AddTrigger(&sensors::SCD30_CO2_Event);
     UX::RenderSerialEvent.AddTrigger(&sensors::AHT20_Humidity_Event);
+*/
     /*
     //UX::RenderSerialEvent.AddTrigger(&sensors::AbsoluteHumidity_g_m3_8_8_Event);
     */
+    infrastructure::event_hub.Add(&UX::RenderOledEvent);
+    UX::RenderOledEvent.AddTrigger(&sensors::LPS25HB_TempF_Event);
+    UX::RenderOledEvent.AddTrigger(&sensors::LPS25HB_Pressure_Event);
+    UX::RenderOledEvent.AddTrigger(&sensors::SCD30_CO2_Event);
+    UX::RenderOledEvent.AddTrigger(&sensors::AHT20_Humidity_Event);
 }
 
 } // namespace Flow
