@@ -122,7 +122,7 @@ public:
     bool Fire(Event* event, EventData* data) {
         bool trigger_found = false;
         for (size_t e_idx = 0; e_idx < events.count; e_idx++) {
-            trigger_found = trigger_found || events.list[e_idx]->ProcessTrigger(event, data);
+            trigger_found = events.list[e_idx]->ProcessTrigger(event, data) || trigger_found;
         }
         return trigger_found;
     }
@@ -140,7 +140,7 @@ public:
                 event.type);
             for (size_t trigger_idx = 0; trigger_idx < event.triggers.count; trigger_idx++) {
                 EventTrigger& trigger = *event.triggers.list[trigger_idx];
-                Serial.printlnf("    Trigger %d, event: %p, data ready: %d, data: %f", trigger_idx, trigger.source_event, trigger.data_ready, trigger.data.fl);
+                Serial.printlnf("    Trigger %d, event: %p, data ready: %d, data: %f/%u/%d", trigger_idx, trigger.source_event, trigger.data_ready, trigger.data.fl, trigger.data.uin16, trigger.data.in16);
             }
         }
     }
