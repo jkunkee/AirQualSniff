@@ -221,9 +221,14 @@ namespace Display {
 } // namespace Display
 
 void init() {
-    peripherals::i2cMuxPresent = peripherals::i2cMux.begin();
-    if (peripherals::i2cMuxPresent) {
-        peripherals::i2cMux.setPortState(0
+    Serial.begin(115200);
+
+    Wire.setSpeed(I2C_DEFAULT_SPEED);
+    Wire.begin();
+
+    i2cMuxPresent = i2cMux.begin();
+    if (i2cMuxPresent) {
+        i2cMux.setPortState(0
             |0x1 // C02
             //|0x2 // nc
             //|0x4 // nc
@@ -234,6 +239,7 @@ void init() {
             //|0x80 // SCD30/PM
             );
     }
+
     Display::init();
 }
 
@@ -480,8 +486,6 @@ typedef enum _OledMode {
 
 bool RenderOled(Eventing::Event* event) {
     static OledMode mode = HOME;
-    Serial.println("Hello OLED");
-    infrastructure::event_hub.DumpStateOnSerial();
 
     static float press = -NAN, tempF = -NAN;
     static uint16_t co2ppm = -1;
@@ -523,7 +527,6 @@ bool RenderOled(Eventing::Event* event) {
         u8g2_DrawPixel(&peripherals::Display::u8g2, 128, 128);
     }
 
-    unsigned long drawStart = millis();
     switch (mode) {
     default:
     case HOME: {
@@ -533,10 +536,10 @@ bool RenderOled(Eventing::Event* event) {
         constexpr u8g2_uint_t text_small_height = 18;
         u8g2_SetFont(&peripherals::Display::u8g2, small_font);
         char buf[20];
-        u8g2_uint_t temp_bottom_left_x = 0, temp_bottom_left_y = peripherals::Display::HEIGHT * 1 / 4;
-        u8g2_uint_t hum_bottom_left_x = 0, hum_bottom_left_y = peripherals::Display::HEIGHT * 2 / 4;
-        u8g2_uint_t co2_bottom_left_x = 0, co2_bottom_left_y = peripherals::Display::HEIGHT * 3 / 4;
-        u8g2_uint_t press_bottom_left_x = 0, press_bottom_left_y = peripherals::Display::HEIGHT * 4 / 4;
+        u8g2_uint_t temp_bottom_left_x = 0, temp_bottom_left_y = peripherals::Display::HEIGHT * 1 / 4 - 10;
+        u8g2_uint_t hum_bottom_left_x = 0, hum_bottom_left_y = peripherals::Display::HEIGHT * 2 / 4 - 10;
+        u8g2_uint_t co2_bottom_left_x = 0, co2_bottom_left_y = peripherals::Display::HEIGHT * 3 / 4 - 10;
+        u8g2_uint_t press_bottom_left_x = 0, press_bottom_left_y = peripherals::Display::HEIGHT * 4 / 4 - 10;
         if (sensors::lps25hb_pressure_sensor_present) {
             snprintf(buf, sizeof(buf), "%0.1fhPa", press);
             u8g2_DrawUTF8(&peripherals::Display::u8g2, press_bottom_left_x, press_bottom_left_y, buf);
@@ -560,6 +563,7 @@ bool RenderOled(Eventing::Event* event) {
         }
     }
     }
+    unsigned long drawStart = millis();
     peripherals::Display::u8g2_ssd1327_unlock();
     u8g2_SendBuffer(&peripherals::Display::u8g2);
     peripherals::Display::u8g2_ssd1327_lock();
@@ -601,7 +605,6 @@ void init() {
     sensors::AbsoluteHumidity_g_m3_8_8_Event.AddTrigger(&sensors::LPS25HB_Pressure_Event);
     sensors::AbsoluteHumidity_g_m3_8_8_Event.AddTrigger(&sensors::AHT20_Humidity_Event);
 */
-/* multiple consumer scenario is broken
     infrastructure::event_hub.Add(&UX::RenderSerialEvent);
     UX::RenderSerialEvent.AddTrigger(&sensors::LPS25HB_Pressure_Event);
     UX::RenderSerialEvent.AddTrigger(&sensors::LPS25HB_Altitude_Event);
@@ -609,10 +612,7 @@ void init() {
     UX::RenderSerialEvent.AddTrigger(&sensors::LPS25HB_TempF_Event);
     UX::RenderSerialEvent.AddTrigger(&sensors::SCD30_CO2_Event);
     UX::RenderSerialEvent.AddTrigger(&sensors::AHT20_Humidity_Event);
-*/
-    /*
     //UX::RenderSerialEvent.AddTrigger(&sensors::AbsoluteHumidity_g_m3_8_8_Event);
-    */
     infrastructure::event_hub.Add(&UX::RenderOledEvent);
     UX::RenderOledEvent.AddTrigger(&sensors::LPS25HB_TempF_Event);
     UX::RenderOledEvent.AddTrigger(&sensors::LPS25HB_Pressure_Event);
@@ -631,12 +631,6 @@ void init() {
 \*****************************************************************************/
 
 void setup() {
-    Serial.begin(115200);
-    Serial.println("Hello World");
-
-    Wire.setSpeed(peripherals::I2C_SAFE_SPEED);
-    Wire.begin();
-
     infrastructure::init();
     peripherals::init();
     sensors::init();
