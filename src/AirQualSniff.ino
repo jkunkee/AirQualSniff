@@ -93,20 +93,17 @@ static QWIICMUX i2cMux;
 static bool i2cMuxPresent = false;
 
 void SpeedUpI2c() {
-    if (i2cMuxPresent) {
-        peripherals::i2cMux.disablePort(PM_MUX_PORT);
-        Wire.end();
-        Wire.setSpeed(I2C_DEFAULT_SPEED); // SPS30 only supports 100KHz
-        Wire.begin();
-    }
+    i2cMux.disablePort(PM_MUX_PORT);
+    Wire.end();
+    Wire.setSpeed(I2C_DEFAULT_SPEED); // SPS30 only supports 100KHz
+    Wire.begin();
 }
 void SlowDownI2c() {
-    if (i2cMuxPresent) {
-        Wire.end();
-        Wire.setSpeed(I2C_SAFE_SPEED); // SPS30 only supports 100KHz
-        Wire.begin();
-        peripherals::i2cMux.enablePort(PM_MUX_PORT);
-    }
+    Wire.end();
+    Wire.setSpeed(I2C_SAFE_SPEED); // SPS30 only supports 100KHz
+    Wire.begin();
+    i2cMux.enablePort(PM_MUX_PORT);
+}
 
 namespace Display {
     // FUll U8G2, SSD1327 controller, EA_128128 display, full framebuffer, First Arduino Hardware I2C, not rotated
@@ -223,7 +220,7 @@ namespace Display {
 void init() {
     Serial.begin(115200);
 
-    Wire.setSpeed(I2C_DEFAULT_SPEED);
+    Wire.setSpeed(I2C_SAFE_SPEED);
     Wire.begin();
 
     i2cMuxPresent = i2cMux.begin();
@@ -240,6 +237,8 @@ void init() {
             );
     }
 
+    // The PM sensor has been muxed off, so speed up
+    //SpeedUpI2c();
     Display::init();
 }
 
@@ -538,8 +537,8 @@ bool RenderOled(Eventing::Event* event) {
         char buf[20];
         u8g2_uint_t temp_bottom_left_x = 0, temp_bottom_left_y = peripherals::Display::HEIGHT * 1 / 4 - 10;
         u8g2_uint_t hum_bottom_left_x = 0, hum_bottom_left_y = peripherals::Display::HEIGHT * 2 / 4 - 10;
-        u8g2_uint_t co2_bottom_left_x = 0, co2_bottom_left_y = peripherals::Display::HEIGHT * 3 / 4 - 10;
-        u8g2_uint_t press_bottom_left_x = 0, press_bottom_left_y = peripherals::Display::HEIGHT * 4 / 4 - 10;
+        u8g2_uint_t co2_bottom_left_x = 0, co2_bottom_left_y = peripherals::Display::HEIGHT * 4 / 4 - 10;
+        u8g2_uint_t press_bottom_left_x = 0, press_bottom_left_y = peripherals::Display::HEIGHT * 3 / 4 - 10;
         if (sensors::lps25hb_pressure_sensor_present) {
             snprintf(buf, sizeof(buf), "%0.1fhPa", press);
             u8g2_DrawUTF8(&peripherals::Display::u8g2, press_bottom_left_x, press_bottom_left_y, buf);
