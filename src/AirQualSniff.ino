@@ -326,7 +326,7 @@ void ReadSCD30() {
 }
 DeltaClockEntry SCD30Timer = {
     .action = ReadSCD30,
-    .interval = 5000,
+    .interval = 2000,
     .repeating = true,
 };
 
@@ -405,7 +405,7 @@ void init() {
     co2SensorPresent = co2Sensor.begin();
     if (co2SensorPresent != false) {
         co2Sensor.setAutoSelfCalibration(true);
-        co2Sensor.setMeasurementInterval(5);
+        co2Sensor.setMeasurementInterval(2);
     }
     humiditySensorPresent = humiditySensor.begin();
 }
