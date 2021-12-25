@@ -69,7 +69,7 @@ namespace infrastructure {
     static void init();
     static void init() {
         deltaClock.begin();
-        wd = new ApplicationWatchdog(3000U, &watchdogHandler);
+        wd = new ApplicationWatchdog(30000U, &watchdogHandler);
     }
 
 } // namespace infrastructure
