@@ -302,6 +302,42 @@ SPS30_ERR SPS30::read_serial(String &str) {
 }
 #endif
 
+/*
+SPS30 fp datum: ug1.0um/m3:0.693 ug2.5um/m3:0.733 ug4.0um/m3:0.733 ug10um/m3:0.733 n0.5um/cm3:4.735 n1.0um/cm3:5.517 n2.5um/cm3:5.533 n4.0um/cm3:5.534 n10um/cm3:5.535 typical um:0.435
+*/
+SPS30_ERR SPS30::float_append_to_string(SPS30_DATA_FLOAT &datum, String &str) {
+    constexpr int decimal_places = 3;
+    str += "SPS30 fp datum:";
+    str += " ug1.0um/m3:" + String(datum.pm_1_0_ug_m3, decimal_places);
+    str += " ug2.5um/m3:" + String(datum.pm_2_5_ug_m3, decimal_places);
+    str += " ug4.0um/m3:" + String(datum.pm_4_0_ug_m3, decimal_places);
+    str += " ug10um/m3:" + String(datum.pm_10_ug_m3, decimal_places);
+    str += " n0.5um/cm3:" + String(datum.pm_0_5_n_cm3, decimal_places);
+    str += " n1.0um/cm3:" + String(datum.pm_1_0_n_cm3, decimal_places);
+    str += " n2.5um/cm3:" + String(datum.pm_2_5_n_cm3, decimal_places);
+    str += " n4.0um/cm3:" + String(datum.pm_4_0_n_cm3, decimal_places);
+    str += " n10um/cm3:" + String(datum.pm_10_n_cm3, decimal_places);
+    str += " typical um:" + String(datum.typical_size_um, decimal_places);
+    return SPS30_OK;
+}
+/*
+SPS30 int datum: ug1.0um/m3:1 ug2.5um/m3:1 ug4.0um/m3:1 ug10um/m3:1 n0.5um/cm3:8 n1.0um/cm3:9 n2.5um/cm3:9 n4.0um/cm3:9 n10um/cm3:9 typical nm:398
+*/
+SPS30_ERR SPS30::int_append_to_string(SPS30_DATA_INT &datum, String &str) {
+    str += "SPS30 int datum:";
+    str += " ug1.0um/m3:" + String(datum.pm_1_0_ug_m3);
+    str += " ug2.5um/m3:" + String(datum.pm_2_5_ug_m3);
+    str += " ug4.0um/m3:" + String(datum.pm_4_0_ug_m3);
+    str += " ug10um/m3:" + String(datum.pm_10_ug_m3);
+    str += " n0.5um/cm3:" + String(datum.pm_0_5_n_cm3);
+    str += " n1.0um/cm3:" + String(datum.pm_1_0_n_cm3);
+    str += " n2.5um/cm3:" + String(datum.pm_2_5_n_cm3);
+    str += " n4.0um/cm3:" + String(datum.pm_4_0_n_cm3);
+    str += " n10um/cm3:" + String(datum.pm_10_n_cm3);
+    str += " typical nm:" + String(datum.typical_size_nm);
+    return SPS30_OK;
+}
+
 // function pulled from datasheet
 uint8_t SPS30::sensirion_CalcCrc(uint8_t data[2]) {
     uint8_t crc = 0xFF;

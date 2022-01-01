@@ -119,6 +119,9 @@ public:
     SPS30_ERR read_serial(String &str);
 #endif
 
+    static SPS30_ERR float_append_to_string(SPS30_DATA_FLOAT &datum, String &str);
+    static SPS30_ERR int_append_to_string(SPS30_DATA_INT &datum, String &str);
+
     uint8_t product_type[8];
     uint8_t firmware_version[2];
     SPS30_ERR device_status;
