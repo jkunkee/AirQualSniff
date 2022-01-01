@@ -29,7 +29,7 @@ SYSTEM_MODE(AUTOMATIC);
 
 // To use I2C buffers bigger than 32 bytes, we provide a function for allocating the buffers. Particle-specific.
 // https://docs.staging.particle.io/cards/firmware/wire-i2c/acquirewirebuffer/
-static constexpr size_t I2C_BUFFER_SIZE = 512;
+static constexpr size_t I2C_BUFFER_SIZE = 128;
 
 hal_i2c_config_t acquireWireBuffer() {
     hal_i2c_config_t config = {
@@ -210,6 +210,7 @@ namespace Display {
         //u8g2_Setup_ssd1327_i2c_ea_w128128_f(&u8g2, U8G2_R0, u8x8_byte_arduino_hw_i2c, u8x8_gpio_and_delay_arduino);
         u8g2_InitDisplay(&u8g2);
         u8g2_SetPowerSave(&u8g2, 0);
+        u8g2_ssd1327_register_reset();
         u8g2_SetFont(&u8g2, u8g2_font_nerhoe_tf);
         //u8g2_SetDrawColor(&u8g2, 0x8);
         u8g2_ClearBuffer(&u8g2);
@@ -455,7 +456,7 @@ bool RenderSerial(Eventing::Event* event) {
             } else if (trigger->source_event == &sensors::AHT20_Humidity_Event) {
                 rh = trigger->data.fl;
             } else {
-                Serial.printlnf("Unhandled event \"%s\" %0.2f/%u/%d/%x", trigger->source_event->name, trigger->data.fl, trigger->data.uin16, trigger->data.in16, trigger->data.uin16);
+                Serial.printlnf("Unhandled event \"%s\" %0.2f/%u/%d/%x/%p", trigger->source_event->name, trigger->data.fl, trigger->data.uin16, trigger->data.in16, trigger->data.uin16, trigger->data.ptr);
             }
         }
     }
