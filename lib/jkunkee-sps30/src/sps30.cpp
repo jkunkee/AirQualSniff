@@ -108,9 +108,8 @@ SPS30_ERR SPS30::read_data_no_wait_float(SPS30_DATA_FLOAT *data_struct) {
         return SPS30_WRONG_FORMAT;
     }
     uint8_t buf[SPS30_I2C_FLOAT_DATA_SIZE] = { 0 };
-    constexpr size_t buf_len = sizeof(buf);
     set_pointer(ADDR_DATA);
-    SPS30_ERR result = read_data(buf_len, buf, buf_len);
+    SPS30_ERR result = read_data(sizeof(buf), buf, sizeof(buf));
     if (result != SPS30_OK) {
         return result;
     }
