@@ -239,7 +239,7 @@ void init() {
     }
 
     // The PM sensor has been muxed off, so speed up
-    //SpeedUpI2c();
+    SpeedUpI2c();
     Display::init();
 }
 
@@ -385,6 +385,39 @@ bool CalculateAbsHum(Eventing::Event* event) {
 Eventing::Event AbsoluteHumidity_g_m3_8_8_Event(&CalculateAbsHum, "Calculate absolute humidity from relative humidity", Eventing::TRIGGER_ON_ALL);
 */
 
+static SPS30 pmSensor;
+static bool pmSensorPresent = false;
+
+static Eventing::Event SPS30_Data_Event(NULL, "SPS30 PM Sensor data event", Eventing::TRIGGER_NONE);
+static SPS30_DATA_FLOAT sps30_global_datum_struct;
+static Eventing::EventData sps30_global_datum;
+void ReadSPS30() {
+    if (pmSensorPresent) {
+        bool sendData = false;
+        SPS30_ERR readyErr, retrieveErr;
+        bool dataIsReady, dataRetrieved;
+        peripherals::SlowDownI2c();
+        readyErr = pmSensor.is_data_ready();
+        // verbose for easy addition of debug statements
+        dataIsReady = readyErr == SPS30_OK;
+        retrieveErr = pmSensor.read_data_no_wait_float(&sps30_global_datum_struct);
+        dataRetrieved = retrieveErr == SPS30_OK;
+        sendData = dataIsReady && dataRetrieved;
+        peripherals::SpeedUpI2c();
+        if (sendData) {
+            sps30_global_datum.ptr = &sps30_global_datum_struct;
+            String str;
+            SPS30::float_append_to_string(sps30_global_datum_struct, str);
+            infrastructure::event_hub.Fire(&SPS30_Data_Event, &sps30_global_datum);
+        }
+    }
+}
+static DeltaClockEntry SPS30Timer = {
+    .action = &ReadSPS30,
+    .interval = 2500,
+    .repeating = true,
+};
+
 void init() {
     lps25hb_pressure_sensor_present = pressureSensor.begin();
     if (lps25hb_pressure_sensor_present) {
@@ -409,6 +442,24 @@ void init() {
         co2Sensor.setMeasurementInterval(2);
     }
     humiditySensorPresent = humiditySensor.begin();
+    peripherals::SlowDownI2c();
+    pmSensorPresent = pmSensor.begin();
+    if (pmSensorPresent) {
+        pmSensorPresent = pmSensorPresent && (pmSensor.start_measuring(SPS30_FORMAT_IEEE754) == SPS30_OK);
+        sps30_global_datum_struct = {
+            .pm_1_0_ug_m3 = -NAN,
+            .pm_2_5_ug_m3 = -NAN,
+            .pm_4_0_ug_m3 = -NAN,
+            .pm_10_ug_m3 = -NAN,
+            .pm_0_5_n_cm3 = -NAN,
+            .pm_1_0_n_cm3 = -NAN,
+            .pm_2_5_n_cm3 = -NAN,
+            .pm_4_0_n_cm3 = -NAN,
+            .pm_10_n_cm3 = -NAN,
+            .typical_size_um = -NAN,
+        };
+    }
+    peripherals::SpeedUpI2c();
 }
 
 } // namespace sensors
@@ -437,6 +488,7 @@ bool RenderSerial(Eventing::Event* event) {
     static float press = -NAN, tempF = -NAN, tempC = -NAN, alt = -NAN;
     static uint16_t co2ppm = -1;
     static float rh = -NAN;
+    static SPS30_DATA_FLOAT pm = { 0 };
     for (size_t evt_idx = 0; evt_idx < event->triggers.count; evt_idx++) {
         Eventing::EventTrigger* trigger = event->triggers.list[evt_idx];
         if (trigger->data_ready) {
@@ -455,6 +507,8 @@ bool RenderSerial(Eventing::Event* event) {
                 co2ppm = trigger->data.uin16;
             } else if (trigger->source_event == &sensors::AHT20_Humidity_Event) {
                 rh = trigger->data.fl;
+            } else if (trigger->source_event == &sensors::SPS30_Data_Event) {
+                pm = *((SPS30_DATA_FLOAT*)trigger->data.ptr);
             } else {
                 Serial.printlnf("Unhandled event \"%s\" %0.2f/%u/%d/%x/%p", trigger->source_event->name, trigger->data.fl, trigger->data.uin16, trigger->data.in16, trigger->data.uin16, trigger->data.ptr);
             }
@@ -474,6 +528,13 @@ bool RenderSerial(Eventing::Event* event) {
         Serial.printlnf("AHT20: %0.1f%%", rh);
     } else {
         Serial.println("AHT20 not present");
+    }
+    if (sensors::pmSensorPresent) {
+        String str;
+        SPS30::float_append_to_string(pm, str);
+        Serial.printlnf("%s", str.c_str());
+    } else {
+        Serial.println("SPS30 not present");
     }
     //infrastructure::event_hub.DumpStateOnSerial();
     return true;
@@ -593,12 +654,14 @@ void init() {
     infrastructure::deltaClock.insert(&sensors::LPS25HBTimer);
     infrastructure::deltaClock.insert(&sensors::SCD30Timer);
     infrastructure::deltaClock.insert(&sensors::AHT20Timer);
+    infrastructure::deltaClock.insert(&sensors::SPS30Timer);
     infrastructure::event_hub.Add(&sensors::LPS25HB_Pressure_Event);
     infrastructure::event_hub.Add(&sensors::LPS25HB_Altitude_Event);
     infrastructure::event_hub.Add(&sensors::LPS25HB_TempC_Event);
     infrastructure::event_hub.Add(&sensors::LPS25HB_TempF_Event);
     infrastructure::event_hub.Add(&sensors::SCD30_CO2_Event);
     infrastructure::event_hub.Add(&sensors::AHT20_Humidity_Event);
+    infrastructure::event_hub.Add(&sensors::SPS30_Data_Event);
 /*
     infrastructure::event_hub.Add(&sensors::AbsoluteHumidity_g_m3_8_8_Event);
     sensors::AbsoluteHumidity_g_m3_8_8_Event.AddTrigger(&sensors::LPS25HB_TempC_Event);
@@ -612,6 +675,7 @@ void init() {
     UX::RenderSerialEvent.AddTrigger(&sensors::LPS25HB_TempF_Event);
     UX::RenderSerialEvent.AddTrigger(&sensors::SCD30_CO2_Event);
     UX::RenderSerialEvent.AddTrigger(&sensors::AHT20_Humidity_Event);
+    UX::RenderSerialEvent.AddTrigger(&sensors::SPS30_Data_Event);
     //UX::RenderSerialEvent.AddTrigger(&sensors::AbsoluteHumidity_g_m3_8_8_Event);
     infrastructure::event_hub.Add(&UX::RenderOledEvent);
     UX::RenderOledEvent.AddTrigger(&sensors::LPS25HB_TempF_Event);
