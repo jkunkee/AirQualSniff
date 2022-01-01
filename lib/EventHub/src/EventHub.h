@@ -43,6 +43,7 @@ public:
         float fl;
         int16_t in16;
         uint16_t uin16;
+        void* ptr;
     };
 };
 
