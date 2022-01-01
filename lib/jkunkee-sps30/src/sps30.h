@@ -8,6 +8,41 @@
 #include "Arduino.h"
 #include <Wire.h>
 
+// Reading floating-point values from the SPS30 requires a ~40-byte contiguous
+// I2C transaction. This is impossible on standard Arduino, which has a hard-
+// coded I2C buffer size of 32, but the underlying HAL may offer platform-
+// specific techniques for overriding this value.
+#if defined(PARTICLE_WIRING_ARDUINO_COMPATIBILTY)
+// Set this to the value of hal_i2c_config_t.rx_buffer and .tx_buffer that
+// you provide in acquireWireBuffer().
+#define SPS30_I2C_BUFFER_LEN 512
+#elif defined(ARDUINO)
+#define SPS30_I2C_BUFFER_LEN 32
+#else
+#warning SPS30 driver does not have an I2C buffer length for this platform; defaulting to Arduino 32-byte limit.
+#endif
+
+#ifndef SPS30_I2C_BUFFER_LEN
+#define SPS30_I2C_BUFFER_LEN 32
+#endif
+
+// Each I2C RX transaction is
+// TX: i2c addr, reg addr MSB, reg addr LSB, RX: data 0, data 1, data 0-1 CRC[, data n, data n+1, data n-n+1 CRC]
+// The I2C addr byte is usually handled separately by the HAL, so it does not need to be acccounted for.
+// This means that the I2C buffer length for a given message, as a function of the message, is:
+#define SPS30_I2C_BUFFER_LEN_FROM_DATA_SIZE(data_byte_count) (data_byte_count * 3 / 2)
+#define SPS30_I2C_DATA_SIZE_FROM_BUFFER_LEN(len) (len * 2 / 3)
+
+// Used when calling read_data to validate arguments and allocate arrays
+#define SPS30_I2C_FLOAT_DATA_SIZE (10*4)
+#define SPS30_I2C_INT_DATA_SIZE (10*2)
+#define SPS30_I2C_SERIAL_STRING_SIZE (48)
+#define SPS30_I2C_MAX_DATA_SIZE SPS30_I2C_SERIAL_STRING_SIZE
+#define SPS30_I2C_MAX_RX_BUFFER_LEN SPS30_I2C_BUFFER_LEN_FROM_DATA_SIZE(SPS30_I2C_MAX_DATA_SIZE)
+// Used in ifdefs to remove unsupportable functionality
+#define SPS30_I2C_BUFFER_LEN_FOR_FLOAT SPS30_I2C_BUFFER_LEN_FROM_DATA_SIZE(SPS30_I2C_FLOAT_DATA_SIZE)
+#define SPS30_I2C_BUFFER_LEN_FOR_SERIAL SPS30_I2C_BUFFER_LEN_FROM_DATA_SIZE(SPS30_I2C_SERIAL_STRING_SIZE)
+
 typedef enum _SPS30_ERR {
     SPS30_OK = 0,
     SPS30_I2C_TOO_LONG = 1,
@@ -63,7 +98,9 @@ public:
     SPS30_ERR start_measuring(SPS30_DATA_FORMAT data_format);
     SPS30_ERR stop_measuring();
     SPS30_ERR is_data_ready();
+#if SPS30_I2C_BUFFER_LEN >= SPS30_I2C_BUFFER_LEN_FOR_FLOAT
     SPS30_ERR read_data_no_wait_float(SPS30_DATA_FLOAT *data_struct);
+#endif
     SPS30_ERR read_data_no_wait_int(SPS30_DATA_INT *data_struct);
 
     SPS30_ERR sleep();
@@ -78,7 +115,9 @@ public:
     SPS30_ERR read_status_register(bool *fan_speed_warning, bool *laser_current_error, bool *fan_rpm_error);
     SPS30_ERR clear_status_register();
 
+#if SPS30_I2C_BUFFER_LEN >= SPS30_I2C_BUFFER_LEN_FOR_SERIAL
     SPS30_ERR read_serial(String &str);
+#endif
 
     uint8_t product_type[8];
     uint8_t firmware_version[2];

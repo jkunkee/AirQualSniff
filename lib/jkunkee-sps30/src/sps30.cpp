@@ -93,36 +93,43 @@ SPS30_ERR SPS30::is_data_ready() {
     }
 }
 
+#if SPS30_I2C_BUFFER_LEN >= SPS30_I2C_BUFFER_LEN_FOR_FLOAT
+typedef union {
+    uint32_t int32; // using a byte array would require knowing the endianness of the system
+    float fl;
+} int_float;
 SPS30_ERR SPS30::read_data_no_wait_float(SPS30_DATA_FLOAT *data_struct) {
-    return SPS30_I2C_TOO_LONG; // I haven't figured out how to break up reads to fit the Arduino Wire 32-byte buffer.
     if (data_struct == NULL) {
         return SPS30_BAD_ARGUMENTS;
     }
     if (m_data_format != SPS30_FORMAT_IEEE754) {
         return SPS30_WRONG_FORMAT;
     }
-    uint8_t buf[40] = { 0 };
+    uint8_t buf[SPS30_I2C_FLOAT_DATA_SIZE] = { 0 };
+    constexpr size_t buf_len = sizeof(buf);
     set_pointer(ADDR_DATA);
-    SPS30_ERR result = read_data(sizeof(buf)/2+2, buf, sizeof(buf));
+    SPS30_ERR result = read_data(buf_len, buf, buf_len);
     if (result != SPS30_OK) {
         return result;
     }
     int idx = 0;
-    data_struct->pm_1_0_ug_m3 = (float)((buf[idx] << 24) | (buf[idx+1] << 16) | (buf[idx+2] << 8) | (buf[idx+3] << 0)); idx += 4;
-    data_struct->pm_2_5_ug_m3 = (float)((buf[idx] << 24) | (buf[idx+1] << 16) | (buf[idx+2] << 8) | (buf[idx+3] << 0)); idx += 4;
-    data_struct->pm_4_0_ug_m3 = (float)((buf[idx] << 24) | (buf[idx+1] << 16) | (buf[idx+2] << 8) | (buf[idx+3] << 0)); idx += 4;
-    data_struct->pm_10_ug_m3 = (float)((buf[idx] << 24) | (buf[idx+1] << 16) | (buf[idx+2] << 8) | (buf[idx+3] << 0)); idx += 4;
-    data_struct->pm_0_5_n_cm3 = (float)((buf[idx] << 24) | (buf[idx+1] << 16) | (buf[idx+2] << 8) | (buf[idx+3] << 0)); idx += 4;
-    data_struct->pm_1_0_n_cm3 = (float)((buf[idx] << 24) | (buf[idx+1] << 16) | (buf[idx+2] << 8) | (buf[idx+3] << 0)); idx += 4;
-    data_struct->pm_2_5_n_cm3 = (float)((buf[idx] << 24) | (buf[idx+1] << 16) | (buf[idx+2] << 8) | (buf[idx+3] << 0)); idx += 4;
-    data_struct->pm_4_0_n_cm3 = (float)((buf[idx] << 24) | (buf[idx+1] << 16) | (buf[idx+2] << 8) | (buf[idx+3] << 0)); idx += 4;
-    data_struct->pm_10_n_cm3 = (float)((buf[idx] << 24) | (buf[idx+1] << 16) | (buf[idx+2] << 8) | (buf[idx+3] << 0)); idx += 4;
-    data_struct->typical_size_um = (float)((buf[idx] << 24) | (buf[idx+1] << 16) | (buf[idx+2] << 8) | (buf[idx+3] << 0)); idx += 4;
+    int_float mixer;
+    mixer.int32 = (((uint32_t)buf[idx]) << 24) | (((uint32_t)buf[idx+1]) << 16) | (((uint32_t)buf[idx+2]) << 8) | (((uint32_t)buf[idx+3]) << 0); idx += 4; data_struct->pm_1_0_ug_m3 = mixer.fl;
+    mixer.int32 = (((uint32_t)buf[idx]) << 24) | (((uint32_t)buf[idx+1]) << 16) | (((uint32_t)buf[idx+2]) << 8) | (((uint32_t)buf[idx+3]) << 0); idx += 4; data_struct->pm_2_5_ug_m3 = mixer.fl;
+    mixer.int32 = (((uint32_t)buf[idx]) << 24) | (((uint32_t)buf[idx+1]) << 16) | (((uint32_t)buf[idx+2]) << 8) | (((uint32_t)buf[idx+3]) << 0); idx += 4; data_struct->pm_4_0_ug_m3 = mixer.fl;
+    mixer.int32 = (((uint32_t)buf[idx]) << 24) | (((uint32_t)buf[idx+1]) << 16) | (((uint32_t)buf[idx+2]) << 8) | (((uint32_t)buf[idx+3]) << 0); idx += 4; data_struct->pm_10_ug_m3 = mixer.fl;
+    mixer.int32 = (((uint32_t)buf[idx]) << 24) | (((uint32_t)buf[idx+1]) << 16) | (((uint32_t)buf[idx+2]) << 8) | (((uint32_t)buf[idx+3]) << 0); idx += 4; data_struct->pm_0_5_n_cm3 = mixer.fl;
+    mixer.int32 = (((uint32_t)buf[idx]) << 24) | (((uint32_t)buf[idx+1]) << 16) | (((uint32_t)buf[idx+2]) << 8) | (((uint32_t)buf[idx+3]) << 0); idx += 4; data_struct->pm_1_0_n_cm3 = mixer.fl;
+    mixer.int32 = (((uint32_t)buf[idx]) << 24) | (((uint32_t)buf[idx+1]) << 16) | (((uint32_t)buf[idx+2]) << 8) | (((uint32_t)buf[idx+3]) << 0); idx += 4; data_struct->pm_2_5_n_cm3 = mixer.fl;
+    mixer.int32 = (((uint32_t)buf[idx]) << 24) | (((uint32_t)buf[idx+1]) << 16) | (((uint32_t)buf[idx+2]) << 8) | (((uint32_t)buf[idx+3]) << 0); idx += 4; data_struct->pm_4_0_n_cm3 = mixer.fl;
+    mixer.int32 = (((uint32_t)buf[idx]) << 24) | (((uint32_t)buf[idx+1]) << 16) | (((uint32_t)buf[idx+2]) << 8) | (((uint32_t)buf[idx+3]) << 0); idx += 4; data_struct->pm_10_n_cm3 = mixer.fl;
+    mixer.int32 = (((uint32_t)buf[idx]) << 24) | (((uint32_t)buf[idx+1]) << 16) | (((uint32_t)buf[idx+2]) << 8) | (((uint32_t)buf[idx+3]) << 0); idx += 4; data_struct->typical_size_um = mixer.fl;
     return SPS30_OK;
 }
+#endif
 
 SPS30_ERR SPS30::read_data_no_wait_int(SPS30_DATA_INT *data_struct) {
-    uint8_t buf[20];
+    uint8_t buf[SPS30_I2C_INT_DATA_SIZE];
     SPS30_ERR result;
 
     if (data_struct == NULL) {
@@ -140,16 +147,16 @@ SPS30_ERR SPS30::read_data_no_wait_int(SPS30_DATA_INT *data_struct) {
         return result;
     }
     int idx = 0;
-    data_struct->pm_1_0_ug_m3 = (uint16_t)((buf[idx] << 8) | (buf[idx+1] << 0)); idx += 2;
-    data_struct->pm_2_5_ug_m3 = (uint16_t)((buf[idx] << 8) | (buf[idx+1] << 0)); idx += 2;
-    data_struct->pm_4_0_ug_m3 = (uint16_t)((buf[idx] << 8) | (buf[idx+1] << 0)); idx += 2;
-    data_struct->pm_10_ug_m3 = (uint16_t)((buf[idx] << 8) | (buf[idx+1] << 0)); idx += 2;
-    data_struct->pm_0_5_n_cm3 = (uint16_t)((buf[idx] << 8) | (buf[idx+1] << 0)); idx += 2;
-    data_struct->pm_1_0_n_cm3 = (uint16_t)((buf[idx] << 8) | (buf[idx+1] << 0)); idx += 2;
-    data_struct->pm_2_5_n_cm3 = (uint16_t)((buf[idx] << 8) | (buf[idx+1] << 0)); idx += 2;
-    data_struct->pm_4_0_n_cm3 = (uint16_t)((buf[idx] << 8) | (buf[idx+1] << 0)); idx += 2;
-    data_struct->pm_10_n_cm3 = (uint16_t)((buf[idx] << 8) | (buf[idx+1] << 0)); idx += 2;
-    data_struct->typical_size_nm = (uint16_t)((buf[idx] << 8) | (buf[idx+1] << 0)); idx += 2;
+    data_struct->pm_1_0_ug_m3 = ((((uint16_t)buf[idx]) << 8) | (((uint16_t)buf[idx+1]) << 0)); idx += 2;
+    data_struct->pm_2_5_ug_m3 = ((((uint16_t)buf[idx]) << 8) | (((uint16_t)buf[idx+1]) << 0)); idx += 2;
+    data_struct->pm_4_0_ug_m3 = ((((uint16_t)buf[idx]) << 8) | (((uint16_t)buf[idx+1]) << 0)); idx += 2;
+    data_struct->pm_10_ug_m3  = ((((uint16_t)buf[idx]) << 8) | (((uint16_t)buf[idx+1]) << 0)); idx += 2;
+    data_struct->pm_0_5_n_cm3 = ((((uint16_t)buf[idx]) << 8) | (((uint16_t)buf[idx+1]) << 0)); idx += 2;
+    data_struct->pm_1_0_n_cm3 = ((((uint16_t)buf[idx]) << 8) | (((uint16_t)buf[idx+1]) << 0)); idx += 2;
+    data_struct->pm_2_5_n_cm3 = ((((uint16_t)buf[idx]) << 8) | (((uint16_t)buf[idx+1]) << 0)); idx += 2;
+    data_struct->pm_4_0_n_cm3 = ((((uint16_t)buf[idx]) << 8) | (((uint16_t)buf[idx+1]) << 0)); idx += 2;
+    data_struct->pm_10_n_cm3  = ((((uint16_t)buf[idx]) << 8) | (((uint16_t)buf[idx+1]) << 0)); idx += 2;
+    data_struct->typical_size_nm = ((((uint16_t)buf[idx]) << 8) | (((uint16_t)buf[idx+1]) << 0)); idx += 2;
     return SPS30_OK;
 }
 
@@ -258,8 +265,9 @@ SPS30_ERR SPS30::clear_status_register() {
     return result;
 }
 
+#if SPS30_I2C_BUFFER_LEN >= SPS30_I2C_BUFFER_LEN_FOR_SERIAL
+// Warning, this has not been tested
 SPS30_ERR SPS30::read_serial(String &str) {
-    return SPS30_I2C_TOO_LONG; // I haven't figured out how to break up reads to fit the Arduino Wire 32-byte buffer.
     uint8_t buf[48];
     SPS30_ERR result;
 
@@ -290,6 +298,7 @@ SPS30_ERR SPS30::read_serial(String &str) {
     str += (char*)buf;
     return SPS30_OK;
 }
+#endif
 
 // function pulled from datasheet
 uint8_t SPS30::sensirion_CalcCrc(uint8_t data[2]) {
@@ -325,10 +334,6 @@ SPS30_ERR SPS30::read_data(uint8_t desired_bytes, uint8_t *buf, size_t buf_len, 
     // The SPS30 doesn't seem to handle separate 30-byte reads; instead of continuing where it left off (persistent pointer theory),
     // it just spits out junk bytes.
 
-    uint8_t bytes_read = 0;
-    if (desired_bytes > 20) {
-        return SPS30_I2C_TOO_LONG;
-    }
 //    // Break read into 20-byte segments: every two bytes read has one byte of checksum and the read has to fit within the Arduino Wire 32-byte buffer
 //    while (desired_bytes > 10) {
 //        SPS30_ERR stat = read_data(10, buf, buf_len, false);
@@ -342,7 +347,11 @@ SPS30_ERR SPS30::read_data(uint8_t desired_bytes, uint8_t *buf, size_t buf_len, 
 //    }
 
     // prep CRC'd buffer
-    uint8_t raw_buf[30];
+    uint8_t raw_buf[SPS30_I2C_MAX_RX_BUFFER_LEN];
+    uint8_t bytes_read = 0;
+    if (desired_bytes > sizeof(raw_buf) || desired_bytes > SPS30_I2C_MAX_DATA_SIZE) {
+        return SPS30_I2C_TOO_LONG;
+    }
     // prep bounds
     uint8_t raw_expected = desired_bytes + desired_bytes / 2; // one CRC byte for every two data bytes
     // run i2c transaction
@@ -383,7 +392,7 @@ SPS30_ERR SPS30::read_data(uint8_t desired_bytes, uint8_t *buf, size_t buf_len, 
 
 SPS30_ERR SPS30::set_pointer_and_write(uint16_t addr, uint8_t *buf, uint8_t buf_count) {
     // Luckily, no write sequence is longer than 20 bytes!
-    if (buf_count > 20  || buf == NULL) {
+    if (buf_count > 20 || buf == NULL) {
         return SPS30_BAD_ARGUMENTS;
     }
 
