@@ -60,6 +60,8 @@ bool SPS30::begin(TwoWire &wirePort, uint8_t i2c_addr) {
         device_status = SPS30_OK;
     }
 
+    stop_measuring();
+
     return shibboleth_ok && version_ok;
 }
 
