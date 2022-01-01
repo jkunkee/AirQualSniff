@@ -267,32 +267,18 @@ SPS30_ERR SPS30::clear_status_register() {
 }
 
 #if SPS30_I2C_BUFFER_LEN >= SPS30_I2C_BUFFER_LEN_FOR_SERIAL
-// Warning, this has not been tested
+// e.g. 6F282085F95A8249
 SPS30_ERR SPS30::read_serial(String &str) {
-    uint8_t buf[48];
+    uint8_t buf[SPS30_I2C_SERIAL_DATA_SIZE+1];
     SPS30_ERR result;
+
+    buf[SPS30_I2C_SERIAL_DATA_SIZE] = '\0'; // ensure null termination
 
     result = set_pointer(ADDR_SERIAL);
     if (result != SPS30_OK) {
         return result;
     }
-    result = read_data(20, buf, sizeof(buf));
-    if (result != SPS30_OK) {
-        return result;
-    }
-    result = set_pointer(ADDR_SERIAL+20);
-    if (result != SPS30_OK) {
-        return result;
-    }
-    result = read_data(20, buf+20, sizeof(buf)-20);
-    if (result != SPS30_OK) {
-        return result;
-    }
-    result = set_pointer(ADDR_SERIAL+40);
-    if (result != SPS30_OK) {
-        return result;
-    }
-    result = read_data(8, buf+40, sizeof(buf)-40);
+    result = read_data(SPS30_I2C_SERIAL_DATA_SIZE, buf, sizeof(buf));
     if (result != SPS30_OK) {
         return result;
     }
