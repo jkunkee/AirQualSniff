@@ -1,6 +1,8 @@
 
 #pragma once
 
+#include <DeltaClock.h>
+
 namespace Eventing {
 
 template <class T> class PointerList {
@@ -128,6 +130,7 @@ public:
         return trigger_found;
     }
     PointerList<Event> events;
+    DeltaClock delta_clock;
 #ifdef EVENTHUB_DEBUG
     void DumpStateOnSerial() {
         Serial.printlnf("Hub %p, %u events", this, events.count);

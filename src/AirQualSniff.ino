@@ -1,11 +1,10 @@
 
 // checked-in dependencies
 #include "decimator.h"
-#include "DeltaClock.h"
 #include "Atmospherics.h"
 #include "sps30.h"
 #define EVENTHUB_DEBUG
-#include "EventHub.h"
+#include "Eventing.h"
 // checked-in 3p dependencies
 #include "SparkFun_SGP30_Arduino_Library.h"
 #include "U8g2lib.h"
@@ -56,8 +55,6 @@ static constexpr int LED = D7;
 
 namespace infrastructure {
 
-    static DeltaClock deltaClock;
-
     static Eventing::EventHub event_hub;
 
     void watchdogHandler(void) {
@@ -68,7 +65,7 @@ namespace infrastructure {
 
     static void init();
     static void init() {
-        deltaClock.begin();
+        event_hub.delta_clock.begin();
         wd = new ApplicationWatchdog(30000U, &watchdogHandler);
     }
 
@@ -651,10 +648,10 @@ namespace flow {
 
 // One Init To Rule Them All, And In The Setup, Bind Them
 void init() {
-    infrastructure::deltaClock.insert(&sensors::LPS25HBTimer);
-    infrastructure::deltaClock.insert(&sensors::SCD30Timer);
-    infrastructure::deltaClock.insert(&sensors::AHT20Timer);
-    infrastructure::deltaClock.insert(&sensors::SPS30Timer);
+    infrastructure::event_hub.delta_clock.insert(&sensors::LPS25HBTimer);
+    infrastructure::event_hub.delta_clock.insert(&sensors::SCD30Timer);
+    infrastructure::event_hub.delta_clock.insert(&sensors::AHT20Timer);
+    infrastructure::event_hub.delta_clock.insert(&sensors::SPS30Timer);
     infrastructure::event_hub.Add(&sensors::LPS25HB_Pressure_Event);
     infrastructure::event_hub.Add(&sensors::LPS25HB_Altitude_Event);
     infrastructure::event_hub.Add(&sensors::LPS25HB_TempC_Event);
@@ -704,7 +701,7 @@ void setup() {
 void loop() {
     //Serial.printlnf("Loop Start %lu", millis());
     ApplicationWatchdog::checkin();
-    infrastructure::deltaClock.update();
+    infrastructure::event_hub.delta_clock.update();
     delay(400);
 }
 
