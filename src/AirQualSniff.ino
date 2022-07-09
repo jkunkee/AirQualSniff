@@ -85,6 +85,7 @@ namespace peripherals {
 static constexpr uint32_t I2C_DEFAULT_SPEED = CLOCK_SPEED_400KHZ;
 static constexpr uint32_t I2C_SAFE_SPEED    = CLOCK_SPEED_100KHZ;
 static constexpr uint8_t PM_MUX_PORT = 4;
+static constexpr uint8_t CO2_MUX_PORT = 3;
 
 static QWIICMUX i2cMux;
 static bool i2cMuxPresent = false;
@@ -224,10 +225,10 @@ void init() {
     i2cMuxPresent = i2cMux.begin();
     if (i2cMuxPresent) {
         i2cMux.setPortState(0
-            |0x1 // C02
+            //|0x1 // nc
             //|0x2 // nc
             //|0x4 // nc
-            //|0x8 // nc
+            | (1 << CO2_MUX_PORT) // CO2
             //|0x10 // nc
             //|0x20 // nc
             //|0x40 // nc
