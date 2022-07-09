@@ -87,7 +87,7 @@ namespace peripherals {
 
 static constexpr uint32_t I2C_DEFAULT_SPEED = CLOCK_SPEED_400KHZ;
 static constexpr uint32_t I2C_SAFE_SPEED    = CLOCK_SPEED_100KHZ;
-static constexpr uint8_t PM_MUX_PORT = 7;
+static constexpr uint8_t PM_MUX_PORT = 4;
 
 static QWIICMUX i2cMux;
 static bool i2cMuxPresent = false;
