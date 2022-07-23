@@ -61,20 +61,20 @@ public:
     bool data_ready;
 };
 
-typedef bool (*EventAction)(Event* event);
+typedef void (*EventAction)(Event* event, EventTrigger *out);
 
 typedef enum _EventTriggerType {
-    TRIGGER_NONE,
+    TRIGGER_MANUAL,
     TRIGGER_ON_ANY,
     TRIGGER_ON_ALL,
-    //TRIGGER_TEMPORAL_DATA_AS_MS,
+    TRIGGER_TEMPORAL,
 } EventTriggerType;
 
 class Event {
 public:
-    Event(EventAction a, const char* n, EventTriggerType t) : action(a), name(n), type(t) {}
+    Event(EventAction a, const char* n, EventTriggerType t, unsigned long _interval_ms = 0) : action(a), name(n), type(t), interval_ms(_interval_ms) {}
     bool AddTrigger(Event *trigger) { return triggers.Add(new EventTrigger(trigger)); }
-    bool ProcessTrigger(Event* src_event, EventData* data) {
+    bool ProcessTrigger(Event* src_event, EventData* data, EventTrigger* out) {
         bool trigger_found = false;
         for (size_t idx = 0; idx < triggers.count; idx++) {
             if (triggers.list[idx]->source_event == src_event) {
@@ -98,7 +98,7 @@ public:
                 }
             }
             if (is_triggered) {
-                action(this);
+                action(this, out);
                 ResetTriggers();
             }
         }
@@ -114,23 +114,44 @@ public:
     const char* name;
     EventTriggerType type;
     PointerList<EventTrigger> triggers;
+    unsigned long interval_ms;
 };
 
 class EventHub {
+private:
+    DeltaClock delta_clock;
+    PointerList<DeltaClockEntry> delta_clock_entries;
 public:
     EventHub() {}
     bool Add(Event* event) {
+        if (event->type == TRIGGER_TEMPORAL) {
+            DeltaClockEntry *entry = new DeltaClockEntry;
+            *entry = { 0 };
+            entry->interval = event->interval_ms;
+            entry->repeating = true;
+            entry->action = ?;
+            delta_clock_entries.Add(entry);
+        }
         return events.Add(event);
     }
     bool Fire(Event* event, EventData* data) {
         bool trigger_found = false;
         for (size_t e_idx = 0; e_idx < events.count; e_idx++) {
-            trigger_found = events.list[e_idx]->ProcessTrigger(event, data) || trigger_found;
+            EventTrigger response(NULL);
+            trigger_found = events.list[e_idx]->ProcessTrigger(event, data, &response) || trigger_found;
+            if (response.data_ready) {
+                Fire(events.list[e_idx], &response.data);
+            }
         }
         return trigger_found;
     }
+    void begin() {
+        delta_clock.begin();
+    }
+    void update() {
+        delta_clock.update();
+    }
     PointerList<Event> events;
-    DeltaClock delta_clock;
 #ifdef EVENTHUB_DEBUG
     void DumpStateOnSerial() {
         Serial.printlnf("Hub %p, %u events", this, events.count);

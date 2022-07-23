@@ -261,10 +261,10 @@ static bool lps25hb_pressure_sensor_present = false;
 // 70 deg F in actively cooled airstream was -5 deg F
 static constexpr float pressureSensorTempFOffset = 80.3 - 83.2; // actual - measured
 
-Eventing::Event LPS25HB_Pressure_Event(NULL, "LPS25HB Pressure hPa", Eventing::TRIGGER_NONE);
-Eventing::Event LPS25HB_Altitude_Event(NULL, "LPS25HB Altitude m", Eventing::TRIGGER_NONE);
-Eventing::Event LPS25HB_TempC_Event(NULL, "LPS25HB Temp C", Eventing::TRIGGER_NONE);
-Eventing::Event LPS25HB_TempF_Event(NULL, "LPS25HB Temp F", Eventing::TRIGGER_NONE);
+Eventing::Event LPS25HB_Pressure_Event(NULL, "LPS25HB Pressure hPa", Eventing::TRIGGER_MANUAL);
+Eventing::Event LPS25HB_Altitude_Event(NULL, "LPS25HB Altitude m", Eventing::TRIGGER_MANUAL);
+Eventing::Event LPS25HB_TempC_Event(NULL, "LPS25HB Temp C", Eventing::TRIGGER_MANUAL);
+Eventing::Event LPS25HB_TempF_Event(NULL, "LPS25HB Temp F", Eventing::TRIGGER_MANUAL);
 
 static bool LPS25HB_data_is_ready();
 static bool LPS25HB_data_is_ready() {
@@ -308,7 +308,7 @@ static bool co2SensorPresent = false;
 // 70 deg F in actively cooled airstream was -1 deg F
 static constexpr float co2SensorTempFOffset = 80.1 - 79.0;
 
-Eventing::Event SCD30_CO2_Event(NULL, "SCD30 CO2 ppm", Eventing::TRIGGER_NONE);
+Eventing::Event SCD30_CO2_Event(NULL, "SCD30 CO2 ppm", Eventing::TRIGGER_MANUAL);
 
 void ReadSCD30() {
     if (co2SensorPresent && co2Sensor.dataAvailable()) {
@@ -333,7 +333,7 @@ static AHT20 humiditySensor;
 static bool humiditySensorPresent = false;
 static constexpr float humiditySensorTempOffset = 0.0;
 
-Eventing::Event AHT20_Humidity_Event(NULL, "AHT20 Relative Humidity %%", Eventing::TRIGGER_NONE);
+Eventing::Event AHT20_Humidity_Event(NULL, "AHT20 Relative Humidity %%", Eventing::TRIGGER_MANUAL);
 
 void ReadAHT20() {
     if (humiditySensorPresent && humiditySensor.isCalibrated()) {
@@ -386,7 +386,7 @@ Eventing::Event AbsoluteHumidity_g_m3_8_8_Event(&CalculateAbsHum, "Calculate abs
 static SPS30 pmSensor;
 static bool pmSensorPresent = false;
 
-static Eventing::Event SPS30_Data_Event(NULL, "SPS30 PM Sensor data event", Eventing::TRIGGER_NONE);
+static Eventing::Event SPS30_Data_Event(NULL, "SPS30 PM Sensor data event", Eventing::TRIGGER_MANUAL);
 static SPS30_DATA_FLOAT sps30_global_datum_struct;
 static Eventing::EventData sps30_global_datum;
 void ReadSPS30() {
@@ -680,6 +680,7 @@ void init() {
     UX::RenderOledEvent.AddTrigger(&sensors::LPS25HB_Pressure_Event);
     UX::RenderOledEvent.AddTrigger(&sensors::SCD30_CO2_Event);
     UX::RenderOledEvent.AddTrigger(&sensors::AHT20_Humidity_Event);
+    UX::RenderOledEvent.AddTrigger(&sensors::SPS30_Data_Event);
 }
 
 } // namespace Flow
