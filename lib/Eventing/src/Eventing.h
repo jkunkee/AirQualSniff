@@ -1,153 +1,350 @@
 
 #pragma once
 
-#include <DeltaClock.h>
+//
+// Copyright (C) 2022 Jon Kunkee jonathan.kunkee@gmail.com
+// License: BSD 3-clause
+//
+// Event-driven programming library for Arduino
+//
+// (Probably trivially adaptable to any setup+loop C++ application)
+//
+// An Event is something that happens.
+//
+// Events are named in and referenced using EventNameEnum.
+//
+// Connections between Events are described in EventHandlers, which contain
+// the set of Events the EventHandler depends on and how to wait for those
+// Events. They also contain a pointer to an EventHandlerFunc function that
+// executes when the trigger conditions are met.
+//
+// EventHandlerFunc functions can, in turn, produce data and emit Events.
+//
+// No handling is currently provided to enforce it, but the directed Event
+// dependency graph should be acyclic.
+//
+// Data produced by an Event is copied into each listening EventHandler
+// in the list of triggers. Multiple data types are accommodated using
+// the EventData class; typically each Event name is associated with
+// one data type, which is then implicitly coded into the EventHandlerFuncs.
+// More complex data can be passed by having a global struct that is passed
+// by pointer in EventData.ptr, but this moves the data flow outside
+// the Eventing library's control.
+//
+// TODO:
+// Pass by reference instead of value as many places as makes sense
+// TRIGGER_TEMPORAL (aka DeltaClock)
+// Use function pointers or enum as ID insead of String
+// no-alloc/pre-alloc option
+// debug dump of full state
+// pass handler func the full handler object to make event searching easy
+// shift type scopes inward to simplify interface
+// somehow tidy up EventHandlerFunc interface
+// make dbg.print levels meaningful (or hidden behind a macro)
+//
+
+#ifdef EVENTHUB_DEBUG
+// https://github.com/arduino-libraries/Arduino_DebugUtils/blob/master/src/Arduino_DebugUtils.h
+#include <Arduino_DebugUtils.h>
+#define dbgprint dbg.print
+#else
+#define dbgprint()
+#endif
+
+// https://arduino.stackexchange.com/questions/17639/the-difference-between-time-t-and-datetime#:~:text=A%20DateTime%20is%20a%20full%20class%20with%20lots,of%20the%20time%20stored%20in%20the%20DateTime%20object.
+#ifndef time_t
+typedef unsigned long time_t;
+#endif
+
+#ifdef EVENTHUB_TEMPORAL
+#include "DeltaClock.h"
+#endif
 
 namespace Eventing {
 
+#ifdef EVENTHUB_DEBUG
+static Arduino_DebugUtils dbg;
+#endif
+
 template <class T> class PointerList {
 public:
-    PointerList() {
-        list = new T*[5];
-        count = 0;
-        capacity = 5;
-    }
-    T** list;
-    size_t count;
-    size_t capacity;
-    bool Add(T* item) {
-#ifdef EVENTHUB_DEBUG
-        if (count > capacity) {
-            // something has gone horribly wrong
-            Serial.println("PointList add encountered bad count/capacity values");
-            return false;
-        }
+  PointerList() {
+    list = new T*[5];
+    count = 0;
+    capacity = 5;
+  }
+  T** list;
+  size_t count;
+  size_t capacity;
+  bool Add(T* item) {
+    if (count > capacity) {
+        // something has gone horribly wrong
+#ifdef EVENTHUB_PTRLIST_DEBUG
+        dbg.print(DBG_ERROR, "PointList add encountered bad count/capacity values");
 #endif
-        if (count >= capacity) {
-            T** new_list = new T*[capacity+2];
-            memcpy(new_list, list, capacity*sizeof(T*));
-            delete(list);
-            list = new_list;
-            capacity = capacity+2;
-        }
-        list[count] = item;
-        count++;
-        return true; // maybe one day check for OOM and duplicates
+        return false;
     }
-};
-
-class Event;
-
-class EventData {
-public:
-    EventData() : fl(0.0) {}
-    union {
-        float fl;
-        int16_t in16;
-        uint16_t uin16;
-        void* ptr;
-    };
-};
-
-class EventTrigger {
-public:
-    EventTrigger(Event* e) : source_event(e), data_ready(false) {}
-    void Reset() {
-        data.fl = -NAN;
-        data_ready = false;
+    if (count >= capacity) {
+      T** new_list = new T*[capacity+2];
+      memcpy(new_list, list, capacity*sizeof(T*));
+      delete(list);
+      list = new_list;
+      capacity = capacity+2;
     }
-    Event* source_event;
-    EventData data;
-    bool data_ready;
+    list[count] = item;
+    count++;
+    return true; // maybe one day check for OOM and duplicates
+  }
+#ifdef EVENTHUB_PTRLIST_DEBUG
+  void print() {
+    dbg.print(DBG_INFO, "PointerList %p, %d entries:", this, count);
+    for (int idx = 0; idx < count; idx++) {
+      dbg.print(DBG_INFO, "  Item: %p", list[idx]);
+    }
+  }
+#endif
 };
 
-typedef bool (*EventAction)(Event* event);
+typedef union _EventData {
+  float fl;
+  int16_t in16;
+  uint16_t uin16;
+  void* ptr;
+} EventData;
 
 typedef enum _EventTriggerType {
-    TRIGGER_NONE,
+    TRIGGER_MANUAL,
     TRIGGER_ON_ANY,
     TRIGGER_ON_ALL,
-    //TRIGGER_TEMPORAL_DATA_AS_MS,
+#ifdef EVENTHUB_TEMPORAL
+    TRIGGER_TEMPORAL,
+#endif
 } EventTriggerType;
 
-class Event {
+class EventTrigger {
+  // James: maybe allow for decimation here with 'wait until N fires'
 public:
-    Event(EventAction a, const char* n, EventTriggerType t) : action(a), name(n), type(t) {}
-    bool AddTrigger(Event *trigger) { return triggers.Add(new EventTrigger(trigger)); }
-    bool ProcessTrigger(Event* src_event, EventData* data) {
-        bool trigger_found = false;
-        for (size_t idx = 0; idx < triggers.count; idx++) {
-            if (triggers.list[idx]->source_event == src_event) {
-                triggers.list[idx]->data = *data;
-                triggers.list[idx]->data_ready = true;
-                trigger_found = true;
-                break;
-            }
-        }
-        if (triggers.count > 0) {
-            bool is_triggered = false;
-            if (type == TRIGGER_ON_ALL) {
-                is_triggered = true;
-                for (size_t idx = 0; idx < triggers.count; idx++) {
-                    is_triggered = is_triggered && triggers.list[idx]->data_ready;
-                }
-            } else if (type == TRIGGER_ON_ANY) {
-                is_triggered = false;
-                for (size_t idx = 0; idx < triggers.count; idx++) {
-                    is_triggered = is_triggered || triggers.list[idx]->data_ready;
-                }
-            }
-            if (is_triggered) {
-                action(this);
-                ResetTriggers();
-            }
-        }
-        return trigger_found;
+  EventTrigger(String id) : event_id(id) {}
+  String event_id;
+  EventData data;
+  bool data_ready;
+  void Deliver(EventData dataIn) {
+    dbgprint(DBG_INFO, "    EventTrigger %s got %p", event_id.c_str(), data.ptr);
+    data = dataIn;
+    data_ready = true;
+  }
+  void Reset() {
+#ifdef EVENTHUB_DEBUG
+    data.in16 = 5;
+#endif
+    data_ready = false;
+  }
+#ifdef EVENTHUB_DEBUG
+  void print() {
+    dbgprint(DBG_INFO, "    EventTrigger %p listening for %s", this, event_id.c_str());
+  }
+#endif
+};
+
+// The called function has no way to know how to generate an event, so
+// rely on the parent EventHandler's ID string and filling out an output object
+// to allow it to do so.
+// Return true if data was generated.
+typedef bool (*EventHandlerFunc)(PointerList<EventTrigger>& triggers, EventData& out);
+
+class EventHandler {
+private:
+public:
+  EventHandler(String id, EventHandlerFunc func, EventTriggerType typeIn, time_t intervalIn = 0)
+  : event_id(id)
+  {
+    action = func;
+    type = typeIn;
+    interval = intervalIn;
+  }
+
+  String event_id;
+  EventHandlerFunc action;
+  EventTriggerType type;
+  PointerList<EventTrigger> triggers;
+  time_t interval;
+
+  EventTrigger* FindTrigger(String id) {
+    for (int triggerIdx = 0; triggerIdx < triggers.count; triggerIdx++) {
+      EventTrigger* trigger = triggers.list[triggerIdx];
+      if (trigger->event_id.equalsIgnoreCase(id)) {
+        return trigger;
+      }
     }
-    void ResetTriggers() {
-        for (size_t idx = 0; idx < triggers.count; idx++) {
-            triggers.list[idx]->Reset();
+    return nullptr;
+  }
+  // TODO: sweep to pass by reference instead of value
+  bool AddTrigger(String id) {
+    EventTrigger* trigger = FindTrigger(id);
+    if (trigger == NULL) {
+      return triggers.Add(new EventTrigger(id));
+    } else {
+      return true;
+    }
+  }
+  void ResetTriggers() {
+    for (int triggerIdx = 0; triggerIdx < triggers.count; triggerIdx++) {
+      triggers.list[triggerIdx]->Reset();
+    }
+  }
+  bool TriggerConditionMet() {
+    switch (type) {
+    default:
+    case TRIGGER_MANUAL:
+      return false;
+#ifdef EVENTHUB_TEMPORAL
+    case TRIGGER_TEMPORAL:
+#endif
+    case TRIGGER_ON_ANY:
+      return true;
+    case TRIGGER_ON_ALL: {
+        bool AllTriggered = true;
+        for (int triggerIdx = 0; triggerIdx < triggers.count && AllTriggered; triggerIdx++) {
+          AllTriggered = AllTriggered && triggers.list[triggerIdx]->data_ready;
         }
+        return AllTriggered;
+      }
+    }
+    return false;
+  }
+  // return true if this EventHandler fired and generated data
+  bool Deliver(String id, EventData data, EventData& outData) {
+    EventTrigger* trigger = FindTrigger(id);
+    if (trigger == nullptr) {
+      dbgprint("  EventHandler %s did not find entry for trigger %s", event_id.c_str(), id.c_str());
+      return false;
     }
 
-    EventAction action;
-    const char* name;
-    EventTriggerType type;
-    PointerList<EventTrigger> triggers;
+    dbgprint(DBG_INFO, "  EventHandler %s got %s=%p", event_id.c_str(), id.c_str(), data.ptr);
+    trigger->Deliver(data);
+
+    if (TriggerConditionMet()) {
+      dbgprint(DBG_INFO, "    TriggerConditionMet!");
+      bool dataGenerated = action(triggers, outData);
+      ResetTriggers();
+      return dataGenerated;
+    }
+
+    return false;
+  }
+#ifdef EVENTHUB_DEBUG
+  void print() {
+    dbgprint(DBG_INFO, "  Handler %s type %d has %d triggers:", event_id.c_str(), type, triggers.count);
+    for (int idx = 0; idx < triggers.count; idx++) {
+      triggers.list[idx]->print();
+    }
+  }
+#endif
 };
 
 class EventHub {
+private:
+#ifdef EVENTHUB_TEMPORAL
+  DeltaClock clock;
+#endif
+  PointerList<EventHandler> handlers;
+
+  EventHandler* FindHandler(String id) {
+    for (int handlerIdx = 0; handlerIdx < handlers.count; handlerIdx++) {
+      EventHandler* handler = handlers.list[handlerIdx];
+      if (handler->event_id.equalsIgnoreCase(id)) {
+        return handler;
+      }
+    }
+    return nullptr;
+  }
+
+  class TemporalContext {
+  public:
+    TemporalContext() {}
+    EventHandler* handler;
+    EventHub* hub;
+  };
+
 public:
-    EventHub() {}
-    bool Add(Event* event) {
-        return events.Add(event);
+#ifdef EVENTHUB_TEMPORAL
+  bool begin() {
+    return clock.begin();
+  }
+  void update() {
+    clock.update();
+  }
+  // If it's not static, the this pointer means it can't be a DeltaClockAction.
+  // If it's static, it can't deliver the result.
+  // Pack enough context into the void* to solve this problem!
+  static void TemporalAction(void* contextIn) {
+    dbgprint(DBG_INFO, "Firing Temporal Handler");
+    TemporalContext* context = (TemporalContext*)contextIn;
+    EventData data;
+    bool produced = context->handler->action(context->handler->triggers, data);
+    if (produced != false) {
+      context->hub->Deliver(context->handler->event_id, data);
     }
-    bool Fire(Event* event, EventData* data) {
-        bool trigger_found = false;
-        for (size_t e_idx = 0; e_idx < events.count; e_idx++) {
-            trigger_found = events.list[e_idx]->ProcessTrigger(event, data) || trigger_found;
-        }
-        return trigger_found;
+  }
+#endif
+  bool AddHandler(String id, EventHandlerFunc func, EventTriggerType type, time_t interval = 0) {
+    EventHandler* eventHandler = FindHandler(id);
+    bool addStatus;
+    if (eventHandler == nullptr) {
+      eventHandler = new EventHandler(id, func, type, interval);
+      addStatus = handlers.Add(eventHandler);
+#ifdef EVENTHUB_TEMPORAL
+      // could just be at the end, but I don't remember how DeltaClock handles
+      // double-add
+      if (type == TRIGGER_TEMPORAL) {
+        dbgprint(DBG_INFO, "Adding Temporal Handler");
+        DeltaClockEntry* clockEntry = (DeltaClockEntry*)malloc(sizeof(DeltaClockEntry));
+        clockEntry->action = (DeltaClockAction)&this->TemporalAction;
+        clockEntry->interval = interval;
+        clockEntry->repeating = true;
+        TemporalContext* context = new TemporalContext();
+        context->handler = eventHandler;
+        context->hub = this;
+        clockEntry->context = (void*)context;
+        clock.insert(clockEntry);
+      }
+#endif
+    } else {
+      eventHandler->action = func;
+      eventHandler->type = type;
+      eventHandler->interval = interval;
+      addStatus = true;
     }
-    PointerList<Event> events;
-    DeltaClock delta_clock;
+    return addStatus;
+  }
+  bool AddHandlerTrigger(String handlerId, String triggerId) {
+    EventHandler* eventHandler = FindHandler(handlerId);
+    if (eventHandler != nullptr) {
+      return eventHandler->AddTrigger(triggerId);
+    } else {
+      return false;
+    }
+  }
+  bool Deliver(String id, EventData data) {
+    dbgprint(DBG_INFO, "EventHub delivering %s %p", id.c_str(), data.ptr);
+    for (int handlerIdx = 0; handlerIdx < handlers.count; handlerIdx++) {
+      EventHandler* eventHandler = handlers.list[handlerIdx];
+      EventData outData;
+      bool eventFired = eventHandler->Deliver(id, data, outData);
+      if (eventFired) {
+        dbgprint(DBG_INFO, " Handler %s generated data: %p", eventHandler->event_id.c_str(), outData.ptr);
+        Deliver(eventHandler->event_id, outData);
+      }
+    }
+    return true;
+  }
 #ifdef EVENTHUB_DEBUG
-    void DumpStateOnSerial() {
-        Serial.printlnf("Hub %p, %u events", this, events.count);
-        for (size_t event_idx = 0; event_idx < events.count; event_idx++) {
-            Event& event = *events.list[event_idx];
-            Serial.printlnf(
-                "  Event %p \"%s\", %u triggers, type %d",
-                events.list[event_idx],
-                event.name ? event.name : "",
-                event.triggers.count,
-                event.type);
-            for (size_t trigger_idx = 0; trigger_idx < event.triggers.count; trigger_idx++) {
-                EventTrigger& trigger = *event.triggers.list[trigger_idx];
-                Serial.printlnf("    Trigger %d, event: %p, data ready: %d, data: %f/%u/%d", trigger_idx, trigger.source_event, trigger.data_ready, trigger.data.fl, trigger.data.uin16, trigger.data.in16);
-            }
-        }
+  void print() {
+    dbgprint(DBG_INFO, "EventHub %p has %d handlers:", this, handlers.count);
+    for (int idx = 0; idx < handlers.count; idx++) {
+      handlers.list[idx]->print();
     }
+  }
 #endif
 };
 
