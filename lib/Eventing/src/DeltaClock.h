@@ -17,8 +17,13 @@ typedef struct _DeltaClockEntry {
 
 class DeltaClock {
 public:
-    DeltaClock();
-    void begin();
+    DeltaClock() : head(NULL), lastUpdate(0) {}
+    void begin() {
+#ifdef DC_TEST
+        Serial.begin();
+        printToSerial();
+#endif
+    }
     // mark the passage of time, call expired events, and requeue repeating events
     void update();
     // insert a new entry into the delta clock
@@ -27,7 +32,9 @@ public:
     // If an entry expires multiple times, it will run the expected number of times all at once.
     void insert(DeltaClockEntry* entry);
     // dequeue all events
-    void clear();
+    void clear() {
+        head = NULL;
+    }
 private:
     DeltaClockEntry* head;
     unsigned long lastUpdate;

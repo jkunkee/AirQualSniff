@@ -1,15 +1,6 @@
 
 #include "DeltaClock.h"
 
-DeltaClock::DeltaClock() : head(NULL), lastUpdate(0) {}
-
-void DeltaClock::begin() {
-#ifdef DC_TEST
-    Serial.begin();
-    printToSerial();
-#endif
-}
-
 void DeltaClock::update() {
     // Establish amount of time passed, accounting for millis() rollover
     unsigned long now = millis();
@@ -101,10 +92,6 @@ cleanup:
     printToSerial();
 #endif
     return;
-}
-
-void DeltaClock::clear() {
-    head = NULL;
 }
 
 #ifdef DC_TEST
