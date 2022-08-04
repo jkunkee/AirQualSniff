@@ -25,7 +25,7 @@ void DeltaClock::update() {
             delta -= head->remaining;
             head->remaining = 0;
             // execute
-            head->action();
+            head->action(head->context);
             // remove the item from the list
             DeltaClockEntry* old = head;
             head = head->next;
