@@ -18,11 +18,12 @@ typedef struct _DeltaClockEntry {
 class DeltaClock {
 public:
     DeltaClock() : head(NULL), lastUpdate(0) {}
-    void begin() {
+    bool begin() {
 #ifdef DC_TEST
         Serial.begin();
         printToSerial();
 #endif
+        return true;
     }
     // mark the passage of time, call expired events, and requeue repeating events
     void update();
