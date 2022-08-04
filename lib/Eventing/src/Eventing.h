@@ -53,7 +53,7 @@
 
 // https://arduino.stackexchange.com/questions/17639/the-difference-between-time-t-and-datetime#:~:text=A%20DateTime%20is%20a%20full%20class%20with%20lots,of%20the%20time%20stored%20in%20the%20DateTime%20object.
 #ifndef time_t
-typedef unsigned long time_t;
+//typedef unsigned long time_t;
 #endif
 
 #ifdef EVENTHUB_TEMPORAL
