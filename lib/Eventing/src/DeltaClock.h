@@ -5,12 +5,15 @@
 
 //#define DC_TEST
 
-typedef void (*DeltaClockAction)(void);
+typedef void (*DeltaClockAction)(void*);
 
 typedef struct _DeltaClockEntry {
     DeltaClockAction action;
     unsigned long interval;
     boolean repeating;
+    // A void* context structure allows for reuse of a single DeltaClockAction
+    // for multiple DeltaClockEntries--say, when an EventHub wraps their creation.
+    void* context;
     unsigned long remaining;
     struct _DeltaClockEntry* next;
 } DeltaClockEntry;
