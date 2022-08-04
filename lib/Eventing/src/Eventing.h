@@ -48,7 +48,7 @@
 #include <Arduino_DebugUtils.h>
 #define dbgprint dbg.print
 #else
-#define dbgprint()
+#define dbgprint(a, ...)
 #endif
 
 // https://arduino.stackexchange.com/questions/17639/the-difference-between-time-t-and-datetime#:~:text=A%20DateTime%20is%20a%20full%20class%20with%20lots,of%20the%20time%20stored%20in%20the%20DateTime%20object.
