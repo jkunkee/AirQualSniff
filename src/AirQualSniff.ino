@@ -3,7 +3,8 @@
 #include "decimator.h"
 #include "Atmospherics.h"
 #include "sps30.h"
-#define EVENTHUB_DEBUG
+//#define EVENTHUB_DEBUG
+#define EVENTHUB_TEMPORAL
 #include "Eventing.h"
 // checked-in 3p dependencies
 #include "SparkFun_SGP30_Arduino_Library.h"
@@ -65,7 +66,7 @@ namespace infrastructure {
 
     static void init();
     static void init() {
-        event_hub.delta_clock.begin();
+        event_hub.begin();
         wd = new ApplicationWatchdog(30000U, &watchdogHandler);
     }
 
@@ -261,11 +262,6 @@ static bool lps25hb_pressure_sensor_present = false;
 // 70 deg F in actively cooled airstream was -5 deg F
 static constexpr float pressureSensorTempFOffset = 80.3 - 83.2; // actual - measured
 
-Eventing::Event LPS25HB_Pressure_Event(NULL, "LPS25HB Pressure hPa", Eventing::TRIGGER_NONE);
-Eventing::Event LPS25HB_Altitude_Event(NULL, "LPS25HB Altitude m", Eventing::TRIGGER_NONE);
-Eventing::Event LPS25HB_TempC_Event(NULL, "LPS25HB Temp C", Eventing::TRIGGER_NONE);
-Eventing::Event LPS25HB_TempF_Event(NULL, "LPS25HB Temp F", Eventing::TRIGGER_NONE);
-
 static bool LPS25HB_data_is_ready();
 static bool LPS25HB_data_is_ready() {
     constexpr uint8_t STATUS_REG_P_DA = 0x2;
@@ -276,8 +272,8 @@ static bool LPS25HB_data_is_ready() {
             (status & STATUS_REG_P_DA);
 }
 
-static void ReadLPS25HB();
-static void ReadLPS25HB() {
+static bool ReadLPS25HB(Eventing::PointerList<Eventing::EventTrigger>& triggers, Eventing::EventData& out);
+static bool ReadLPS25HB(Eventing::PointerList<Eventing::EventTrigger>& triggers, Eventing::EventData& out) {
     if (lps25hb_pressure_sensor_present != false && LPS25HB_data_is_ready()) {
         Eventing::EventData tempC;
         Eventing::EventData tempF;
@@ -289,17 +285,15 @@ static void ReadLPS25HB() {
         pressurehPa.fl = pressureSensor.getPressure_hPa();
         altitudem.fl = atmospherics::pressure_to_est_altitude(pressurehPa.fl);
 
-        infrastructure::event_hub.Fire(&LPS25HB_Pressure_Event, &pressurehPa);
-        infrastructure::event_hub.Fire(&LPS25HB_Altitude_Event, &altitudem);
-        infrastructure::event_hub.Fire(&LPS25HB_TempC_Event, &tempC);
-        infrastructure::event_hub.Fire(&LPS25HB_TempF_Event, &tempF);
+        infrastructure::event_hub.Deliver(String("LPS25HB Pressure hPa"), pressurehPa);
+        infrastructure::event_hub.Deliver(String("LPS25HB Altitude m"), altitudem);
+        infrastructure::event_hub.Deliver(String("LPS25HB Temp C"), tempC);
+        infrastructure::event_hub.Deliver(String("LPS25HB Temp F"), tempF);
     }
+
+    // Data is delivered with Deliver, so out param is unused.
+    return false;
 }
-static DeltaClockEntry LPS25HBTimer = {
-    .action = ReadLPS25HB,
-    .interval = 1000, // pre-decimated output is at 1 Hz
-    .repeating = true,
-};
 
 static SCD30 co2Sensor;
 static bool co2SensorPresent = false;
@@ -308,9 +302,8 @@ static bool co2SensorPresent = false;
 // 70 deg F in actively cooled airstream was -1 deg F
 static constexpr float co2SensorTempFOffset = 80.1 - 79.0;
 
-Eventing::Event SCD30_CO2_Event(NULL, "SCD30 CO2 ppm", Eventing::TRIGGER_NONE);
-
-void ReadSCD30() {
+static bool ReadSCD30(Eventing::PointerList<Eventing::EventTrigger>& triggers, Eventing::EventData& out);
+static bool ReadSCD30(Eventing::PointerList<Eventing::EventTrigger>& triggers, Eventing::EventData& out) {
     if (co2SensorPresent && co2Sensor.dataAvailable()) {
         Eventing::EventData rh;
         Eventing::EventData tempC;
@@ -320,37 +313,25 @@ void ReadSCD30() {
         tempC.fl = co2Sensor.getTemperature() + co2SensorTempFOffset * 5 / 9;
         co2.uin16 = co2Sensor.getCO2();
 
-        infrastructure::event_hub.Fire(&SCD30_CO2_Event, &co2);
+        infrastructure::event_hub.Deliver(String("SCD30 CO2 ppm"), co2);
     }
+    // Data is delivered with Deliver, so out param is unused.
+    return false;
 }
-DeltaClockEntry SCD30Timer = {
-    .action = ReadSCD30,
-    .interval = 2000,
-    .repeating = true,
-};
 
 static AHT20 humiditySensor;
 static bool humiditySensorPresent = false;
 static constexpr float humiditySensorTempOffset = 0.0;
 
-Eventing::Event AHT20_Humidity_Event(NULL, "AHT20 Relative Humidity %%", Eventing::TRIGGER_NONE);
-
-void ReadAHT20() {
+static bool ReadAHT20(Eventing::PointerList<Eventing::EventTrigger>& triggers, Eventing::EventData& out);
+static bool ReadAHT20(Eventing::PointerList<Eventing::EventTrigger>& triggers, Eventing::EventData& out) {
     if (humiditySensorPresent && humiditySensor.isCalibrated()) {
         humiditySensor.triggerMeasurement();
-
-        Eventing::EventData rh;
-
-        rh.fl = humiditySensor.getHumidity();
-
-        infrastructure::event_hub.Fire(&AHT20_Humidity_Event, &rh);
+        out.fl = humiditySensor.getHumidity();
+        return true;
     }
+    return false;
 }
-static DeltaClockEntry AHT20Timer = {
-    .action = ReadAHT20,
-    .interval = 1000,
-    .repeating = true,
-};
 
 /*
 bool CalculateAbsHum(Eventing::Event* event) {
@@ -386,10 +367,8 @@ Eventing::Event AbsoluteHumidity_g_m3_8_8_Event(&CalculateAbsHum, "Calculate abs
 static SPS30 pmSensor;
 static bool pmSensorPresent = false;
 
-static Eventing::Event SPS30_Data_Event(NULL, "SPS30 PM Sensor data event", Eventing::TRIGGER_NONE);
 static SPS30_DATA_FLOAT sps30_global_datum_struct;
-static Eventing::EventData sps30_global_datum;
-void ReadSPS30() {
+bool ReadSPS30(Eventing::PointerList<Eventing::EventTrigger>& triggers, Eventing::EventData& out) {
     if (pmSensorPresent) {
         bool sendData = false;
         SPS30_ERR readyErr, retrieveErr;
@@ -403,18 +382,14 @@ void ReadSPS30() {
         sendData = dataIsReady && dataRetrieved;
         peripherals::SpeedUpI2c();
         if (sendData) {
-            sps30_global_datum.ptr = &sps30_global_datum_struct;
-            String str;
-            SPS30::float_append_to_string(sps30_global_datum_struct, str);
-            infrastructure::event_hub.Fire(&SPS30_Data_Event, &sps30_global_datum);
+            out.ptr = &sps30_global_datum_struct;
+            //String str;
+            //SPS30::float_append_to_string(sps30_global_datum_struct, str);
         }
+        return sendData;
     }
+    return false;
 }
-static DeltaClockEntry SPS30Timer = {
-    .action = &ReadSPS30,
-    .interval = 2500,
-    .repeating = true,
-};
 
 void init() {
     lps25hb_pressure_sensor_present = pressureSensor.begin();
@@ -482,33 +457,33 @@ void init() {
 
 namespace UX {
 
-bool RenderSerial(Eventing::Event* event) {
+bool RenderSerial(Eventing::PointerList<Eventing::EventTrigger>& triggers, Eventing::EventData& out) {
     static float press = -NAN, tempF = -NAN, tempC = -NAN, alt = -NAN;
     static uint16_t co2ppm = -1;
     static float rh = -NAN;
     static SPS30_DATA_FLOAT pm = { 0 };
-    for (size_t evt_idx = 0; evt_idx < event->triggers.count; evt_idx++) {
-        Eventing::EventTrigger* trigger = event->triggers.list[evt_idx];
+    for (size_t evt_idx = 0; evt_idx < triggers.count; evt_idx++) {
+        Eventing::EventTrigger* trigger = triggers.list[evt_idx];
         if (trigger->data_ready) {
-            if (trigger->source_event == &sensors::LPS25HB_Pressure_Event) {
+            if (trigger->event_id.equalsIgnoreCase(String("LPS25HB Pressure hPa"))) {
                 press = trigger->data.fl;
-                return true;
-            } else if (trigger->source_event == &sensors::LPS25HB_Altitude_Event) {
+                return false;
+            } else if (trigger->event_id.equalsIgnoreCase(String("LPS25HB Altitude m"))) {
                 alt = trigger->data.fl;
-                return true;
-            } else if (trigger->source_event == &sensors::LPS25HB_TempC_Event) {
+                return false;
+            } else if (trigger->event_id.equalsIgnoreCase(String("LPS25HB Temp C"))) {
                 tempC = trigger->data.fl;
-                return true;
-            } else if (trigger->source_event == &sensors::LPS25HB_TempF_Event) {
+                return false;
+            } else if (trigger->event_id.equalsIgnoreCase(String("LPS25HB Temp F"))) {
                 tempF = trigger->data.fl;
-            } else if (trigger->source_event == &sensors::SCD30_CO2_Event) {
+            } else if (trigger->event_id.equalsIgnoreCase(String("SCD30 CO2 ppm"))) {
                 co2ppm = trigger->data.uin16;
-            } else if (trigger->source_event == &sensors::AHT20_Humidity_Event) {
+            } else if (trigger->event_id.equalsIgnoreCase(String("AHT20 Relative Humidity %%"))) {
                 rh = trigger->data.fl;
-            } else if (trigger->source_event == &sensors::SPS30_Data_Event) {
+            } else if (trigger->event_id.equalsIgnoreCase(String("SPS30 Raw"))) {
                 pm = *((SPS30_DATA_FLOAT*)trigger->data.ptr);
             } else {
-                Serial.printlnf("Unhandled event \"%s\" %0.2f/%u/%d/%x/%p", trigger->source_event->name, trigger->data.fl, trigger->data.uin16, trigger->data.in16, trigger->data.uin16, trigger->data.ptr);
+                Serial.printlnf("Unhandled event \"%s\" %0.2f/%u/%d/%x/%p", trigger->event_id.c_str(), trigger->data.fl, trigger->data.uin16, trigger->data.in16, trigger->data.uin16, trigger->data.ptr);
             }
         }
     }
@@ -535,33 +510,32 @@ bool RenderSerial(Eventing::Event* event) {
         Serial.println("SPS30 not present");
     }
     //infrastructure::event_hub.DumpStateOnSerial();
-    return true;
+    return false;
 }
-Eventing::Event RenderSerialEvent(&RenderSerial, "RenderSerialEvent", Eventing::EventTriggerType::TRIGGER_ON_ANY);
 
 typedef enum _OledMode {
     HOME,
 } OledMode;
 
-bool RenderOled(Eventing::Event* event) {
+bool RenderOled(Eventing::PointerList<Eventing::EventTrigger>& triggers, Eventing::EventData& out) {
     static OledMode mode = HOME;
 
     static float press = -NAN, tempF = -NAN;
     static uint16_t co2ppm = -1;
     static float rh = -NAN;
-    for (size_t evt_idx = 0; evt_idx < event->triggers.count; evt_idx++) {
-        Eventing::EventTrigger* trigger = event->triggers.list[evt_idx];
+    for (size_t evt_idx = 0; evt_idx < triggers.count; evt_idx++) {
+        Eventing::EventTrigger* trigger = triggers.list[evt_idx];
         if (trigger->data_ready) {
-            if (trigger->source_event == &sensors::LPS25HB_Pressure_Event) {
+            if (trigger->event_id.equalsIgnoreCase(String("LPS25HB Pressure hPa"))) {
                 press = trigger->data.fl;
-            } else if (trigger->source_event == &sensors::LPS25HB_TempF_Event) {
+            } else if (trigger->event_id.equalsIgnoreCase(String("LPS25HB Temp F"))) {
                 tempF = trigger->data.fl;
-            } else if (trigger->source_event == &sensors::SCD30_CO2_Event) {
+            } else if (trigger->event_id.equalsIgnoreCase(String("SCD30 CO2 ppm"))) {
                 co2ppm = trigger->data.uin16;
-            } else if (trigger->source_event == &sensors::AHT20_Humidity_Event) {
+            } else if (trigger->event_id.equalsIgnoreCase(String("AHT20 Relative Humidity %%"))) {
                 rh = trigger->data.fl;
             } else {
-                Serial.printlnf("Unhandled event \"%s\" %0.2f/%u/%d/%x", trigger->source_event->name, trigger->data.fl, trigger->data.uin16, trigger->data.in16, trigger->data.uin16);
+                Serial.printlnf("Unhandled event \"%s\" %0.2f/%u/%d/%x", trigger->event_id.c_str(), trigger->data.fl, trigger->data.uin16, trigger->data.in16, trigger->data.uin16);
             }
         }
     }
@@ -628,9 +602,8 @@ bool RenderOled(Eventing::Event* event) {
     peripherals::Display::u8g2_ssd1327_lock();
     unsigned long drawEnd = millis();
     Serial.printlnf("draw latency: %lu ms", drawEnd - drawStart);
-    return true;
+    return false;
 }
-Eventing::Event RenderOledEvent(&RenderOled, "RenderOledEvent", Eventing::EventTriggerType::TRIGGER_ON_ALL);
 
 } // namespace UX
 
@@ -649,37 +622,31 @@ namespace flow {
 
 // One Init To Rule Them All, And In The Setup, Bind Them
 void init() {
-    infrastructure::event_hub.delta_clock.insert(&sensors::LPS25HBTimer);
-    infrastructure::event_hub.delta_clock.insert(&sensors::SCD30Timer);
-    infrastructure::event_hub.delta_clock.insert(&sensors::AHT20Timer);
-    infrastructure::event_hub.delta_clock.insert(&sensors::SPS30Timer);
-    infrastructure::event_hub.Add(&sensors::LPS25HB_Pressure_Event);
-    infrastructure::event_hub.Add(&sensors::LPS25HB_Altitude_Event);
-    infrastructure::event_hub.Add(&sensors::LPS25HB_TempC_Event);
-    infrastructure::event_hub.Add(&sensors::LPS25HB_TempF_Event);
-    infrastructure::event_hub.Add(&sensors::SCD30_CO2_Event);
-    infrastructure::event_hub.Add(&sensors::AHT20_Humidity_Event);
-    infrastructure::event_hub.Add(&sensors::SPS30_Data_Event);
+    infrastructure::event_hub.AddHandler(String("LPS25HB Raw"), sensors::ReadLPS25HB, Eventing::TRIGGER_TEMPORAL, 1000); // pre-decimated output is at 1 Hz
+    infrastructure::event_hub.AddHandler(String("SCD30 Raw"), sensors::ReadSCD30, Eventing::TRIGGER_TEMPORAL, 2000);
+    infrastructure::event_hub.AddHandler(String("AHT20 Relative Humidity %%"), sensors::ReadAHT20, Eventing::TRIGGER_TEMPORAL, 1000);
+    infrastructure::event_hub.AddHandler(String("SPS30 Raw"), sensors::ReadSPS30, Eventing::TRIGGER_TEMPORAL, 2500);
 /*
     infrastructure::event_hub.Add(&sensors::AbsoluteHumidity_g_m3_8_8_Event);
     sensors::AbsoluteHumidity_g_m3_8_8_Event.AddTrigger(&sensors::LPS25HB_TempC_Event);
     sensors::AbsoluteHumidity_g_m3_8_8_Event.AddTrigger(&sensors::LPS25HB_Pressure_Event);
     sensors::AbsoluteHumidity_g_m3_8_8_Event.AddTrigger(&sensors::AHT20_Humidity_Event);
 */
-    infrastructure::event_hub.Add(&UX::RenderSerialEvent);
-    UX::RenderSerialEvent.AddTrigger(&sensors::LPS25HB_Pressure_Event);
-    UX::RenderSerialEvent.AddTrigger(&sensors::LPS25HB_Altitude_Event);
-    UX::RenderSerialEvent.AddTrigger(&sensors::LPS25HB_TempC_Event);
-    UX::RenderSerialEvent.AddTrigger(&sensors::LPS25HB_TempF_Event);
-    UX::RenderSerialEvent.AddTrigger(&sensors::SCD30_CO2_Event);
-    UX::RenderSerialEvent.AddTrigger(&sensors::AHT20_Humidity_Event);
-    UX::RenderSerialEvent.AddTrigger(&sensors::SPS30_Data_Event);
+    infrastructure::event_hub.AddHandler(String("RenderSerialEvent"), UX::RenderSerial, Eventing::TRIGGER_ON_ANY);
+    infrastructure::event_hub.AddHandlerTrigger(String("RenderSerialEvent"), String("LPS25HB Pressure hPa"));
+    infrastructure::event_hub.AddHandlerTrigger(String("RenderSerialEvent"), String("LPS25HB Altitude m"));
+    infrastructure::event_hub.AddHandlerTrigger(String("RenderSerialEvent"), String("LPS25HB Temp C"));
+    infrastructure::event_hub.AddHandlerTrigger(String("RenderSerialEvent"), String("LPS25HB Temp F"));
+    infrastructure::event_hub.AddHandlerTrigger(String("RenderSerialEvent"), String("SCD30 CO2 ppm"));
+    infrastructure::event_hub.AddHandlerTrigger(String("RenderSerialEvent"), String("AHT20 Relative Humidity %%"));
+    infrastructure::event_hub.AddHandlerTrigger(String("RenderSerialEvent"), String("SPS30 Raw"));
     //UX::RenderSerialEvent.AddTrigger(&sensors::AbsoluteHumidity_g_m3_8_8_Event);
-    infrastructure::event_hub.Add(&UX::RenderOledEvent);
-    UX::RenderOledEvent.AddTrigger(&sensors::LPS25HB_TempF_Event);
-    UX::RenderOledEvent.AddTrigger(&sensors::LPS25HB_Pressure_Event);
-    UX::RenderOledEvent.AddTrigger(&sensors::SCD30_CO2_Event);
-    UX::RenderOledEvent.AddTrigger(&sensors::AHT20_Humidity_Event);
+    infrastructure::event_hub.AddHandler("RenderOledEvent", UX::RenderOled, Eventing::TRIGGER_ON_ANY);
+    infrastructure::event_hub.AddHandlerTrigger(String("RenderOledEvent"), String("LPS25HB Temp F"));
+    infrastructure::event_hub.AddHandlerTrigger(String("RenderOledEvent"), String("LPS25HB Pressure hPa"));
+    infrastructure::event_hub.AddHandlerTrigger(String("RenderOledEvent"), String("SCD30 CO2 ppm"));
+    infrastructure::event_hub.AddHandlerTrigger(String("RenderOledEvent"), String("AHT20 Relative Humidity %%"));
+    infrastructure::event_hub.AddHandlerTrigger(String("RenderOledEvent"), String("SPS30 Raw"));
 }
 
 } // namespace Flow
@@ -702,7 +669,7 @@ void setup() {
 void loop() {
     //Serial.printlnf("Loop Start %lu", millis());
     ApplicationWatchdog::checkin();
-    infrastructure::event_hub.delta_clock.update();
+    infrastructure::event_hub.update();
     delay(400);
 }
 
