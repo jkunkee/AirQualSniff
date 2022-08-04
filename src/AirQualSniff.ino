@@ -297,6 +297,7 @@ static bool ReadLPS25HB(Eventing::PointerList<Eventing::EventTrigger>& triggers,
 
 static SCD30 co2Sensor;
 static bool co2SensorPresent = false;
+static constexpr uint16_t co2SensorInterval = 10;
 // Device returns 79.0 deg F, TemporalScanner returns 80.1
 // Offset is added
 // 70 deg F in actively cooled airstream was -1 deg F
@@ -412,7 +413,7 @@ void init() {
     co2SensorPresent = co2Sensor.begin();
     if (co2SensorPresent != false) {
         co2Sensor.setAutoSelfCalibration(true);
-        co2Sensor.setMeasurementInterval(2);
+        co2Sensor.setMeasurementInterval(co2SensorInterval);
     }
     humiditySensorPresent = humiditySensor.begin();
     peripherals::SlowDownI2c();
@@ -623,7 +624,7 @@ namespace flow {
 // One Init To Rule Them All, And In The Setup, Bind Them
 void init() {
     infrastructure::event_hub.AddHandler(String("LPS25HB Raw"), sensors::ReadLPS25HB, Eventing::TRIGGER_TEMPORAL, 1000); // pre-decimated output is at 1 Hz
-    infrastructure::event_hub.AddHandler(String("SCD30 Raw"), sensors::ReadSCD30, Eventing::TRIGGER_TEMPORAL, 2000);
+    infrastructure::event_hub.AddHandler(String("SCD30 Raw"), sensors::ReadSCD30, Eventing::TRIGGER_TEMPORAL, sensors::co2SensorInterval*1000);
     infrastructure::event_hub.AddHandler(String("AHT20 Relative Humidity %%"), sensors::ReadAHT20, Eventing::TRIGGER_TEMPORAL, 1000);
     infrastructure::event_hub.AddHandler(String("SPS30 Raw"), sensors::ReadSPS30, Eventing::TRIGGER_TEMPORAL, 2500);
 /*
