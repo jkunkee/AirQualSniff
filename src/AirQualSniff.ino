@@ -384,8 +384,6 @@ bool ReadSPS30(Eventing::PointerList<Eventing::EventTrigger>& triggers, Eventing
         peripherals::SpeedUpI2c();
         if (sendData) {
             out.ptr = &sps30_global_datum_struct;
-            //String str;
-            //SPS30::float_append_to_string(sps30_global_datum_struct, str);
         }
         return sendData;
     }
