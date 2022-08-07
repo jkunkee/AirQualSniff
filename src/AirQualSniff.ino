@@ -755,7 +755,6 @@ void loop() {
     //Serial.printlnf("Loop Start %lu", millis());
     ApplicationWatchdog::checkin();
     infrastructure::event_hub.update();
-    delay(400);
     peripherals::Joystick::EmitChangeEvent();
 }
 
