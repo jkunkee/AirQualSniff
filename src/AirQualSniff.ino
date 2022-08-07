@@ -27,6 +27,8 @@ SYSTEM_THREAD(ENABLED);
 // Always connect and stay connected
 SYSTEM_MODE(AUTOMATIC);
 
+//SerialLogHandler logHandler(LOG_LEVEL_ALL);
+
 // To use I2C buffers bigger than 32 bytes, we provide a function for allocating the buffers. Particle-specific.
 // https://docs.staging.particle.io/cards/firmware/wire-i2c/acquirewirebuffer/
 static constexpr size_t I2C_BUFFER_SIZE = 128;
@@ -58,18 +60,25 @@ namespace infrastructure {
 
     static Eventing::EventHub event_hub;
 
+    static ApplicationWatchdog *wd = NULL;
+
     void watchdogHandler(void) {
+        Serial.printlnf("ApplicationWatchdog triggered!");
+        Serial.printlnf("######### FreeRAM: %lu Uptime: %ld", System.freeMemory(), millis());
+        Serial.flush();
         System.reset(RESET_NO_WAIT);
     }
-
-    static ApplicationWatchdog *wd = NULL;
 
     static void init();
     static void init() {
         event_hub.begin();
-        wd = new ApplicationWatchdog(30000U, &watchdogHandler);
+        wd = new ApplicationWatchdog(30000U, &watchdogHandler, 1536);
     }
 
+    bool DumpOsState(Eventing::PointerList<Eventing::EventTrigger>& triggers, Eventing::EventData& out) {
+        Serial.printlnf("######### FreeRAM: %lu Uptime: %ld", System.freeMemory(), millis());
+        return false;
+    }
 } // namespace infrastructure
 
 /*****************************************************************************/
@@ -722,6 +731,7 @@ void init() {
     infrastructure::event_hub.AddHandlerTrigger(String("RenderOledEvent"), String("SCD30 CO2 ppm"));
     infrastructure::event_hub.AddHandlerTrigger(String("RenderOledEvent"), String("AHT20 Relative Humidity %%"));
     infrastructure::event_hub.AddHandlerTrigger(String("RenderOledEvent"), String("SPS30 Raw"));
+    //infrastructure::event_hub.AddHandler("DumpOsState", infrastructure::DumpOsState, Eventing::TRIGGER_TEMPORAL, 5000);
 }
 
 } // namespace Flow
