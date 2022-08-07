@@ -43,9 +43,14 @@
 //
 
 #ifdef EVENTHUB_DEBUG
+#ifdef PARTICLE_WIRING_ARDUINO_COMPATIBILTY
+#define dbgprint(a, ...) Serial.printlnf(__VA_ARGS__)
+#elif defined(ARDUINO)
 // https://github.com/arduino-libraries/Arduino_DebugUtils/blob/master/src/Arduino_DebugUtils.h
 #include <Arduino_DebugUtils.h>
-#define dbgprint dbg.print
+static Arduino_DebugUtils eventhub_arduino_dbg;
+#define dbgprint eventhub_arduino_dbg.print
+#endif
 #else
 #define dbgprint(a, ...)
 #endif
@@ -60,10 +65,6 @@
 #endif
 
 namespace Eventing {
-
-#ifdef EVENTHUB_DEBUG
-static Arduino_DebugUtils dbg;
-#endif
 
 template <class T> class PointerList {
 public:
