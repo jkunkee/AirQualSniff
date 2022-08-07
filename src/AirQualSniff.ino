@@ -205,7 +205,7 @@ namespace Display {
         // Docs say U8G2_SSD1327_EA_W128128_F_HW_I2C, but it chops off the top and bottom 16 rows.
         // u8g2_Setup_ssd1327_i2c_ws_128x128_f seems to work well, at least empirically.
         //u8g2_Setup_ssd1327_i2c_ws_128x128_f(&u8g2, U8G2_R0, u8x8_byte_arduino_hw_i2c, u8x8_gpio_and_delay_arduino);
-        u8g2_Setup_ssd1327_i2c_midas_128x128_f(&u8g2, U8G2_R0, u8x8_byte_arduino_hw_i2c, u8x8_gpio_and_delay_arduino);
+        u8g2_Setup_ssd1327_i2c_midas_128x128_f(&u8g2, U8G2_R3, u8x8_byte_arduino_hw_i2c, u8x8_gpio_and_delay_arduino);
         //u8g2_Setup_ssd1327_i2c_ea_w128128_f(&u8g2, U8G2_R0, u8x8_byte_arduino_hw_i2c, u8x8_gpio_and_delay_arduino);
         u8g2_InitDisplay(&u8g2);
         u8g2_SetPowerSave(&u8g2, 0);
