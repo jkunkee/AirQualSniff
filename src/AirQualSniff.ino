@@ -217,6 +217,80 @@ namespace Display {
     }
 } // namespace Display
 
+namespace Joystick {
+    static JOYSTICK joystick;
+    static bool joystickPresent = false;
+    typedef enum _JOYSTICK_DIRECTION {
+        UP,
+        DOWN,
+        LEFT,
+        RIGHT,
+        UP_RIGHT,
+        UP_LEFT,
+        DOWN_RIGHT,
+        DOWN_LEFT,
+        CENTER,
+    } JOYSTICK_DIRECTION;
+    static constexpr uint16_t BOUNDARY_SIZE = 200;
+    static constexpr uint16_t MAX = 1023;
+    static constexpr uint16_t LEFT_THRESHOLD = BOUNDARY_SIZE;
+    static constexpr uint16_t RIGHT_THRESHOLD = MAX - BOUNDARY_SIZE;
+    static constexpr uint16_t UP_THRESHOLD = BOUNDARY_SIZE;
+    static constexpr uint16_t DOWN_THRESHOLD = MAX - BOUNDARY_SIZE;
+
+    static JOYSTICK_DIRECTION ReadJoystick();
+    static JOYSTICK_DIRECTION ReadJoystick() {
+        uint16_t horiz = joystick.getHorizontal();
+        uint16_t vert = joystick.getVertical();
+
+        JOYSTICK_DIRECTION joyDir;
+        if (vert > DOWN_THRESHOLD && horiz > RIGHT_THRESHOLD) {
+            joyDir = DOWN_RIGHT;
+        } else if (vert > DOWN_THRESHOLD && horiz < LEFT_THRESHOLD) {
+            joyDir = DOWN_LEFT;
+        } else if (vert < UP_THRESHOLD && horiz > RIGHT_THRESHOLD) {
+            joyDir = UP_RIGHT;
+        } else if (vert < UP_THRESHOLD && horiz < LEFT_THRESHOLD) {
+            joyDir = UP_LEFT;
+        } else if (vert > DOWN_THRESHOLD) {
+            joyDir = DOWN;
+        } else if (vert < UP_THRESHOLD) {
+            joyDir = UP;
+        } else if (horiz < LEFT_THRESHOLD) {
+            joyDir = LEFT;
+        } else if (horiz > RIGHT_THRESHOLD) {
+            joyDir = RIGHT;
+        } else {
+            joyDir = CENTER;
+        }
+        Serial.printlnf("Got joy reading x=%d,y=%d", horiz, vert);
+        return joyDir;
+    }
+
+    void EmitChangeEvent();
+    void EmitChangeEvent() {
+        static JOYSTICK_DIRECTION joyDirOld = JOYSTICK_DIRECTION::CENTER;
+
+        if (joystickPresent == false) {
+            return;
+        }
+
+        JOYSTICK_DIRECTION joyDir1 = ReadJoystick();
+        delay(10);
+        JOYSTICK_DIRECTION joyDir2 = ReadJoystick();
+
+        Serial.printlnf("Joy dir change check; joyDir1=%d joyDir2=%d old=%d", joyDir1, joyDir2, joyDirOld);
+        if (joyDir1 == joyDir2 && joyDir1 != joyDirOld) {
+            Eventing::EventData joystickData;
+            joystickData.uin16 = joyDir1;
+            joyDirOld = joyDir1;
+
+            Serial.printlnf("Joy dir change event sent");
+            infrastructure::event_hub.Deliver("Joystick Direction Change", joystickData);
+        }
+    }
+} // namespace Joystick
+
 void init() {
     Serial.begin(115200);
 
@@ -240,6 +314,8 @@ void init() {
     // The PM sensor has been muxed off, so speed up
     SpeedUpI2c();
     Display::init();
+
+    Joystick::joystickPresent = Joystick::joystick.begin();
 }
 
 } // namespace peripherals
@@ -670,6 +746,7 @@ void loop() {
     ApplicationWatchdog::checkin();
     infrastructure::event_hub.update();
     delay(400);
+    peripherals::Joystick::EmitChangeEvent();
 }
 
 /*****************************************************************************/
