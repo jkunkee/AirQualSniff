@@ -286,7 +286,7 @@ namespace Joystick {
         } else {
             joyDir = CENTER;
         }
-        Serial.printlnf("Got joy reading x=%d,y=%d", horiz, vert);
+        //Serial.printlnf("Got joy reading x=%d,y=%d", horiz, vert);
         return joyDir;
     }
 
@@ -302,13 +302,13 @@ namespace Joystick {
         delay(10);
         JOYSTICK_DIRECTION joyDir2 = ReadJoystick();
 
-        Serial.printlnf("Joy dir change check; joyDir1=%d joyDir2=%d old=%d", joyDir1, joyDir2, joyDirOld);
+        //Serial.printlnf("Joy dir change check; joyDir1=%d joyDir2=%d old=%d", joyDir1, joyDir2, joyDirOld);
         if (joyDir1 == joyDir2 && joyDir1 != joyDirOld) {
             Eventing::EventData joystickData;
             joystickData.uin16 = joyDir1;
             joyDirOld = joyDir1;
 
-            Serial.printlnf("Joy dir change event sent");
+            //Serial.printlnf("Joy dir change event sent");
             infrastructure::event_hub.Deliver("Joystick Direction Change", joystickData);
         }
     }
@@ -757,7 +757,7 @@ void init() {
     infrastructure::event_hub.AddHandlerTrigger(String("RenderOledEvent"), String("LPS25HB Pressure hPa"));
     infrastructure::event_hub.AddHandlerTrigger(String("RenderOledEvent"), String("SCD30 CO2 ppm"));
     infrastructure::event_hub.AddHandlerTrigger(String("RenderOledEvent"), String("AHT20 Relative Humidity %%"));
-    infrastructure::event_hub.AddHandlerTrigger(String("RenderOledEvent"), String("SPS30 Raw"));
+    //infrastructure::event_hub.AddHandlerTrigger(String("RenderOledEvent"), String("SPS30 Raw"));
     infrastructure::event_hub.AddHandlerTrigger(String("RenderOledEvent"), String("Joystick Direction Change"));
     infrastructure::event_hub.AddHandler("PaintOled", peripherals::Display::Paint, Eventing::TRIGGER_TEMPORAL, 500);
     //infrastructure::event_hub.AddHandler("DumpOsState", infrastructure::DumpOsState, Eventing::TRIGGER_TEMPORAL, 5000);
