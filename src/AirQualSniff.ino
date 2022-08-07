@@ -607,17 +607,17 @@ bool RenderSerial(Eventing::PointerList<Eventing::EventTrigger>& triggers, Event
     } else {
         Serial.println("SPS30 not present");
     }
-    //infrastructure::event_hub.DumpStateOnSerial();
     return false;
 }
 
 typedef enum _OledMode {
     HOME,
+    BLANK,
+    DEBUG_RETICLE,
 } OledMode;
 
 bool RenderOled(Eventing::PointerList<Eventing::EventTrigger>& triggers, Eventing::EventData& out) {
     static OledMode mode = HOME;
-
     static float press = -NAN, tempF = -NAN;
     static uint16_t co2ppm = -1;
     static float rh = -NAN;
@@ -632,6 +632,20 @@ bool RenderOled(Eventing::PointerList<Eventing::EventTrigger>& triggers, Eventin
                 co2ppm = trigger->data.uin16;
             } else if (trigger->event_id.equalsIgnoreCase(String("AHT20 Relative Humidity %%"))) {
                 rh = trigger->data.fl;
+            } else if (trigger->event_id.equalsIgnoreCase(String("Joystick Direction Change"))) {
+                peripherals::Joystick::JOYSTICK_DIRECTION joyDir = (peripherals::Joystick::JOYSTICK_DIRECTION)trigger->data.uin16;
+                switch (joyDir) {
+                default:
+                case peripherals::Joystick::JOYSTICK_DIRECTION::CENTER:
+                    mode = HOME;
+                    break;
+                case peripherals::Joystick::JOYSTICK_DIRECTION::RIGHT:
+                    mode = BLANK;
+                    break;
+                case peripherals::Joystick::JOYSTICK_DIRECTION::UP:
+                    mode = DEBUG_RETICLE;
+                    break;
+                }
             } else {
                 Serial.printlnf("Unhandled event \"%s\" %0.2f/%u/%d/%x", trigger->event_id.c_str(), trigger->data.fl, trigger->data.uin16, trigger->data.in16, trigger->data.uin16);
             }
@@ -639,7 +653,47 @@ bool RenderOled(Eventing::PointerList<Eventing::EventTrigger>& triggers, Eventin
     }
 
     u8g2_ClearBuffer(&peripherals::Display::u8g2);
-    if (0) { // debugging reticle
+
+    switch (mode) {
+    default:
+    case HOME: {
+            const uint8_t *big_font = u8g2_font_osb29_tf; // 0 is widest at 16px, 100 is 69px, -20 is 58
+            constexpr u8g2_uint_t text_big_height = 29;
+            const uint8_t *small_font = u8g2_font_osb18_tf; // F is 18 px, C is 17
+            constexpr u8g2_uint_t text_small_height = 18;
+            u8g2_SetFont(&peripherals::Display::u8g2, small_font);
+            char buf[20];
+            u8g2_uint_t temp_bottom_left_x = 0, temp_bottom_left_y = peripherals::Display::HEIGHT * 1 / 4 - 10;
+            u8g2_uint_t hum_bottom_left_x = 0, hum_bottom_left_y = peripherals::Display::HEIGHT * 2 / 4 - 10;
+            u8g2_uint_t co2_bottom_left_x = 0, co2_bottom_left_y = peripherals::Display::HEIGHT * 4 / 4 - 10;
+            u8g2_uint_t press_bottom_left_x = 0, press_bottom_left_y = peripherals::Display::HEIGHT * 3 / 4 - 10;
+            if (sensors::lps25hb_pressure_sensor_present) {
+                snprintf(buf, sizeof(buf), "%0.1fhPa", press);
+                u8g2_DrawUTF8(&peripherals::Display::u8g2, press_bottom_left_x, press_bottom_left_y, buf);
+                snprintf(buf, sizeof(buf), "%0.1f\u00b0F", tempF);
+                u8g2_DrawUTF8(&peripherals::Display::u8g2, temp_bottom_left_x, temp_bottom_left_y, buf);
+            } else {
+                u8g2_DrawUTF8(&peripherals::Display::u8g2, press_bottom_left_x, press_bottom_left_y, "-hPa");
+                u8g2_DrawUTF8(&peripherals::Display::u8g2, temp_bottom_left_x, temp_bottom_left_y, "-\u00b0F");
+            }
+            if (sensors::co2SensorPresent) {
+                snprintf(buf, sizeof(buf), "%uppm CO2", co2ppm);
+                u8g2_DrawUTF8(&peripherals::Display::u8g2, co2_bottom_left_x, co2_bottom_left_y, buf);
+            } else {
+                u8g2_DrawUTF8(&peripherals::Display::u8g2, co2_bottom_left_x, co2_bottom_left_y, "-ppm CO2");
+            }
+            if (sensors::humiditySensorPresent) {
+                snprintf(buf, sizeof(buf), "%0.1f%% rh", rh);
+                u8g2_DrawUTF8(&peripherals::Display::u8g2, hum_bottom_left_x, hum_bottom_left_y, buf);
+            } else {
+                u8g2_DrawUTF8(&peripherals::Display::u8g2, hum_bottom_left_x, hum_bottom_left_y, "-% rh");
+            }
+        }
+        break;
+    case BLANK:
+        // Buffer is already cleared by default
+        break;
+    case DEBUG_RETICLE:
         for (int n = 0; n < 128; n++) {
             if (n % 5 == 0) {
                 u8g2_DrawPixel(&peripherals::Display::u8g2, n, 0);
@@ -656,43 +710,7 @@ bool RenderOled(Eventing::PointerList<Eventing::EventTrigger>& triggers, Eventin
         u8g2_DrawPixel(&peripherals::Display::u8g2, 126, 126);
         u8g2_DrawPixel(&peripherals::Display::u8g2, 127, 127);
         u8g2_DrawPixel(&peripherals::Display::u8g2, 128, 128);
-    }
-
-    switch (mode) {
-    default:
-    case HOME: {
-        const uint8_t *big_font = u8g2_font_osb29_tf; // 0 is widest at 16px, 100 is 69px, -20 is 58
-        constexpr u8g2_uint_t text_big_height = 29;
-        const uint8_t *small_font = u8g2_font_osb18_tf; // F is 18 px, C is 17
-        constexpr u8g2_uint_t text_small_height = 18;
-        u8g2_SetFont(&peripherals::Display::u8g2, small_font);
-        char buf[20];
-        u8g2_uint_t temp_bottom_left_x = 0, temp_bottom_left_y = peripherals::Display::HEIGHT * 1 / 4 - 10;
-        u8g2_uint_t hum_bottom_left_x = 0, hum_bottom_left_y = peripherals::Display::HEIGHT * 2 / 4 - 10;
-        u8g2_uint_t co2_bottom_left_x = 0, co2_bottom_left_y = peripherals::Display::HEIGHT * 4 / 4 - 10;
-        u8g2_uint_t press_bottom_left_x = 0, press_bottom_left_y = peripherals::Display::HEIGHT * 3 / 4 - 10;
-        if (sensors::lps25hb_pressure_sensor_present) {
-            snprintf(buf, sizeof(buf), "%0.1fhPa", press);
-            u8g2_DrawUTF8(&peripherals::Display::u8g2, press_bottom_left_x, press_bottom_left_y, buf);
-            snprintf(buf, sizeof(buf), "%0.1f\u00b0F", tempF);
-            u8g2_DrawUTF8(&peripherals::Display::u8g2, temp_bottom_left_x, temp_bottom_left_y, buf);
-        } else {
-            u8g2_DrawUTF8(&peripherals::Display::u8g2, press_bottom_left_x, press_bottom_left_y, "-hPa");
-            u8g2_DrawUTF8(&peripherals::Display::u8g2, temp_bottom_left_x, temp_bottom_left_y, "-\u00b0F");
-        }
-        if (sensors::co2SensorPresent) {
-            snprintf(buf, sizeof(buf), "%uppm CO2", co2ppm);
-            u8g2_DrawUTF8(&peripherals::Display::u8g2, co2_bottom_left_x, co2_bottom_left_y, buf);
-        } else {
-            u8g2_DrawUTF8(&peripherals::Display::u8g2, co2_bottom_left_x, co2_bottom_left_y, "-ppm CO2");
-        }
-        if (sensors::humiditySensorPresent) {
-            snprintf(buf, sizeof(buf), "%0.1f%% rh", rh);
-            u8g2_DrawUTF8(&peripherals::Display::u8g2, hum_bottom_left_x, hum_bottom_left_y, buf);
-        } else {
-            u8g2_DrawUTF8(&peripherals::Display::u8g2, hum_bottom_left_x, hum_bottom_left_y, "-% rh");
-        }
-    }
+        break;
     }
     peripherals::Display::BufferIsDirty = true;
     return false;
@@ -740,6 +758,7 @@ void init() {
     infrastructure::event_hub.AddHandlerTrigger(String("RenderOledEvent"), String("SCD30 CO2 ppm"));
     infrastructure::event_hub.AddHandlerTrigger(String("RenderOledEvent"), String("AHT20 Relative Humidity %%"));
     infrastructure::event_hub.AddHandlerTrigger(String("RenderOledEvent"), String("SPS30 Raw"));
+    infrastructure::event_hub.AddHandlerTrigger(String("RenderOledEvent"), String("Joystick Direction Change"));
     infrastructure::event_hub.AddHandler("PaintOled", peripherals::Display::Paint, Eventing::TRIGGER_TEMPORAL, 500);
     //infrastructure::event_hub.AddHandler("DumpOsState", infrastructure::DumpOsState, Eventing::TRIGGER_TEMPORAL, 5000);
 }
