@@ -210,6 +210,20 @@ namespace Display {
         u8g2_SendF(&peripherals::Display::u8g2, "c", 0xA4);
     }
 
+    bool BufferIsDirty = false;
+    bool Paint(Eventing::PointerList<Eventing::EventTrigger>& triggers, Eventing::EventData& out) {
+        if (BufferIsDirty != false) {
+            unsigned long drawStart = millis();
+            u8g2_ssd1327_unlock();
+            u8g2_SendBuffer(&u8g2);
+            u8g2_ssd1327_lock();
+            unsigned long drawEnd = millis();
+            Serial.printlnf("draw latency: %lu ms", drawEnd - drawStart);
+            BufferIsDirty = false;
+        }
+        return false;
+    }
+
     void init() {
         // Docs say U8G2_SSD1327_EA_W128128_F_HW_I2C, but it chops off the top and bottom 16 rows.
         // u8g2_Setup_ssd1327_i2c_ws_128x128_f seems to work well, at least empirically.
@@ -680,12 +694,7 @@ bool RenderOled(Eventing::PointerList<Eventing::EventTrigger>& triggers, Eventin
         }
     }
     }
-    unsigned long drawStart = millis();
-    peripherals::Display::u8g2_ssd1327_unlock();
-    u8g2_SendBuffer(&peripherals::Display::u8g2);
-    peripherals::Display::u8g2_ssd1327_lock();
-    unsigned long drawEnd = millis();
-    Serial.printlnf("draw latency: %lu ms", drawEnd - drawStart);
+    peripherals::Display::BufferIsDirty = true;
     return false;
 }
 
@@ -731,6 +740,7 @@ void init() {
     infrastructure::event_hub.AddHandlerTrigger(String("RenderOledEvent"), String("SCD30 CO2 ppm"));
     infrastructure::event_hub.AddHandlerTrigger(String("RenderOledEvent"), String("AHT20 Relative Humidity %%"));
     infrastructure::event_hub.AddHandlerTrigger(String("RenderOledEvent"), String("SPS30 Raw"));
+    infrastructure::event_hub.AddHandler("PaintOled", peripherals::Display::Paint, Eventing::TRIGGER_TEMPORAL, 500);
     //infrastructure::event_hub.AddHandler("DumpOsState", infrastructure::DumpOsState, Eventing::TRIGGER_TEMPORAL, 5000);
 }
 
