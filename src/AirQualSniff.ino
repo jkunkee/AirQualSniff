@@ -514,7 +514,7 @@ void init() {
     }
     humiditySensorPresent = humiditySensor.begin();
     peripherals::SlowDownI2c();
-    pmSensorPresent = false;//pmSensor.begin();
+    pmSensorPresent = pmSensor.begin();
     if (pmSensorPresent) {
         pmSensorPresent = pmSensorPresent && (pmSensor.start_measuring(SPS30_FORMAT_IEEE754) == SPS30_OK);
         sps30_global_datum_struct = {
@@ -529,6 +529,8 @@ void init() {
             .pm_10_n_cm3 = -NAN,
             .typical_size_um = -NAN,
         };
+        pmSensor.stop_measuring();
+        pmSensorPresent = false;
     }
     peripherals::SpeedUpI2c();
 }
