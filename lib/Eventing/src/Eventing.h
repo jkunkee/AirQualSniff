@@ -33,7 +33,6 @@
 //
 // TODO:
 // Pass by reference instead of value as many places as makes sense
-// TRIGGER_TEMPORAL (aka DeltaClock)
 // Use function pointers or enum as ID insead of String
 // no-alloc/pre-alloc option
 // debug dump of full state
@@ -216,7 +215,7 @@ public:
   bool Deliver(String id, EventData data, EventData& outData) {
     EventTrigger* trigger = FindTrigger(id);
     if (trigger == nullptr) {
-      dbgprint("  EventHandler %s did not find entry for trigger %s", event_id.c_str(), id.c_str());
+      dbgprint(DBG_INFO, "  EventHandler %s did not find entry for trigger %s", event_id.c_str(), id.c_str());
       return false;
     }
 
@@ -326,7 +325,7 @@ public:
     }
   }
   bool Deliver(String id, EventData data) {
-    dbgprint(DBG_INFO, "EventHub delivering %s %p", id.c_str(), data.ptr);
+    dbgprint(DBG_INFO, "EventHub delivering %s %p at %lu", id.c_str(), data.ptr, millis());
     for (int handlerIdx = 0; handlerIdx < handlers.count; handlerIdx++) {
       EventHandler* eventHandler = handlers.list[handlerIdx];
       EventData outData;
@@ -336,6 +335,7 @@ public:
         Deliver(eventHandler->event_id, outData);
       }
     }
+    dbgprint(DBG_INFO, "  EventHub delivery complete at %lu", millis());
     return true;
   }
 #ifdef EVENTHUB_DEBUG
