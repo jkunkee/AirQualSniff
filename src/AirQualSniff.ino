@@ -79,6 +79,7 @@ namespace infrastructure {
         Serial.printlnf("######### FreeRAM: %lu Uptime: %ld", System.freeMemory(), millis());
         return false;
     }
+
 } // namespace infrastructure
 
 /*****************************************************************************/
@@ -762,7 +763,7 @@ void init() {
     infrastructure::event_hub.AddHandlerTrigger(String("RenderOledEvent"), String("AHT20 Relative Humidity %%"));
     //infrastructure::event_hub.AddHandlerTrigger(String("RenderOledEvent"), String("SPS30 Raw"));
     infrastructure::event_hub.AddHandlerTrigger(String("RenderOledEvent"), String("Joystick Direction Change"));
-    infrastructure::event_hub.AddHandler("PaintOled", peripherals::Display::Paint, Eventing::TRIGGER_TEMPORAL, 500);
+    infrastructure::event_hub.AddHandler("PaintOled", peripherals::Display::Paint, Eventing::TRIGGER_TEMPORAL, 1200); // long enough for the longest loop to prevent delta clock recursion
     //infrastructure::event_hub.AddHandler("DumpOsState", infrastructure::DumpOsState, Eventing::TRIGGER_TEMPORAL, 5000);
 }
 
@@ -784,10 +785,14 @@ void setup() {
 }
 
 void loop() {
-    //Serial.printlnf("Loop Start %lu", millis());
+    system_tick_t start = millis();
     ApplicationWatchdog::checkin();
     infrastructure::event_hub.update();
     peripherals::Joystick::EmitChangeEvent();
+    system_tick_t end = millis();
+    if (end - start > 100) {
+        Serial.printlnf("###### Loop End; duration %lu", millis() - start);
+    }
 }
 
 /*****************************************************************************/
