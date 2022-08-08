@@ -213,6 +213,7 @@ namespace Display {
     bool BufferIsDirty = false;
     bool Paint(Eventing::PointerList<Eventing::EventTrigger>& triggers, Eventing::EventData& out) {
         if (BufferIsDirty != false) {
+            u8g2_ssd1327_register_reset();
             unsigned long drawStart = millis();
             u8g2_ssd1327_unlock();
             u8g2_SendBuffer(&u8g2);
