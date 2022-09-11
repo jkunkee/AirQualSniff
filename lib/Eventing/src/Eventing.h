@@ -124,7 +124,7 @@ typedef enum _EventTriggerType {
 class EventTrigger {
   // James: maybe allow for decimation here with 'wait until N fires'
 public:
-  EventTrigger(String id) : event_id(id) {}
+  EventTrigger(String id) : event_id(id), data({0}), data_ready(false) {}
   String event_id;
   EventData data;
   bool data_ready;
