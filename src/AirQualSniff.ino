@@ -612,7 +612,15 @@ bool RenderSerial(Eventing::PointerList<Eventing::EventTrigger>& triggers, Event
     }
     if (sensors::pmSensorPresent) {
         String str;
-        SPS30::float_append_to_string(pm, str);
+        float totalugcm3 = pm.pm_1_0_ug_m3 + pm.pm_2_5_ug_m3 + pm.pm_4_0_ug_m3 + pm.pm_10_ug_m3;
+        float totalcm3 = pm.pm_0_5_n_cm3 + pm.pm_1_0_n_cm3 + pm.pm_2_5_n_cm3 + pm.pm_4_0_n_cm3 + pm.pm_10_n_cm3;
+        str += "SPS30: ";
+        str += String(totalugcm3, 1);
+        str += "ug/cm3 ";
+        str += String(totalcm3, 1);
+        str += "n/cm3 ";
+        str += String(pm.typical_size_um, 1);
+        str += "um typical ";
         Serial.printlnf("%s", str.c_str());
     } else {
         Serial.println("SPS30 not present");
