@@ -211,12 +211,18 @@ namespace Display {
         u8g2_SendF(&peripherals::Display::u8g2, "c", 0xA4);
     }
 
+    void u8g2_ssd1327_errata_workaround() {
+        // Somehow some configuration bits sometimes get flipped; fix just the ones I know are busted:
+        // Deactivate scroll
+        u8g2_SendF(&peripherals::Display::u8g2, "c", 0x2E);
+    }
+
     bool BufferIsDirty = false;
     bool Paint(Eventing::PointerList<Eventing::EventTrigger>& triggers, Eventing::EventData& out) {
         if (BufferIsDirty != false) {
-            u8g2_ssd1327_register_reset();
             unsigned long drawStart = millis();
             u8g2_ssd1327_unlock();
+            u8g2_ssd1327_errata_workaround();
             u8g2_SendBuffer(&u8g2);
             u8g2_ssd1327_lock();
             unsigned long drawEnd = millis();
