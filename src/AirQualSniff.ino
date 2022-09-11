@@ -630,6 +630,7 @@ bool RenderSerial(Eventing::PointerList<Eventing::EventTrigger>& triggers, Event
 
 typedef enum _OledMode {
     HOME,
+    PM_DISPLAY,
     BLANK,
     DEBUG_RETICLE,
 } OledMode;
@@ -639,6 +640,7 @@ bool RenderOled(Eventing::PointerList<Eventing::EventTrigger>& triggers, Eventin
     static float press = -NAN, tempF = -NAN;
     static uint16_t co2ppm = -1;
     static float rh = -NAN;
+    static SPS30_DATA_FLOAT pm = { .typical_size_um = -NAN };
     for (size_t evt_idx = 0; evt_idx < triggers.count; evt_idx++) {
         Eventing::EventTrigger* trigger = triggers.list[evt_idx];
         if (trigger->data_ready) {
@@ -650,11 +652,19 @@ bool RenderOled(Eventing::PointerList<Eventing::EventTrigger>& triggers, Eventin
                 co2ppm = trigger->data.uin16;
             } else if (trigger->event_id.equalsIgnoreCase(String("AHT20 Relative Humidity %%"))) {
                 rh = trigger->data.fl;
+            } else if (trigger->event_id.equalsIgnoreCase(String("SPS30 Raw"))) {
+                Serial.printlnf("pm ptr: %p", trigger->data.ptr);
+                pm = *((SPS30_DATA_FLOAT*)trigger->data.ptr);
             } else if (trigger->event_id.equalsIgnoreCase(String("Joystick Direction Change"))) {
                 peripherals::Joystick::JOYSTICK_DIRECTION joyDir = (peripherals::Joystick::JOYSTICK_DIRECTION)trigger->data.uin16;
                 switch (joyDir) {
                 default:
                 case peripherals::Joystick::JOYSTICK_DIRECTION::CENTER:
+                    break;
+                case peripherals::Joystick::JOYSTICK_DIRECTION::LEFT:
+                    mode = PM_DISPLAY;
+                    break;
+                case peripherals::Joystick::JOYSTICK_DIRECTION::DOWN:
                     mode = HOME;
                     break;
                 case peripherals::Joystick::JOYSTICK_DIRECTION::RIGHT:
@@ -706,6 +716,40 @@ bool RenderOled(Eventing::PointerList<Eventing::EventTrigger>& triggers, Eventin
             } else {
                 u8g2_DrawUTF8(&peripherals::Display::u8g2, hum_bottom_left_x, hum_bottom_left_y, "-% rh");
             }
+        }
+        break;
+    case PM_DISPLAY: {
+            constexpr size_t bufLen = 20;
+            char buf[bufLen];
+            const uint8_t *small_font = u8g2_font_osb18_tf; // F is 18 px, C is 17
+            int8_t ascent;
+            int8_t descent;
+
+            u8g2_SetFont(&peripherals::Display::u8g2, small_font);
+            // I can't tell why, but these lines buried in u8g2_SetFont don't run
+            peripherals::Display::u8g2.font_info.ascent_A = small_font[13];
+            peripherals::Display::u8g2.font_info.descent_g = small_font[14];
+            peripherals::Display::u8g2.font_ref_ascent = peripherals::Display::u8g2.font_info.ascent_A;
+            peripherals::Display::u8g2.font_ref_descent = peripherals::Display::u8g2.font_info.descent_g;
+            ascent = u8g2_GetAscent(&peripherals::Display::u8g2);
+            descent = u8g2_GetDescent(&peripherals::Display::u8g2);
+
+            u8g2_uint_t x = 0;
+            u8g2_uint_t y = 0;
+
+            float totalugcm3 = pm.pm_1_0_ug_m3 + pm.pm_2_5_ug_m3 + pm.pm_4_0_ug_m3 + pm.pm_10_ug_m3;
+            snprintf(buf, bufLen, "%0.1fug/cm3", totalugcm3);
+            y = (ascent) + 0 * (ascent - descent);
+            u8g2_DrawUTF8(&peripherals::Display::u8g2, x, y, buf);
+
+            float totalcm3 = pm.pm_0_5_n_cm3 + pm.pm_1_0_n_cm3 + pm.pm_2_5_n_cm3 + pm.pm_4_0_n_cm3 + pm.pm_10_n_cm3;
+            snprintf(buf, bufLen, "%0.1fpart/cm3", totalcm3);
+            y = (ascent) + 1 * (ascent - descent);
+            u8g2_DrawUTF8(&peripherals::Display::u8g2, x, y, buf);
+
+            snprintf(buf, bufLen, "%0.1fum typ", pm.typical_size_um);
+            y = (ascent) + 2 * (ascent - descent);
+            u8g2_DrawUTF8(&peripherals::Display::u8g2, x, y, buf);
         }
         break;
     case BLANK:
@@ -775,7 +819,7 @@ void init() {
     infrastructure::event_hub.AddHandlerTrigger(String("RenderOledEvent"), String("LPS25HB Pressure hPa"));
     infrastructure::event_hub.AddHandlerTrigger(String("RenderOledEvent"), String("SCD30 CO2 ppm"));
     infrastructure::event_hub.AddHandlerTrigger(String("RenderOledEvent"), String("AHT20 Relative Humidity %%"));
-    //infrastructure::event_hub.AddHandlerTrigger(String("RenderOledEvent"), String("SPS30 Raw"));
+    infrastructure::event_hub.AddHandlerTrigger(String("RenderOledEvent"), String("SPS30 Raw"));
     infrastructure::event_hub.AddHandlerTrigger(String("RenderOledEvent"), String("Joystick Direction Change"));
     infrastructure::event_hub.AddHandler("PaintOled", peripherals::Display::Paint, Eventing::TRIGGER_TEMPORAL, 1200); // long enough for the longest loop to prevent delta clock recursion
     //infrastructure::event_hub.AddHandler("DumpOsState", infrastructure::DumpOsState, Eventing::TRIGGER_TEMPORAL, 5000);
