@@ -474,6 +474,7 @@ Eventing::Event AbsoluteHumidity_g_m3_8_8_Event(&CalculateAbsHum, "Calculate abs
 
 static SPS30 pmSensor;
 static bool pmSensorPresent = false;
+static constexpr uint32_t cleanIntervalGoal = 60 /* sec/min */ * 60 /* min/hr */ * 24 /* hr/day */ * 7 /* day/wk */ * 1;
 
 static SPS30_DATA_FLOAT sps30_global_datum_struct;
 bool ReadSPS30(Eventing::PointerList<Eventing::EventTrigger>& triggers, Eventing::EventData& out) {
@@ -537,8 +538,12 @@ void init() {
             .pm_10_n_cm3 = -NAN,
             .typical_size_um = -NAN,
         };
-        pmSensor.stop_measuring();
-        pmSensorPresent = false;
+        uint32_t fanCleanInterval;
+        if (pmSensor.read_fan_cleaning_interval(&fanCleanInterval) != SPS30_OK) {
+            if (fanCleanInterval != cleanIntervalGoal) {
+                pmSensor.set_fan_cleaning_interval(cleanIntervalGoal);
+            }
+        }
     }
     peripherals::SpeedUpI2c();
 }
