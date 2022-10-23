@@ -627,6 +627,8 @@ bool RenderSerial(Eventing::PointerList<Eventing::EventTrigger>& triggers, Event
         str += String(pm.typical_size_um, 1);
         str += "um typical ";
         Serial.printlnf("%s", str.c_str());
+        Serial.printlnf("  n .5um:%0.0f,1:%0.0f,2.5:%0.0f,4.0:%0.0f,10:%0.0f", pm.pm_0_5_n_cm3, pm.pm_1_0_n_cm3, pm.pm_2_5_n_cm3, pm.pm_4_0_n_cm3, pm.pm_10_n_cm3);
+        Serial.printlnf("  ug           1:%0.0f,2.5:%0.0f,4.0:%0.0f,10:%0.0f", pm.pm_1_0_ug_m3, pm.pm_2_5_ug_m3, pm.pm_4_0_ug_m3, pm.pm_10_ug_m3);
     } else {
         Serial.println("SPS30 not present");
     }
@@ -743,7 +745,7 @@ bool RenderOled(Eventing::PointerList<Eventing::EventTrigger>& triggers, Eventin
             u8g2_uint_t y = 0;
 
             float totalugcm3 = pm.pm_1_0_ug_m3 + pm.pm_2_5_ug_m3 + pm.pm_4_0_ug_m3 + pm.pm_10_ug_m3;
-            snprintf(buf, bufLen, "%0.1fug/cm3", totalugcm3);
+            snprintf(buf, bufLen, "%0.1fug/m3", totalugcm3);
             y = (ascent) + 0 * (ascent - descent);
             u8g2_DrawUTF8(&peripherals::Display::u8g2, x, y, buf);
 
