@@ -220,13 +220,13 @@ namespace Display {
     bool BufferIsDirty = false;
     bool Paint(Eventing::PointerList<Eventing::EventTrigger>& triggers, Eventing::EventData& out) {
         if (BufferIsDirty != false) {
-            unsigned long drawStart = millis();
+            //unsigned long drawStart = millis();
             u8g2_ssd1327_unlock();
             u8g2_ssd1327_errata_workaround();
             u8g2_SendBuffer(&u8g2);
             u8g2_ssd1327_lock();
-            unsigned long drawEnd = millis();
-            Serial.printlnf("draw latency: %lu ms", drawEnd - drawStart);
+            //unsigned long drawEnd = millis();
+            //Serial.printlnf("draw latency: %lu ms", drawEnd - drawStart);
             BufferIsDirty = false;
         }
         return false;
@@ -628,7 +628,7 @@ bool RenderSerial(Eventing::PointerList<Eventing::EventTrigger>& triggers, Event
         str += "um typical ";
         Serial.printlnf("%s", str.c_str());
         Serial.printlnf("  n .5um:%0.0f,1:%0.0f,2.5:%0.0f,4.0:%0.0f,10:%0.0f", pm.pm_0_5_n_cm3, pm.pm_1_0_n_cm3, pm.pm_2_5_n_cm3, pm.pm_4_0_n_cm3, pm.pm_10_n_cm3);
-        Serial.printlnf("  ug           1:%0.0f,2.5:%0.0f,4.0:%0.0f,10:%0.0f", pm.pm_1_0_ug_m3, pm.pm_2_5_ug_m3, pm.pm_4_0_ug_m3, pm.pm_10_ug_m3);
+        Serial.printlnf("  ug 1um:%0.0f,2.5:%0.0f,4.0:%0.0f,10:%0.0f", pm.pm_1_0_ug_m3, pm.pm_2_5_ug_m3, pm.pm_4_0_ug_m3, pm.pm_10_ug_m3);
     } else {
         Serial.println("SPS30 not present");
     }
@@ -660,7 +660,6 @@ bool RenderOled(Eventing::PointerList<Eventing::EventTrigger>& triggers, Eventin
             } else if (trigger->event_id.equalsIgnoreCase(String("AHT20 Relative Humidity %%"))) {
                 rh = trigger->data.fl;
             } else if (trigger->event_id.equalsIgnoreCase(String("SPS30 Raw"))) {
-                Serial.printlnf("pm ptr: %p", trigger->data.ptr);
                 pm = *((SPS30_DATA_FLOAT*)trigger->data.ptr);
             } else if (trigger->event_id.equalsIgnoreCase(String("Joystick Direction Change"))) {
                 peripherals::Joystick::JOYSTICK_DIRECTION joyDir = (peripherals::Joystick::JOYSTICK_DIRECTION)trigger->data.uin16;
