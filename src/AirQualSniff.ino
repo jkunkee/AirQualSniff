@@ -539,7 +539,7 @@ void init() {
             .typical_size_um = -NAN,
         };
         uint32_t fanCleanInterval;
-        if (pmSensor.read_fan_cleaning_interval(&fanCleanInterval) != SPS30_OK) {
+        if (pmSensor.read_fan_cleaning_interval(&fanCleanInterval) == SPS30_OK) {
             if (fanCleanInterval != cleanIntervalGoal) {
                 pmSensor.set_fan_cleaning_interval(cleanIntervalGoal);
             }
