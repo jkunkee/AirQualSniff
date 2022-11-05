@@ -475,6 +475,7 @@ Eventing::Event AbsoluteHumidity_g_m3_8_8_Event(&CalculateAbsHum, "Calculate abs
 static SPS30 pmSensor;
 static bool pmSensorPresent = false;
 static constexpr uint32_t cleanIntervalGoal = 60 /* sec/min */ * 60 /* min/hr */ * 24 /* hr/day */ * 7 /* day/wk */ * 1;
+static uint8_t pmTickCounter = 0;
 
 static SPS30_DATA_FLOAT sps30_global_datum_struct;
 bool ReadSPS30(Eventing::PointerList<Eventing::EventTrigger>& triggers, Eventing::EventData& out) {
@@ -482,17 +483,38 @@ bool ReadSPS30(Eventing::PointerList<Eventing::EventTrigger>& triggers, Eventing
         bool sendData = false;
         SPS30_ERR readyErr, retrieveErr;
         bool dataIsReady, dataRetrieved;
-        peripherals::SlowDownI2c();
-        readyErr = pmSensor.is_data_ready();
-        // verbose for easy addition of debug statements
-        dataIsReady = readyErr == SPS30_OK;
-        retrieveErr = pmSensor.read_data_no_wait_float(&sps30_global_datum_struct);
-        dataRetrieved = retrieveErr == SPS30_OK;
-        sendData = dataIsReady && dataRetrieved;
-        peripherals::SpeedUpI2c();
+
+        switch (pmTickCounter) {
+        case 0:
+            // start
+            peripherals::SlowDownI2c();
+            pmSensor.start_measuring(SPS30_FORMAT_IEEE754);
+            peripherals::SpeedUpI2c();
+            break;
+        case 1:
+            // wait; 2s will always produce data (1hz)
+            break;
+        case 2:
+            // read and stop
+            peripherals::SlowDownI2c();
+            readyErr = pmSensor.is_data_ready();
+            // verbose for easy addition of debug statements
+            dataIsReady = readyErr == SPS30_OK;
+            retrieveErr = pmSensor.read_data_no_wait_float(&sps30_global_datum_struct);
+            dataRetrieved = retrieveErr == SPS30_OK;
+            sendData = dataIsReady && dataRetrieved;
+            pmSensor.stop_measuring();
+            peripherals::SpeedUpI2c();
+            break;
+        default:
+            // wait
+            break;
+        }
+
         if (sendData) {
             out.ptr = &sps30_global_datum_struct;
         }
+        pmTickCounter = (pmTickCounter + 1) % 60;
         return sendData;
     }
     return false;
@@ -804,7 +826,7 @@ void init() {
     infrastructure::event_hub.AddHandler(String("LPS25HB Raw"), sensors::ReadLPS25HB, Eventing::TRIGGER_TEMPORAL, 1000); // pre-decimated output is at 1 Hz
     infrastructure::event_hub.AddHandler(String("SCD30 Raw"), sensors::ReadSCD30, Eventing::TRIGGER_TEMPORAL, sensors::co2SensorInterval*1000);
     infrastructure::event_hub.AddHandler(String("AHT20 Relative Humidity %%"), sensors::ReadAHT20, Eventing::TRIGGER_TEMPORAL, 1000);
-    infrastructure::event_hub.AddHandler(String("SPS30 Raw"), sensors::ReadSPS30, Eventing::TRIGGER_TEMPORAL, 2500);
+    infrastructure::event_hub.AddHandler(String("SPS30 Raw"), sensors::ReadSPS30, Eventing::TRIGGER_TEMPORAL, 1000);
 /*
     infrastructure::event_hub.Add(&sensors::AbsoluteHumidity_g_m3_8_8_Event);
     sensors::AbsoluteHumidity_g_m3_8_8_Event.AddTrigger(&sensors::LPS25HB_TempC_Event);
