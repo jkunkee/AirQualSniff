@@ -476,6 +476,7 @@ static SPS30 pmSensor;
 static bool pmSensorPresent = false;
 static constexpr uint32_t cleanIntervalGoal = 60 /* sec/min */ * 60 /* min/hr */ * 24 /* hr/day */ * 7 /* day/wk */ * 1;
 static uint8_t pmTickCounter = 0;
+static constexpr uint8_t pmMeasurementInterval = 60; // seconds
 
 static SPS30_DATA_FLOAT sps30_global_datum_struct;
 bool ReadSPS30(Eventing::PointerList<Eventing::EventTrigger>& triggers, Eventing::EventData& out) {
@@ -514,7 +515,7 @@ bool ReadSPS30(Eventing::PointerList<Eventing::EventTrigger>& triggers, Eventing
         if (sendData) {
             out.ptr = &sps30_global_datum_struct;
         }
-        pmTickCounter = (pmTickCounter + 1) % 60;
+        pmTickCounter = (pmTickCounter + 1) % pmMeasurementInterval;
         return sendData;
     }
     return false;
