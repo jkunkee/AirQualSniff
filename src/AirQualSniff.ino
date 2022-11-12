@@ -441,37 +441,29 @@ static bool ReadAHT20(Eventing::PointerList<Eventing::EventTrigger>& triggers, E
     return false;
 }
 
-/*
-bool CalculateAbsHum(Eventing::Event* event) {
+static bool CalculateAbsoluteHumidity_8_8_g_m3(Eventing::PointerList<Eventing::EventTrigger>& triggers, Eventing::EventData& out);
+static bool CalculateAbsoluteHumidity_8_8_g_m3(Eventing::PointerList<Eventing::EventTrigger>& triggers, Eventing::EventData& out) {
     float tempC = -NAN;
     float pressurehPa = -NAN;
     float rh = -NAN;
-    for (size_t evt_idx = 0; evt_idx < event->triggers.count; evt_idx++) {
-        Eventing::EventTrigger* trigger = event->triggers.list[evt_idx];
+    for (size_t evt_idx = 0; evt_idx < triggers.count; evt_idx++) {
+        Eventing::EventTrigger* trigger = triggers.list[evt_idx];
         if (trigger->data_ready) {
-            if (trigger->source_event == &AHT20_Humidity_Event) {
-                rh = trigger->data.fl;
-            } else if (trigger->source_event == &LPS25HB_Pressure_Event) {
+            if (trigger->event_id.equalsIgnoreCase(String("LPS25HB Pressure hPa"))) {
                 pressurehPa = trigger->data.fl;
-            } else if (trigger->source_event == &LPS25HB_TempC_Event) {
-                tempC = trigger->data.fl;
-            } else {
-                //Serial.printlnf("Unhandled event \"%s\" %0.2f/%u/%d/%x", trigger->source_event->name, trigger->data.fl, trigger->data.uin16, trigger->data.in16, trigger->data.uin16);
                 return false;
+            } else if (trigger->event_id.equalsIgnoreCase(String("LPS25HB Temp C"))) {
+                tempC = trigger->data.fl;
+                return false;
+            } else if (trigger->event_id.equalsIgnoreCase(String("AHT20 Relative Humidity %%"))) {
+                rh = trigger->data.fl;
             }
         }
     }
-    Eventing::EventData absoluteHumidity_g_m3_8_8;
-    absoluteHumidity_g_m3_8_8.uin16 = atmospherics::rel_to_abs_humidity(tempC, pressurehPa, rh);
-    // This wasn't exactly intended, but it's very much needed
-    //Serial.printlnf("Calculated abs hum %u \"%s\"", absoluteHumidity_g_m3_8_8.uin16, event->name);
-#warning Absolute Humidity self-firing event still broken
+    out.uin16 = atmospherics::rel_to_abs_humidity(tempC, pressurehPa, rh);
     return true;
-    return infrastructure::event_hub.Fire(event, &absoluteHumidity_g_m3_8_8);
 }
 
-Eventing::Event AbsoluteHumidity_g_m3_8_8_Event(&CalculateAbsHum, "Calculate absolute humidity from relative humidity", Eventing::TRIGGER_ON_ALL);
-*/
 static SGP30 vocSensor;
 static bool vocSensorPresent = false;
 constexpr uint32_t vocReadInterval = 1000;
@@ -494,6 +486,14 @@ static bool ReadSGP30(Eventing::PointerList<Eventing::EventTrigger>& triggers, E
         infrastructure::event_hub.Deliver(String("SGP30 H2"), datum);
         datum.uin16 = vocSensor.ethanol;
         infrastructure::event_hub.Deliver(String("SGP30 ethanol"), datum);
+    }
+    return false;
+}
+
+static bool SetSGP30AbsoluteHumidity(Eventing::PointerList<Eventing::EventTrigger>& triggers, Eventing::EventData& out);
+static bool SetSGP30AbsoluteHumidity(Eventing::PointerList<Eventing::EventTrigger>& triggers, Eventing::EventData& out) {
+    if (vocSensorPresent && triggers.count >= 1 && triggers.list[0]->data_ready) {
+        vocSensor.setHumidity(triggers.list[0]->data.uin16);
     }
     return false;
 }
@@ -631,6 +631,7 @@ bool RenderSerial(Eventing::PointerList<Eventing::EventTrigger>& triggers, Event
     static SPS30_DATA_FLOAT pm = { 0 };
     static uint16_t eco2 = 0;
     static uint16_t tvoc = 0;
+    static uint16_t absHum = -1;
     for (size_t evt_idx = 0; evt_idx < triggers.count; evt_idx++) {
         Eventing::EventTrigger* trigger = triggers.list[evt_idx];
         if (trigger->data_ready) {
@@ -655,6 +656,8 @@ bool RenderSerial(Eventing::PointerList<Eventing::EventTrigger>& triggers, Event
                 tvoc = trigger->data.uin16;
             } else if (trigger->event_id.equalsIgnoreCase(String("SGP30 eCO2 ppm"))) {
                 eco2 = trigger->data.uin16;
+            } else if (trigger->event_id.equalsIgnoreCase(String("Absolute Humidity 8.8 g/m^3"))) {
+                absHum = trigger->data.uin16;
             } else {
                 Serial.printlnf("Unhandled event \"%s\" %0.2f/%u/%d/%x/%p", trigger->event_id.c_str(), trigger->data.fl, trigger->data.uin16, trigger->data.in16, trigger->data.uin16, trigger->data.ptr);
             }
@@ -676,7 +679,7 @@ bool RenderSerial(Eventing::PointerList<Eventing::EventTrigger>& triggers, Event
         Serial.println("AHT20 not present");
     }
     if (sensors::vocSensorPresent) {
-        Serial.printlnf("SGP30 tVOC:%uppb eCO2:%uppm", tvoc, eco2);
+        Serial.printlnf("SGP30 tVOC:%uppb eCO2:%uppm abshum:0x%4x.%04xg/m^3", tvoc, eco2, absHum >> 8, absHum & 0xFF);
     } else {
         Serial.println("SGP30 not present");
     }
@@ -871,12 +874,12 @@ void init() {
     infrastructure::event_hub.AddHandler(String("AHT20 Relative Humidity %%"), sensors::ReadAHT20, Eventing::TRIGGER_TEMPORAL, 1000);
     infrastructure::event_hub.AddHandler(String("SPS30 Raw"), sensors::ReadSPS30, Eventing::TRIGGER_TEMPORAL, 1000);
     infrastructure::event_hub.AddHandler(String("SGP30 Raw"), sensors::ReadSGP30, Eventing::TRIGGER_TEMPORAL, sensors::vocReadInterval);
-/*
-    infrastructure::event_hub.Add(&sensors::AbsoluteHumidity_g_m3_8_8_Event);
-    sensors::AbsoluteHumidity_g_m3_8_8_Event.AddTrigger(&sensors::LPS25HB_TempC_Event);
-    sensors::AbsoluteHumidity_g_m3_8_8_Event.AddTrigger(&sensors::LPS25HB_Pressure_Event);
-    sensors::AbsoluteHumidity_g_m3_8_8_Event.AddTrigger(&sensors::AHT20_Humidity_Event);
-*/
+    infrastructure::event_hub.AddHandler(String("Absolute Humidity 8.8 g/m^3"), sensors::CalculateAbsoluteHumidity_8_8_g_m3, Eventing::TRIGGER_ON_ALL);
+    infrastructure::event_hub.AddHandlerTrigger(String("Absolute Humidity 8.8 g/m^3"), String("LPS25HB Temp C"));
+    infrastructure::event_hub.AddHandlerTrigger(String("Absolute Humidity 8.8 g/m^3"), String("LPS25HB Pressure hPa"));
+    infrastructure::event_hub.AddHandlerTrigger(String("Absolute Humidity 8.8 g/m^3"), String("AHT20 Relative Humidity %%"));
+    infrastructure::event_hub.AddHandler(String("SGP30 Update Absolute Humidity"), sensors::SetSGP30AbsoluteHumidity, Eventing::TRIGGER_ON_ANY);
+    infrastructure::event_hub.AddHandlerTrigger(String("SGP30 Update Absolute Humidity"), String("Absolute Humidity 8.8 g/m^3"));
     infrastructure::event_hub.AddHandler(String("RenderSerialEvent"), UX::RenderSerial, Eventing::TRIGGER_ON_ANY);
     infrastructure::event_hub.AddHandlerTrigger(String("RenderSerialEvent"), String("LPS25HB Pressure hPa"));
     infrastructure::event_hub.AddHandlerTrigger(String("RenderSerialEvent"), String("LPS25HB Altitude m"));
@@ -885,7 +888,7 @@ void init() {
     infrastructure::event_hub.AddHandlerTrigger(String("RenderSerialEvent"), String("SCD30 CO2 ppm"));
     infrastructure::event_hub.AddHandlerTrigger(String("RenderSerialEvent"), String("AHT20 Relative Humidity %%"));
     infrastructure::event_hub.AddHandlerTrigger(String("RenderSerialEvent"), String("SPS30 Raw"));
-    //UX::RenderSerialEvent.AddTrigger(&sensors::AbsoluteHumidity_g_m3_8_8_Event);
+    infrastructure::event_hub.AddHandlerTrigger(String("RenderSerialEvent"), String("Absolute Humidity 8.8 g/m^3"));
     infrastructure::event_hub.AddHandlerTrigger(String("RenderSerialEvent"), String("SGP30 tVOC ppb"));
     infrastructure::event_hub.AddHandlerTrigger(String("RenderSerialEvent"), String("SGP30 eCO2 ppm"));
     infrastructure::event_hub.AddHandler("RenderOledEvent", UX::RenderOled, Eventing::TRIGGER_ON_ANY);
