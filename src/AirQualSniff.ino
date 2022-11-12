@@ -469,8 +469,34 @@ bool CalculateAbsHum(Eventing::Event* event) {
     return true;
     return infrastructure::event_hub.Fire(event, &absoluteHumidity_g_m3_8_8);
 }
+
 Eventing::Event AbsoluteHumidity_g_m3_8_8_Event(&CalculateAbsHum, "Calculate absolute humidity from relative humidity", Eventing::TRIGGER_ON_ALL);
 */
+static SGP30 vocSensor;
+static bool vocSensorPresent = false;
+constexpr uint32_t vocReadInterval = 1000;
+
+static bool ReadSGP30(Eventing::PointerList<Eventing::EventTrigger>& triggers, Eventing::EventData& out);
+static bool ReadSGP30(Eventing::PointerList<Eventing::EventTrigger>& triggers, Eventing::EventData& out) {
+    if (vocSensorPresent) {
+        Eventing::EventData datum;
+        vocSensor.measureAirQuality();
+        if (vocSensor.CO2 == 400 && vocSensor.TVOC == 0) {
+            // Sensor is still initializing (first 15s after init)
+            return false;
+        }
+        datum.uin16 = vocSensor.TVOC;
+        infrastructure::event_hub.Deliver(String("SGP30 tVOC ppb"), datum);
+        datum.uin16 = vocSensor.CO2;
+        infrastructure::event_hub.Deliver(String("SGP30 eCO2 ppm"), datum);
+        vocSensor.measureRawSignals();
+        datum.uin16 = vocSensor.H2;
+        infrastructure::event_hub.Deliver(String("SGP30 H2"), datum);
+        datum.uin16 = vocSensor.ethanol;
+        infrastructure::event_hub.Deliver(String("SGP30 ethanol"), datum);
+    }
+    return false;
+}
 
 static SPS30 pmSensor;
 static bool pmSensorPresent = false;
@@ -545,6 +571,11 @@ void init() {
         co2Sensor.setMeasurementInterval(co2SensorInterval);
     }
     humiditySensorPresent = humiditySensor.begin();
+    vocSensorPresent = vocSensor.begin();
+    if (vocSensorPresent) {
+        // some day: restore a persistent absolute humidity value for the VOC sensor
+        vocSensor.initAirQuality();
+    }
     peripherals::SlowDownI2c();
     pmSensorPresent = pmSensor.begin();
     if (pmSensorPresent) {
@@ -598,6 +629,8 @@ bool RenderSerial(Eventing::PointerList<Eventing::EventTrigger>& triggers, Event
     static uint16_t co2ppm = -1;
     static float rh = -NAN;
     static SPS30_DATA_FLOAT pm = { 0 };
+    static uint16_t eco2 = 0;
+    static uint16_t tvoc = 0;
     for (size_t evt_idx = 0; evt_idx < triggers.count; evt_idx++) {
         Eventing::EventTrigger* trigger = triggers.list[evt_idx];
         if (trigger->data_ready) {
@@ -618,6 +651,10 @@ bool RenderSerial(Eventing::PointerList<Eventing::EventTrigger>& triggers, Event
                 rh = trigger->data.fl;
             } else if (trigger->event_id.equalsIgnoreCase(String("SPS30 Raw"))) {
                 pm = *((SPS30_DATA_FLOAT*)trigger->data.ptr);
+            } else if (trigger->event_id.equalsIgnoreCase(String("SGP30 tVOC ppb"))) {
+                tvoc = trigger->data.uin16;
+            } else if (trigger->event_id.equalsIgnoreCase(String("SGP30 eCO2 ppm"))) {
+                eco2 = trigger->data.uin16;
             } else {
                 Serial.printlnf("Unhandled event \"%s\" %0.2f/%u/%d/%x/%p", trigger->event_id.c_str(), trigger->data.fl, trigger->data.uin16, trigger->data.in16, trigger->data.uin16, trigger->data.ptr);
             }
@@ -637,6 +674,11 @@ bool RenderSerial(Eventing::PointerList<Eventing::EventTrigger>& triggers, Event
         Serial.printlnf("AHT20: %0.1f%%", rh);
     } else {
         Serial.println("AHT20 not present");
+    }
+    if (sensors::vocSensorPresent) {
+        Serial.printlnf("SGP30 tVOC:%uppb eCO2:%uppm", tvoc, eco2);
+    } else {
+        Serial.println("SGP30 not present");
     }
     if (sensors::pmSensorPresent) {
         String str;
@@ -828,6 +870,7 @@ void init() {
     infrastructure::event_hub.AddHandler(String("SCD30 Raw"), sensors::ReadSCD30, Eventing::TRIGGER_TEMPORAL, sensors::co2SensorInterval*1000);
     infrastructure::event_hub.AddHandler(String("AHT20 Relative Humidity %%"), sensors::ReadAHT20, Eventing::TRIGGER_TEMPORAL, 1000);
     infrastructure::event_hub.AddHandler(String("SPS30 Raw"), sensors::ReadSPS30, Eventing::TRIGGER_TEMPORAL, 1000);
+    infrastructure::event_hub.AddHandler(String("SGP30 Raw"), sensors::ReadSGP30, Eventing::TRIGGER_TEMPORAL, sensors::vocReadInterval);
 /*
     infrastructure::event_hub.Add(&sensors::AbsoluteHumidity_g_m3_8_8_Event);
     sensors::AbsoluteHumidity_g_m3_8_8_Event.AddTrigger(&sensors::LPS25HB_TempC_Event);
@@ -843,6 +886,8 @@ void init() {
     infrastructure::event_hub.AddHandlerTrigger(String("RenderSerialEvent"), String("AHT20 Relative Humidity %%"));
     infrastructure::event_hub.AddHandlerTrigger(String("RenderSerialEvent"), String("SPS30 Raw"));
     //UX::RenderSerialEvent.AddTrigger(&sensors::AbsoluteHumidity_g_m3_8_8_Event);
+    infrastructure::event_hub.AddHandlerTrigger(String("RenderSerialEvent"), String("SGP30 tVOC ppb"));
+    infrastructure::event_hub.AddHandlerTrigger(String("RenderSerialEvent"), String("SGP30 eCO2 ppm"));
     infrastructure::event_hub.AddHandler("RenderOledEvent", UX::RenderOled, Eventing::TRIGGER_ON_ANY);
     infrastructure::event_hub.AddHandlerTrigger(String("RenderOledEvent"), String("LPS25HB Temp F"));
     infrastructure::event_hub.AddHandlerTrigger(String("RenderOledEvent"), String("LPS25HB Pressure hPa"));
