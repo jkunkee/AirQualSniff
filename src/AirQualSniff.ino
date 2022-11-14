@@ -869,35 +869,35 @@ namespace flow {
 
 // One Init To Rule Them All, And In The Setup, Bind Them
 void init() {
-    infrastructure::event_hub.AddHandler(String("LPS25HB Raw"), sensors::ReadLPS25HB, Eventing::TRIGGER_TEMPORAL, 1000); // pre-decimated output is at 1 Hz
-    infrastructure::event_hub.AddHandler(String("SCD30 Raw"), sensors::ReadSCD30, Eventing::TRIGGER_TEMPORAL, sensors::co2SensorInterval*1000);
-    infrastructure::event_hub.AddHandler(String("AHT20 Relative Humidity %%"), sensors::ReadAHT20, Eventing::TRIGGER_TEMPORAL, 1000);
-    infrastructure::event_hub.AddHandler(String("SPS30 Raw"), sensors::ReadSPS30, Eventing::TRIGGER_TEMPORAL, 1000);
-    infrastructure::event_hub.AddHandler(String("SGP30 Raw"), sensors::ReadSGP30, Eventing::TRIGGER_TEMPORAL, sensors::vocReadInterval);
-    infrastructure::event_hub.AddHandler(String("Absolute Humidity 8.8 g/m^3"), sensors::CalculateAbsoluteHumidity_8_8_g_m3, Eventing::TRIGGER_ON_ALL);
-    infrastructure::event_hub.AddHandlerTrigger(String("Absolute Humidity 8.8 g/m^3"), String("LPS25HB Temp C"));
-    infrastructure::event_hub.AddHandlerTrigger(String("Absolute Humidity 8.8 g/m^3"), String("LPS25HB Pressure hPa"));
-    infrastructure::event_hub.AddHandlerTrigger(String("Absolute Humidity 8.8 g/m^3"), String("AHT20 Relative Humidity %%"));
-    infrastructure::event_hub.AddHandler(String("SGP30 Update Absolute Humidity"), sensors::SetSGP30AbsoluteHumidity, Eventing::TRIGGER_ON_ANY);
-    infrastructure::event_hub.AddHandlerTrigger(String("SGP30 Update Absolute Humidity"), String("Absolute Humidity 8.8 g/m^3"));
-    infrastructure::event_hub.AddHandler(String("RenderSerialEvent"), UX::RenderSerial, Eventing::TRIGGER_ON_ANY);
-    infrastructure::event_hub.AddHandlerTrigger(String("RenderSerialEvent"), String("LPS25HB Pressure hPa"));
-    infrastructure::event_hub.AddHandlerTrigger(String("RenderSerialEvent"), String("LPS25HB Altitude m"));
-    infrastructure::event_hub.AddHandlerTrigger(String("RenderSerialEvent"), String("LPS25HB Temp C"));
-    infrastructure::event_hub.AddHandlerTrigger(String("RenderSerialEvent"), String("LPS25HB Temp F"));
-    infrastructure::event_hub.AddHandlerTrigger(String("RenderSerialEvent"), String("SCD30 CO2 ppm"));
-    infrastructure::event_hub.AddHandlerTrigger(String("RenderSerialEvent"), String("AHT20 Relative Humidity %%"));
-    infrastructure::event_hub.AddHandlerTrigger(String("RenderSerialEvent"), String("SPS30 Raw"));
-    infrastructure::event_hub.AddHandlerTrigger(String("RenderSerialEvent"), String("Absolute Humidity 8.8 g/m^3"));
-    infrastructure::event_hub.AddHandlerTrigger(String("RenderSerialEvent"), String("SGP30 tVOC ppb"));
-    infrastructure::event_hub.AddHandlerTrigger(String("RenderSerialEvent"), String("SGP30 eCO2 ppm"));
+    infrastructure::event_hub.AddHandler("LPS25HB Raw", sensors::ReadLPS25HB, Eventing::TRIGGER_TEMPORAL, 1000); // pre-decimated output is at 1 Hz
+    infrastructure::event_hub.AddHandler("SCD30 Raw", sensors::ReadSCD30, Eventing::TRIGGER_TEMPORAL, sensors::co2SensorInterval*1000);
+    infrastructure::event_hub.AddHandler("AHT20 Relative Humidity %%", sensors::ReadAHT20, Eventing::TRIGGER_TEMPORAL, 1000);
+    infrastructure::event_hub.AddHandler("SPS30 Raw", sensors::ReadSPS30, Eventing::TRIGGER_TEMPORAL, 1000);
+    infrastructure::event_hub.AddHandler("SGP30 Raw", sensors::ReadSGP30, Eventing::TRIGGER_TEMPORAL, sensors::vocReadInterval);
+    infrastructure::event_hub.AddHandler("Absolute Humidity 8.8 g/m^3", sensors::CalculateAbsoluteHumidity_8_8_g_m3, Eventing::TRIGGER_ON_ALL);
+    infrastructure::event_hub.AddHandlerTrigger("Absolute Humidity 8.8 g/m^3", "LPS25HB Temp C");
+    infrastructure::event_hub.AddHandlerTrigger("Absolute Humidity 8.8 g/m^3", "LPS25HB Pressure hPa");
+    infrastructure::event_hub.AddHandlerTrigger("Absolute Humidity 8.8 g/m^3", "AHT20 Relative Humidity %%");
+    infrastructure::event_hub.AddHandler("SGP30 Update Absolute Humidity", sensors::SetSGP30AbsoluteHumidity, Eventing::TRIGGER_ON_ANY);
+    infrastructure::event_hub.AddHandlerTrigger("SGP30 Update Absolute Humidity", "Absolute Humidity 8.8 g/m^3");
+    infrastructure::event_hub.AddHandler("RenderSerialEvent", UX::RenderSerial, Eventing::TRIGGER_ON_ANY);
+    infrastructure::event_hub.AddHandlerTrigger("RenderSerialEvent", "LPS25HB Pressure hPa");
+    infrastructure::event_hub.AddHandlerTrigger("RenderSerialEvent", "LPS25HB Altitude m");
+    infrastructure::event_hub.AddHandlerTrigger("RenderSerialEvent", "LPS25HB Temp C");
+    infrastructure::event_hub.AddHandlerTrigger("RenderSerialEvent", "LPS25HB Temp F");
+    infrastructure::event_hub.AddHandlerTrigger("RenderSerialEvent", "SCD30 CO2 ppm");
+    infrastructure::event_hub.AddHandlerTrigger("RenderSerialEvent", "AHT20 Relative Humidity %%");
+    infrastructure::event_hub.AddHandlerTrigger("RenderSerialEvent", "SPS30 Raw");
+    infrastructure::event_hub.AddHandlerTrigger("RenderSerialEvent", "Absolute Humidity 8.8 g/m^3");
+    infrastructure::event_hub.AddHandlerTrigger("RenderSerialEvent", "SGP30 tVOC ppb");
+    infrastructure::event_hub.AddHandlerTrigger("RenderSerialEvent", "SGP30 eCO2 ppm");
     infrastructure::event_hub.AddHandler("RenderOledEvent", UX::RenderOled, Eventing::TRIGGER_ON_ANY);
-    infrastructure::event_hub.AddHandlerTrigger(String("RenderOledEvent"), String("LPS25HB Temp F"));
-    infrastructure::event_hub.AddHandlerTrigger(String("RenderOledEvent"), String("LPS25HB Pressure hPa"));
-    infrastructure::event_hub.AddHandlerTrigger(String("RenderOledEvent"), String("SCD30 CO2 ppm"));
-    infrastructure::event_hub.AddHandlerTrigger(String("RenderOledEvent"), String("AHT20 Relative Humidity %%"));
-    infrastructure::event_hub.AddHandlerTrigger(String("RenderOledEvent"), String("SPS30 Raw"));
-    infrastructure::event_hub.AddHandlerTrigger(String("RenderOledEvent"), String("Joystick Direction Change"));
+    infrastructure::event_hub.AddHandlerTrigger("RenderOledEvent", "LPS25HB Temp F");
+    infrastructure::event_hub.AddHandlerTrigger("RenderOledEvent", "LPS25HB Pressure hPa");
+    infrastructure::event_hub.AddHandlerTrigger("RenderOledEvent", "SCD30 CO2 ppm");
+    infrastructure::event_hub.AddHandlerTrigger("RenderOledEvent", "AHT20 Relative Humidity %%");
+    infrastructure::event_hub.AddHandlerTrigger("RenderOledEvent", "SPS30 Raw");
+    infrastructure::event_hub.AddHandlerTrigger("RenderOledEvent", "Joystick Direction Change");
     infrastructure::event_hub.AddHandler("PaintOled", peripherals::Display::Paint, Eventing::TRIGGER_TEMPORAL, 1200); // long enough for the longest loop to prevent delta clock recursion
     //infrastructure::event_hub.AddHandler("DumpOsState", infrastructure::DumpOsState, Eventing::TRIGGER_TEMPORAL, 5000);
 }
