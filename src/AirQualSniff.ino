@@ -667,8 +667,8 @@ bool RenderSerial(Eventing::PointerList<Eventing::EventTrigger>& triggers, Event
             }
         }
     }
-    // Fire at most every 1000ms
-    if (currentFire - lastFire < 1000) {
+    // Fire at most every 5000ms
+    if (currentFire - lastFire < 5000) {
         return false;
     }
     lastFire = currentFire;
