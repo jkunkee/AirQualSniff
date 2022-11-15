@@ -9,6 +9,7 @@
 // checked-in 3p dependencies
 #include "SparkFun_SGP30_Arduino_Library.h"
 #include "U8g2lib.h"
+#include "boxen.h"
 
 // Particle-style dependencies
 #include <photon-vbat.h>
@@ -720,6 +721,8 @@ typedef enum _OledMode {
     DEBUG_RETICLE,
 } OledMode;
 
+Box *TestBox;
+
 bool RenderOled(Eventing::PointerList<Eventing::EventTrigger>& triggers, Eventing::EventData& out) {
     static OledMode mode = HOME;
     static float press = -NAN, tempF = -NAN;
@@ -856,6 +859,7 @@ bool RenderOled(Eventing::PointerList<Eventing::EventTrigger>& triggers, Eventin
         u8g2_DrawPixel(&peripherals::Display::u8g2, 126, 126);
         u8g2_DrawPixel(&peripherals::Display::u8g2, 127, 127);
         u8g2_DrawPixel(&peripherals::Display::u8g2, 128, 128);
+        TestBox->UpdateValue(pm.pm_10_n_cm3);
         break;
     }
     peripherals::Display::BufferIsDirty = true;
@@ -867,6 +871,10 @@ int ManualSerial(String s) {
     Eventing::EventData data;
     RenderSerial(triggers, data);
     return 33;
+}
+
+void init() {
+    TestBox = new Box(&peripherals::Display::u8g2, 1.0f, 0, 0, 96, 22, u8g2_font_nerhoe_tf, "qA", "l", u8g2_font_osb18_tf, 0);
 }
 
 } // namespace UX
@@ -933,6 +941,7 @@ void setup() {
     infrastructure::init();
     peripherals::init();
     sensors::init();
+    UX::init();
     flow::init();
     Particle.function("ManualSerial", UX::ManualSerial);
 }
