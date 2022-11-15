@@ -451,17 +451,19 @@ static bool CalculateAbsoluteHumidity_8_8_g_m3(Eventing::PointerList<Eventing::E
         if (trigger->data_ready) {
             if (trigger->event_id.equalsIgnoreCase(String("LPS25HB Pressure hPa"))) {
                 pressurehPa = trigger->data.fl;
-                return false;
             } else if (trigger->event_id.equalsIgnoreCase(String("LPS25HB Temp C"))) {
                 tempC = trigger->data.fl;
-                return false;
             } else if (trigger->event_id.equalsIgnoreCase(String("AHT20 Relative Humidity %%"))) {
                 rh = trigger->data.fl;
             }
         }
     }
+    if (tempC != -NAN && pressurehPa != -NAN && rh != -NAN) {
     out.uin16 = atmospherics::rel_to_abs_humidity(tempC, pressurehPa, rh);
     return true;
+    } else {
+        return false;
+    }
 }
 
 static SGP30 vocSensor;
