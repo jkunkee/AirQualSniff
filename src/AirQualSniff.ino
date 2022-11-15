@@ -459,8 +459,8 @@ static bool CalculateAbsoluteHumidity_8_8_g_m3(Eventing::PointerList<Eventing::E
         }
     }
     if (tempC != -NAN && pressurehPa != -NAN && rh != -NAN) {
-    out.uin16 = atmospherics::rel_to_abs_humidity(tempC, pressurehPa, rh);
-    return true;
+        out.uin16 = atmospherics::rel_to_abs_humidity(tempC, pressurehPa, rh);
+        return true;
     } else {
         return false;
     }
@@ -634,6 +634,8 @@ bool RenderSerial(Eventing::PointerList<Eventing::EventTrigger>& triggers, Event
     static uint16_t eco2 = 0;
     static uint16_t tvoc = 0;
     static uint16_t absHum = -1;
+    static system_tick_t lastFire = 0;
+    system_tick_t currentFire = millis();
     for (size_t evt_idx = 0; evt_idx < triggers.count; evt_idx++) {
         Eventing::EventTrigger* trigger = triggers.list[evt_idx];
         if (trigger->data_ready) {
@@ -665,6 +667,11 @@ bool RenderSerial(Eventing::PointerList<Eventing::EventTrigger>& triggers, Event
             }
         }
     }
+    // Fire at most every 1000ms
+    if (currentFire - lastFire < 1000) {
+        return false;
+    }
+    lastFire = currentFire;
     if (sensors::lps25hb_pressure_sensor_present) {
         Serial.printlnf("LPS25HB: %0.2fhPa, %0.1fm, %0.2fF, %0.2fC", press, alt, tempF, tempC);
     } else {
