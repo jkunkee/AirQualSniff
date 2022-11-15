@@ -681,7 +681,7 @@ bool RenderSerial(Eventing::PointerList<Eventing::EventTrigger>& triggers, Event
         Serial.println("AHT20 not present");
     }
     if (sensors::vocSensorPresent) {
-        Serial.printlnf("SGP30 tVOC:%uppb eCO2:%uppm abshum:0x%4x.%04xg/m^3", tvoc, eco2, absHum >> 8, absHum & 0xFF);
+        Serial.printlnf("SGP30 tVOC:%uppb eCO2:%uppm abshum:0x%x.%02xg/m^3", tvoc, eco2, absHum >> 8, absHum & 0xFF);
     } else {
         Serial.println("SGP30 not present");
     }
@@ -702,6 +702,7 @@ bool RenderSerial(Eventing::PointerList<Eventing::EventTrigger>& triggers, Event
     } else {
         Serial.println("SPS30 not present");
     }
+    Serial.println("### End Serial Update");
     return false;
 }
 
@@ -854,6 +855,13 @@ bool RenderOled(Eventing::PointerList<Eventing::EventTrigger>& triggers, Eventin
     return false;
 }
 
+int ManualSerial(String s) {
+    Eventing::PointerList<Eventing::EventTrigger> triggers;
+    Eventing::EventData data;
+    RenderSerial(triggers, data);
+    return 33;
+}
+
 } // namespace UX
 
 /*****************************************************************************/
@@ -919,6 +927,7 @@ void setup() {
     peripherals::init();
     sensors::init();
     flow::init();
+    Particle.function("ManualSerial", UX::ManualSerial);
 }
 
 void loop() {
