@@ -323,6 +323,32 @@ namespace Joystick {
     }
 } // namespace Joystick
 
+namespace NvStorage {
+    struct {
+        uint8_t version;
+        uint16_t vocBaselineCo2;
+        uint16_t vocBaselineTvoc;
+    } NvSettings;
+    int NvSettingsAddress = 0;
+
+    constexpr uint8_t currentVersion = 0;
+    static_assert(currentVersion != 0xFF, "The version must be distinguishable from the erased-flash value 0xFF.");
+
+    void begin() {
+        // The Photon has 2047 bytes of emulated (flash-backed, page-erase-worn) EEPROM
+        EEPROM.get(NvSettingsAddress, NvSettings);
+        if (NvSettings.version != currentVersion) {
+            EEPROM.clear();
+            NvSettings.version = currentVersion;
+            EEPROM.put(NvSettingsAddress, NvSettings);
+        }
+    }
+
+    void commit() {
+        EEPROM.put(NvSettingsAddress, NvSettings);
+    }
+} // namespace NvStorage
+
 void init() {
     Serial.begin(115200);
 
@@ -531,6 +557,17 @@ static bool ReadSGP30(Eventing::PointerList<Eventing::EventTrigger>& triggers, E
     return false;
 }
 
+static bool SaveSGP30Baselines(Eventing::PointerList<Eventing::EventTrigger>& triggers, Eventing::EventData& out);
+static bool SaveSGP30Baselines(Eventing::PointerList<Eventing::EventTrigger>& triggers, Eventing::EventData& out) {
+    if (vocSensorPresent) {
+        vocSensor.getBaseline();
+        peripherals::NvStorage::NvSettings.vocBaselineCo2 = vocSensor.baselineCO2;
+        peripherals::NvStorage::NvSettings.vocBaselineTvoc = vocSensor.baselineTVOC;
+        peripherals::NvStorage::commit();
+    }
+    return false;
+}
+
 static bool SetSGP30AbsoluteHumidity(Eventing::PointerList<Eventing::EventTrigger>& triggers, Eventing::EventData& out);
 static bool SetSGP30AbsoluteHumidity(Eventing::PointerList<Eventing::EventTrigger>& triggers, Eventing::EventData& out) {
     if (vocSensorPresent && triggers.count >= 1 && triggers.list[0]->data_ready) {
@@ -614,8 +651,13 @@ void init() {
     humiditySensorPresent = humiditySensor.begin();
     vocSensorPresent = vocSensor.begin();
     if (vocSensorPresent) {
-        // some day: restore a persistent absolute humidity value for the VOC sensor
         vocSensor.initAirQuality();
+        // 0xFF is the unwritten-flash value
+        if (peripherals::NvStorage::NvSettings.vocBaselineCo2 != 0xFFFF &&
+            peripherals::NvStorage::NvSettings.vocBaselineTvoc != 0xFFFF) {
+            vocSensor.setBaseline(peripherals::NvStorage::NvSettings.vocBaselineCo2,
+                                  peripherals::NvStorage::NvSettings.vocBaselineTvoc);
+        }
     }
     peripherals::SlowDownI2c();
     pmSensorPresent = pmSensor.begin();
@@ -937,6 +979,7 @@ void init() {
     infrastructure::event_hub.AddHandler("AHT20 Relative Humidity %%", sensors::ReadAHT20, Eventing::TRIGGER_TEMPORAL, 1000);
     infrastructure::event_hub.AddHandler("SPS30 Raw", sensors::ReadSPS30, Eventing::TRIGGER_TEMPORAL, 1000);
     infrastructure::event_hub.AddHandler("SGP30 Raw", sensors::ReadSGP30, Eventing::TRIGGER_TEMPORAL, sensors::vocReadInterval);
+    infrastructure::event_hub.AddHandler("SGP30 Save Baselines", sensors::SaveSGP30Baselines, Eventing::TRIGGER_TEMPORAL, 12*60*60*1000);
     infrastructure::event_hub.AddHandler("Absolute Humidity 8.8 g/m^3", sensors::CalculateAbsoluteHumidity_8_8_g_m3, Eventing::TRIGGER_ON_ALL);
     infrastructure::event_hub.AddHandlerTrigger("Absolute Humidity 8.8 g/m^3", "LPS25HB Temp C");
     infrastructure::event_hub.AddHandlerTrigger("Absolute Humidity 8.8 g/m^3", "LPS25HB Pressure hPa");
