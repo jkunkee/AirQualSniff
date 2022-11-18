@@ -436,6 +436,8 @@ static bool ReadSCD30(Eventing::PointerList<Eventing::EventTrigger>& triggers, E
         co2.uin16 = co2Sensor.getCO2();
 
         infrastructure::event_hub.Deliver(String("SCD30 CO2 ppm"), co2);
+        infrastructure::event_hub.Deliver(String("SCD30 temp C"), tempC);
+        infrastructure::event_hub.Deliver(String("SCD30 rh %"), rh);
     }
     // Data is delivered with Deliver, so out param is unused.
     return false;
