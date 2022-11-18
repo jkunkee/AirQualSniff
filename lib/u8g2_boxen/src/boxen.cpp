@@ -40,7 +40,21 @@ void Box::Render() {
     char buf[bufLen];
     switch (m_boxType) {
     case BoxTypeFloat:
-        snprintf(buf, bufLen, "%0.2f", m_value.f);
+        switch (m_digits) {
+        case 0:
+            snprintf(buf, bufLen, "%0.0f", m_value.f);
+            break;
+        default:
+        case 1:
+            snprintf(buf, bufLen, "%0.1f", m_value.f);
+            break;
+        case 2:
+            snprintf(buf, bufLen, "%0.2f", m_value.f);
+            break;
+        case 3:
+            snprintf(buf, bufLen, "%0.3f", m_value.f);
+            break;
+        }
         break;
     case BoxTypeIntSigned:
         snprintf(buf, bufLen, "%ld", m_value.i);
