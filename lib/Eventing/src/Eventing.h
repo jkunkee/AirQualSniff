@@ -170,7 +170,7 @@ public:
   time_t interval;
 
   EventTrigger* FindTrigger(String id) {
-    for (int triggerIdx = 0; triggerIdx < triggers.count; triggerIdx++) {
+    for (size_t triggerIdx = 0; triggerIdx < triggers.count; triggerIdx++) {
       EventTrigger* trigger = triggers.list[triggerIdx];
       if (trigger->event_id.equalsIgnoreCase(id)) {
         return trigger;
@@ -188,7 +188,7 @@ public:
     }
   }
   void ResetTriggers() {
-    for (int triggerIdx = 0; triggerIdx < triggers.count; triggerIdx++) {
+    for (size_t triggerIdx = 0; triggerIdx < triggers.count; triggerIdx++) {
       triggers.list[triggerIdx]->Reset();
     }
   }
@@ -204,7 +204,7 @@ public:
       return true;
     case TRIGGER_ON_ALL: {
         bool AllTriggered = true;
-        for (int triggerIdx = 0; triggerIdx < triggers.count && AllTriggered; triggerIdx++) {
+        for (size_t triggerIdx = 0; triggerIdx < triggers.count && AllTriggered; triggerIdx++) {
           AllTriggered = AllTriggered && triggers.list[triggerIdx]->data_ready;
         }
         return AllTriggered;
@@ -250,7 +250,7 @@ private:
   PointerList<EventHandler> handlers;
 
   EventHandler* FindHandler(String id) {
-    for (int handlerIdx = 0; handlerIdx < handlers.count; handlerIdx++) {
+    for (size_t handlerIdx = 0; handlerIdx < handlers.count; handlerIdx++) {
       EventHandler* handler = handlers.list[handlerIdx];
       if (handler->event_id.equalsIgnoreCase(id)) {
         return handler;
@@ -327,7 +327,7 @@ public:
   }
   bool Deliver(String id, EventData data) {
     dbgprint(DBG_INFO, "EventHub delivering %s %p at %lu", id.c_str(), data.ptr, millis());
-    for (int handlerIdx = 0; handlerIdx < handlers.count; handlerIdx++) {
+    for (size_t handlerIdx = 0; handlerIdx < handlers.count; handlerIdx++) {
       EventHandler* eventHandler = handlers.list[handlerIdx];
       EventData outData;
       bool eventFired = eventHandler->Deliver(id, data, outData);
