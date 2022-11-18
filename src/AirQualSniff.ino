@@ -801,7 +801,10 @@ typedef enum _OledMode {
     DEBUG_RETICLE,
 } OledMode;
 
-Box *TestBox;
+Box *PressureBox;
+Box *TempBox;
+Box *Co2Box;
+Box *RhBox;
 
 bool RenderOled(Eventing::PointerList<Eventing::EventTrigger>& triggers, Eventing::EventData& out) {
     static OledMode mode = HOME;
@@ -939,7 +942,10 @@ bool RenderOled(Eventing::PointerList<Eventing::EventTrigger>& triggers, Eventin
         u8g2_DrawPixel(&peripherals::Display::u8g2, 126, 126);
         u8g2_DrawPixel(&peripherals::Display::u8g2, 127, 127);
         u8g2_DrawPixel(&peripherals::Display::u8g2, 128, 128);
-        TestBox->UpdateValue(pm.pm_10_n_cm3);
+        PressureBox->UpdateValue(press);
+        TempBox->UpdateValue(tempF);
+        Co2Box->UpdateValue((uint32_t)co2ppm);
+        RhBox->UpdateValue(rh);
         break;
     }
     peripherals::Display::BufferIsDirty = true;
@@ -954,7 +960,10 @@ int ManualSerial(String s) {
 }
 
 void init() {
-    TestBox = new Box(&peripherals::Display::u8g2, 1.0f, 0, 0, 96, 22, u8g2_font_nerhoe_tf, "qA", "l", u8g2_font_osb18_tf, 0);
+    PressureBox = new Box(&peripherals::Display::u8g2, -NAN, 0, 0 * 24, 128, 24, u8g2_font_nerhoe_tf, "hPa", "", u8g2_font_osb18_tf, 1);
+    TempBox = new Box(&peripherals::Display::u8g2, -NAN, 0, 1 * 24, 128, 24, u8g2_font_nerhoe_tf, "\u00b0", "F", u8g2_font_osb18_tf, 1);
+    Co2Box = new Box(&peripherals::Display::u8g2, -1UL, 0, 2 * 24, 128, 24, u8g2_font_nerhoe_tf, "ppm", "CO2", u8g2_font_osb18_tf, 0);
+    RhBox = new Box(&peripherals::Display::u8g2, -NAN, 0, 3 * 24, 128, 24, u8g2_font_nerhoe_tf, "%", "rh", u8g2_font_osb18_tf, 1);
 }
 
 } // namespace UX
