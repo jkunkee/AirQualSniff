@@ -403,6 +403,19 @@ static bool ReadLPS25HB(Eventing::PointerList<Eventing::EventTrigger>& triggers,
     return false;
 }
 
+//
+// The SCD30's Autmatic Self-Calibration (ASC) feature requires regular reocnditioning:
+// * A 7-day consecutive run period with 1h/d of fresh air will set the internal
+//   non-volatile calibration values
+// * The sensor must be exposed to >=400ppm concentrations "regularly"
+// * ASC has to be actively enabled, but enablement is non-volatile
+// * The sensor must be exposed to 1h/d fresh air
+// * Continuous Measurement must be used
+//
+// External (forced) recalibration requires a 2-minute steady environment with CO2
+// concentration in the range 400ppm - 2000ppm. After reset this cannot be read back.
+//
+
 static SCD30 co2Sensor;
 static bool co2SensorPresent = false;
 static constexpr uint16_t co2SensorInterval = 10;
@@ -466,6 +479,29 @@ static bool CalculateAbsoluteHumidity_8_8_g_m3(Eventing::PointerList<Eventing::E
         return false;
     }
 }
+
+//
+// The SGP30 can return raw H2 and Ethanol concentrations, but they are not absolute measures and are
+// related to each other with a formula in the datasheets.
+//
+// It may be possible to approximate calibration by relating values measured in open atmosphere to
+// average atmospheric composition values.
+//
+// https://en.wikipedia.org/wiki/Atmosphere_of_Earth
+//
+// One set of such values can be found in the Earth section of Allen's Astrophysical Quantities, but
+// Google Books omits the two pages with the table. Springer Link offers it as an eBook for a
+// considerable sum.
+//
+// CRC Handbook of Chemistry and Physics also has the same problem, and just cites Allen's anynow.
+//
+// A paper about atmospheric ethanol concentrations, "Wet deposition ethanol concentration at US
+// atmospheric integrated research monitoring network (AIRMoN) sites" (Journal of Atmospheric
+// Chemistry, 2021), may contain useful numbers and background--for ethanol, at least.
+//
+// The SGP30 needs to run for at least 12 hours to establish its baseline calibration, which can then
+// be restored after a reset to avoid danother 12-hour baselining period.
+//
 
 static SGP30 vocSensor;
 static bool vocSensorPresent = false;
