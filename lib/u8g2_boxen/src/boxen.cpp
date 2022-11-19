@@ -76,15 +76,25 @@ void Box::Render() {
 
     // Draw the value
     setFontWrapper(m_u8g2, m_valueFont);
-    u8g2_int_t new_x = u8g2_DrawUTF8(m_u8g2, m_x, m_y + u8g2_GetFontAscent(m_u8g2), buf);
+    u8g2_SetFontPosBaseline(m_u8g2);
+    u8g2_int_t numberBaseline;
+    if (m_height - 2*2 < u8g2_GetFontAscent(m_u8g2)) {
+        numberBaseline = m_y + m_height - 2;
+    } else {
+        numberBaseline = m_y + 2 + (m_height - 2*2 - u8g2_GetFontAscent(m_u8g2)) / 2 + u8g2_GetFontAscent(m_u8g2);
+    }
+    u8g2_int_t new_x = u8g2_DrawUTF8(m_u8g2, m_x + 2, numberBaseline, buf) + 1;
 
     // Draw the label(s)
     setFontWrapper(m_u8g2, m_labelFont);
     if (strlen(m_labelBottom) == 0) {
-        u8g2_DrawUTF8(m_u8g2, new_x, m_y + m_height + u8g2_GetFontDescent(m_u8g2), m_labelTop);
+        u8g2_SetFontPosBaseline(m_u8g2);
+        u8g2_DrawUTF8(m_u8g2, new_x, numberBaseline, m_labelTop);
     } else {
-        u8g2_DrawUTF8(m_u8g2, new_x, m_y + u8g2_GetFontAscent(m_u8g2), m_labelTop);
-        u8g2_DrawUTF8(m_u8g2, new_x, m_y + m_height + u8g2_GetFontDescent(m_u8g2), m_labelBottom);
+        u8g2_SetFontPosBottom(m_u8g2);
+        u8g2_DrawUTF8(m_u8g2, new_x, m_y + m_height / 2, m_labelTop);
+        u8g2_SetFontPosTop(m_u8g2);
+        u8g2_DrawUTF8(m_u8g2, new_x, m_y + m_height / 2, m_labelBottom);
     }
 
     // Draw a cute little box around everything
