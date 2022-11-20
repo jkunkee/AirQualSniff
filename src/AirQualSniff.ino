@@ -937,10 +937,6 @@ bool RenderOled(Eventing::PointerList<Eventing::EventTrigger>& triggers, Eventin
         u8g2_DrawPixel(&peripherals::Display::u8g2, 126, 126);
         u8g2_DrawPixel(&peripherals::Display::u8g2, 127, 127);
         u8g2_DrawPixel(&peripherals::Display::u8g2, 128, 128);
-        PressureBox->UpdateValue(press);
-        TempBox->UpdateValue(tempF);
-        Co2Box->UpdateValue((uint32_t)co2ppm);
-        RhBox->UpdateValue(rh);
         break;
     }
     peripherals::Display::BufferIsDirty = true;
