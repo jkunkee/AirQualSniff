@@ -807,6 +807,10 @@ Box *Co2Box;
 Box *RhBox;
 Box *TvocBox;
 
+Box *pmMassBox;
+Box *pmCountBox;
+Box *pmTypicalBox;
+
 bool RenderOled(Eventing::PointerList<Eventing::EventTrigger>& triggers, Eventing::EventData& out) {
     static OledMode mode = HOME;
     static float press = -NAN, tempF = -NAN;
@@ -884,37 +888,13 @@ bool RenderOled(Eventing::PointerList<Eventing::EventTrigger>& triggers, Eventin
         }
         break;
     case PM_DISPLAY: {
-            constexpr size_t bufLen = 20;
-            char buf[bufLen];
-            const uint8_t *small_font = u8g2_font_osb18_tf; // F is 18 px, C is 17
-            int8_t ascent;
-            int8_t descent;
-
-            u8g2_SetFont(&peripherals::Display::u8g2, small_font);
-            // I can't tell why, but these lines buried in u8g2_SetFont don't run
-            peripherals::Display::u8g2.font_info.ascent_A = small_font[13];
-            peripherals::Display::u8g2.font_info.descent_g = small_font[14];
-            peripherals::Display::u8g2.font_ref_ascent = peripherals::Display::u8g2.font_info.ascent_A;
-            peripherals::Display::u8g2.font_ref_descent = peripherals::Display::u8g2.font_info.descent_g;
-            ascent = u8g2_GetAscent(&peripherals::Display::u8g2);
-            descent = u8g2_GetDescent(&peripherals::Display::u8g2);
-
-            u8g2_uint_t x = 0;
-            u8g2_uint_t y = 0;
-
-            float totalugcm3 = pm.pm_1_0_ug_m3 + pm.pm_2_5_ug_m3 + pm.pm_4_0_ug_m3 + pm.pm_10_ug_m3;
-            snprintf(buf, bufLen, "%0.1fug/m3", totalugcm3);
-            y = (ascent) + 0 * (ascent - descent);
-            u8g2_DrawUTF8(&peripherals::Display::u8g2, x, y, buf);
+            float totalugm3 = pm.pm_1_0_ug_m3 + pm.pm_2_5_ug_m3 + pm.pm_4_0_ug_m3 + pm.pm_10_ug_m3;
+            pmMassBox->UpdateValue(totalugm3);
 
             float totalcm3 = pm.pm_0_5_n_cm3 + pm.pm_1_0_n_cm3 + pm.pm_2_5_n_cm3 + pm.pm_4_0_n_cm3 + pm.pm_10_n_cm3;
-            snprintf(buf, bufLen, "%0.1fpart/cm3", totalcm3);
-            y = (ascent) + 1 * (ascent - descent);
-            u8g2_DrawUTF8(&peripherals::Display::u8g2, x, y, buf);
+            pmCountBox->UpdateValue(totalcm3);
 
-            snprintf(buf, bufLen, "%0.1fum typ", pm.typical_size_um);
-            y = (ascent) + 2 * (ascent - descent);
-            u8g2_DrawUTF8(&peripherals::Display::u8g2, x, y, buf);
+            pmTypicalBox->UpdateValue(pm.typical_size_um);
         }
         break;
     case BLANK:
@@ -951,11 +931,10 @@ int ManualSerial(String s) {
 }
 
 void init() {
-    PressureBox = new Box(&peripherals::Display::u8g2, -NAN, 0, 0 * 23, 128, 24, u8g2_font_nerhoe_tf, "hPa", "", u8g2_font_osb18_tf, 0);
-    TempBox = new Box(&peripherals::Display::u8g2, -NAN, 0, 1 * 23, 128, 24, u8g2_font_nerhoe_tf, /*"\u00b0" actual degree symbol */"deg", "F", u8g2_font_osb18_tf, 1);
-    Co2Box = new Box(&peripherals::Display::u8g2, -1UL, 0, 2 * 23, 128, 24, u8g2_font_nerhoe_tf, "ppm", "CO2", u8g2_font_osb18_tf, 0);
-    RhBox = new Box(&peripherals::Display::u8g2, -NAN, 0, 3 * 23, 128, 24, u8g2_font_nerhoe_tf, "%", "rh", u8g2_font_osb18_tf, 1);
-    TvocBox = new Box(&peripherals::Display::u8g2, -1UL, 0, 4 * 23, 128, 24, u8g2_font_nerhoe_tf, "ppb", "tVOC", u8g2_font_osb18_tf, 1);
+
+    pmMassBox = new Box(&peripherals::Display::u8g2, -NAN, 0, 1 * 23, 128, 24, u8g2_font_nerhoe_tf, "ug/", "m^3", u8g2_font_osb18_tf, 1);
+    pmCountBox = new Box(&peripherals::Display::u8g2, -NAN, 0, 2 * 23, 128, 24, u8g2_font_nerhoe_tf, "part/", "cm^3", u8g2_font_osb18_tf, 1);
+    pmTypicalBox = new Box(&peripherals::Display::u8g2, -NAN, 0, 3 * 23, 128, 24, u8g2_font_nerhoe_tf, "um", "typ", u8g2_font_osb18_tf, 1);
 }
 
 } // namespace UX
