@@ -347,6 +347,10 @@ namespace NvStorage {
     void commit() {
         EEPROM.put(NvSettingsAddress, NvSettings);
     }
+
+    void Print() {
+        Serial.printlnf("v%d bco2:%d btvoc:%d", NvSettings.version, NvSettings.vocBaselineCo2, NvSettings.vocBaselineTvoc);
+    }
 } // namespace NvStorage
 
 void init() {
@@ -927,6 +931,7 @@ int ManualSerial(String s) {
     Eventing::PointerList<Eventing::EventTrigger> triggers;
     Eventing::EventData data;
     RenderSerial(triggers, data);
+    peripherals::NvStorage::Print();
     return 33;
 }
 
