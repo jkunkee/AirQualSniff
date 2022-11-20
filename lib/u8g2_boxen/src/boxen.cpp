@@ -74,28 +74,35 @@ void Box::Render() {
     // Don't overwrite what's underneath
     u8g2_SetFontMode(m_u8g2, 1);
 
-    // Draw the value
+    // Measure up the data field
     setFontWrapper(m_u8g2, m_valueFont);
-    u8g2_SetFontPosBaseline(m_u8g2);
     u8g2_int_t numberBaseline;
     if (m_height - 2*2 < u8g2_GetFontAscent(m_u8g2)) {
         numberBaseline = m_y + m_height - 2;
     } else {
         numberBaseline = m_y + 2 + (m_height - 2*2 - u8g2_GetFontAscent(m_u8g2)) / 2 + u8g2_GetFontAscent(m_u8g2);
     }
-    u8g2_int_t new_x = u8g2_DrawUTF8(m_u8g2, m_x + 2, numberBaseline, buf) + 1;
+    u8g2_int_t numberWidth = u8g2_GetStrWidth(m_u8g2, buf);
 
-    // Draw the label(s)
+    // Measure up the label field(s)
     setFontWrapper(m_u8g2, m_labelFont);
+    u8g2_int_t labelWidth = max(u8g2_GetStrWidth(m_u8g2, m_labelTop), u8g2_GetStrWidth(m_u8g2, m_labelBottom));
+
+    // Draw the label field(s)
     if (strlen(m_labelBottom) == 0) {
         u8g2_SetFontPosBaseline(m_u8g2);
-        u8g2_DrawUTF8(m_u8g2, new_x, numberBaseline, m_labelTop);
+        u8g2_DrawUTF8(m_u8g2, m_x + m_width - 2 - labelWidth, numberBaseline, m_labelTop);
     } else {
         u8g2_SetFontPosBottom(m_u8g2);
-        u8g2_DrawUTF8(m_u8g2, new_x, m_y + m_height / 2, m_labelTop);
+        u8g2_DrawUTF8(m_u8g2, m_x + m_width - 2 - labelWidth, m_y + m_height / 2, m_labelTop);
         u8g2_SetFontPosTop(m_u8g2);
-        u8g2_DrawUTF8(m_u8g2, new_x, m_y + m_height / 2, m_labelBottom);
+        u8g2_DrawUTF8(m_u8g2, m_x + m_width - 2 - labelWidth, m_y + m_height / 2, m_labelBottom);
     }
+
+    // Draw the data field
+    setFontWrapper(m_u8g2, m_valueFont);
+    u8g2_SetFontPosBaseline(m_u8g2);
+    u8g2_DrawUTF8(m_u8g2, m_x + m_width - 2 - labelWidth - 1 - numberWidth, numberBaseline, buf);
 
     // Draw a cute little box around everything
     u8g2_DrawFrame(m_u8g2, m_x, m_y, m_width, m_height);
