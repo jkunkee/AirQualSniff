@@ -936,6 +936,11 @@ int ManualSerial(String s) {
 }
 
 void init() {
+    PressureBox = new Box(&peripherals::Display::u8g2, -NAN, 0, 0 * 23, 128, 24, u8g2_font_bitcasual_tf, "hPa", "", u8g2_font_osb18_tf, 0);
+    TempBox = new Box(&peripherals::Display::u8g2, -NAN, 0, 1 * 23, 128, 24, u8g2_font_bitcasual_tf, /*"\u00b0" actual degree symbol */"deg", "F", u8g2_font_osb18_tf, 1);
+    Co2Box = new Box(&peripherals::Display::u8g2, -1UL, 0, 2 * 23, 128, 24, u8g2_font_bitcasual_tf, "ppm", "CO2", u8g2_font_osb18_tf, 0);
+    RhBox = new Box(&peripherals::Display::u8g2, -NAN, 0, 3 * 23, 128, 24, u8g2_font_bitcasual_tf, "%", "rh", u8g2_font_osb18_tf, 1);
+    TvocBox = new Box(&peripherals::Display::u8g2, -1UL, 0, 4 * 23, 128, 24, u8g2_font_bitcasual_tf, "ppb", "tVOC", u8g2_font_osb18_tf, 1);
 
     pmMassBox = new Box(&peripherals::Display::u8g2, -NAN, 0, 1 * 23, 128, 24, u8g2_font_nerhoe_tf, "ug/", "m^3", u8g2_font_osb18_tf, 1);
     pmCountBox = new Box(&peripherals::Display::u8g2, -NAN, 0, 2 * 23, 128, 24, u8g2_font_nerhoe_tf, "part/", "cm^3", u8g2_font_osb18_tf, 1);
