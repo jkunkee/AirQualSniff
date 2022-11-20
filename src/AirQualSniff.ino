@@ -805,12 +805,14 @@ Box *PressureBox;
 Box *TempBox;
 Box *Co2Box;
 Box *RhBox;
+Box *TvocBox;
 
 bool RenderOled(Eventing::PointerList<Eventing::EventTrigger>& triggers, Eventing::EventData& out) {
     static OledMode mode = HOME;
     static float press = -NAN, tempF = -NAN;
     static uint16_t co2ppm = -1;
     static float rh = -NAN;
+    static uint16_t tvoc = -1;
     static SPS30_DATA_FLOAT pm = { .typical_size_um = -NAN };
     for (size_t evt_idx = 0; evt_idx < triggers.count; evt_idx++) {
         Eventing::EventTrigger* trigger = triggers.list[evt_idx];
@@ -825,6 +827,8 @@ bool RenderOled(Eventing::PointerList<Eventing::EventTrigger>& triggers, Eventin
                 rh = trigger->data.fl;
             } else if (trigger->event_id.equalsIgnoreCase(String("SPS30 Raw"))) {
                 pm = *((SPS30_DATA_FLOAT*)trigger->data.ptr);
+            } else if (trigger->event_id.equalsIgnoreCase(String("SGP30 tVOC ppb"))) {
+                tvoc = trigger->data.uin16;
             } else if (trigger->event_id.equalsIgnoreCase(String("Joystick Direction Change"))) {
                 peripherals::Joystick::JOYSTICK_DIRECTION joyDir = (peripherals::Joystick::JOYSTICK_DIRECTION)trigger->data.uin16;
                 switch (joyDir) {
@@ -855,36 +859,27 @@ bool RenderOled(Eventing::PointerList<Eventing::EventTrigger>& triggers, Eventin
     switch (mode) {
     default:
     case HOME: {
-            const uint8_t *big_font = u8g2_font_osb29_tf; // 0 is widest at 16px, 100 is 69px, -20 is 58
-            constexpr u8g2_uint_t text_big_height = 29;
-            const uint8_t *small_font = u8g2_font_osb18_tf; // F is 18 px, C is 17
-            constexpr u8g2_uint_t text_small_height = 18;
-            u8g2_SetFont(&peripherals::Display::u8g2, small_font);
-            char buf[20];
-            u8g2_uint_t temp_bottom_left_x = 0, temp_bottom_left_y = peripherals::Display::HEIGHT * 1 / 4 - 10;
-            u8g2_uint_t hum_bottom_left_x = 0, hum_bottom_left_y = peripherals::Display::HEIGHT * 2 / 4 - 10;
-            u8g2_uint_t co2_bottom_left_x = 0, co2_bottom_left_y = peripherals::Display::HEIGHT * 4 / 4 - 10;
-            u8g2_uint_t press_bottom_left_x = 0, press_bottom_left_y = peripherals::Display::HEIGHT * 3 / 4 - 10;
             if (sensors::lps25hb_pressure_sensor_present) {
-                snprintf(buf, sizeof(buf), "%0.1fhPa", press);
-                u8g2_DrawUTF8(&peripherals::Display::u8g2, press_bottom_left_x, press_bottom_left_y, buf);
-                snprintf(buf, sizeof(buf), "%0.1f\u00b0F", tempF);
-                u8g2_DrawUTF8(&peripherals::Display::u8g2, temp_bottom_left_x, temp_bottom_left_y, buf);
+                PressureBox->UpdateValue(press);
+                TempBox->UpdateValue(tempF);
             } else {
-                u8g2_DrawUTF8(&peripherals::Display::u8g2, press_bottom_left_x, press_bottom_left_y, "-hPa");
-                u8g2_DrawUTF8(&peripherals::Display::u8g2, temp_bottom_left_x, temp_bottom_left_y, "-\u00b0F");
+                PressureBox->UpdateValue(-NAN);
+                TempBox->UpdateValue(-NAN);
             }
             if (sensors::co2SensorPresent) {
-                snprintf(buf, sizeof(buf), "%uppm CO2", co2ppm);
-                u8g2_DrawUTF8(&peripherals::Display::u8g2, co2_bottom_left_x, co2_bottom_left_y, buf);
+                Co2Box->UpdateValue((uint32_t)co2ppm);
             } else {
-                u8g2_DrawUTF8(&peripherals::Display::u8g2, co2_bottom_left_x, co2_bottom_left_y, "-ppm CO2");
+                Co2Box->UpdateValue(9999UL);
             }
             if (sensors::humiditySensorPresent) {
-                snprintf(buf, sizeof(buf), "%0.1f%% rh", rh);
-                u8g2_DrawUTF8(&peripherals::Display::u8g2, hum_bottom_left_x, hum_bottom_left_y, buf);
+                RhBox->UpdateValue(rh);
             } else {
-                u8g2_DrawUTF8(&peripherals::Display::u8g2, hum_bottom_left_x, hum_bottom_left_y, "-% rh");
+                RhBox->UpdateValue(-NAN);
+            }
+            if (sensors::vocSensorPresent) {
+                TvocBox->UpdateValue((uint32_t)tvoc);
+            } else {
+                TvocBox->UpdateValue(9999UL);
             }
         }
         break;
@@ -960,10 +955,11 @@ int ManualSerial(String s) {
 }
 
 void init() {
-    PressureBox = new Box(&peripherals::Display::u8g2, -NAN, 0, 0 * 24, 128, 24, u8g2_font_nerhoe_tf, "hPa", "", u8g2_font_osb18_tf, 1);
-    TempBox = new Box(&peripherals::Display::u8g2, -NAN, 0, 1 * 24, 128, 24, u8g2_font_nerhoe_tf, "\u00b0", "F", u8g2_font_osb18_tf, 1);
-    Co2Box = new Box(&peripherals::Display::u8g2, -1UL, 0, 2 * 24, 128, 24, u8g2_font_nerhoe_tf, "ppm", "CO2", u8g2_font_osb18_tf, 0);
-    RhBox = new Box(&peripherals::Display::u8g2, -NAN, 0, 3 * 24, 128, 24, u8g2_font_nerhoe_tf, "%", "rh", u8g2_font_osb18_tf, 1);
+    PressureBox = new Box(&peripherals::Display::u8g2, -NAN, 0, 0 * 23, 128, 24, u8g2_font_nerhoe_tf, "hPa", "", u8g2_font_osb18_tf, 0);
+    TempBox = new Box(&peripherals::Display::u8g2, -NAN, 0, 1 * 23, 128, 24, u8g2_font_nerhoe_tf, /*"\u00b0" actual degree symbol */"deg", "F", u8g2_font_osb18_tf, 1);
+    Co2Box = new Box(&peripherals::Display::u8g2, -1UL, 0, 2 * 23, 128, 24, u8g2_font_nerhoe_tf, "ppm", "CO2", u8g2_font_osb18_tf, 0);
+    RhBox = new Box(&peripherals::Display::u8g2, -NAN, 0, 3 * 23, 128, 24, u8g2_font_nerhoe_tf, "%", "rh", u8g2_font_osb18_tf, 1);
+    TvocBox = new Box(&peripherals::Display::u8g2, -1UL, 0, 4 * 23, 128, 24, u8g2_font_nerhoe_tf, "ppb", "tVOC", u8g2_font_osb18_tf, 1);
 }
 
 } // namespace UX
@@ -1012,6 +1008,7 @@ void init() {
     infrastructure::event_hub.AddHandlerTrigger("RenderOledEvent", "SCD30 CO2 ppm");
     infrastructure::event_hub.AddHandlerTrigger("RenderOledEvent", "AHT20 Relative Humidity %%");
     infrastructure::event_hub.AddHandlerTrigger("RenderOledEvent", "SPS30 Raw");
+    infrastructure::event_hub.AddHandlerTrigger("RenderOledEvent", "SGP30 tVOC ppb");
     infrastructure::event_hub.AddHandlerTrigger("RenderOledEvent", "Joystick Direction Change");
     infrastructure::event_hub.AddHandler("PaintOled", peripherals::Display::Paint, Eventing::TRIGGER_TEMPORAL, 1200); // long enough for the longest loop to prevent delta clock recursion
     //infrastructure::event_hub.AddHandler("DumpOsState", infrastructure::DumpOsState, Eventing::TRIGGER_TEMPORAL, 5000);
