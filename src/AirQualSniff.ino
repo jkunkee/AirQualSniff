@@ -331,11 +331,15 @@ namespace NvStorage {
     } NvSettings;
     int NvSettingsAddress = 0;
 
-    constexpr uint8_t currentVersion = 0;
+    constexpr uint8_t currentVersion = 1;
+    static_assert(currentVersion != 0x00, "The version must be distinguishable from the new-firmware value 0x00.");
     static_assert(currentVersion != 0xFF, "The version must be distinguishable from the erased-flash value 0xFF.");
 
     void begin() {
         // The Photon has 2047 bytes of emulated (flash-backed, page-erase-worn) EEPROM
+        // It appears that when the firmware is updated, the EEPROM area is zero'd out,
+        // so the baseline isn't preserved across flashes and the version can't start
+        // at zero.
         EEPROM.get(NvSettingsAddress, NvSettings);
         if (NvSettings.version != currentVersion) {
             EEPROM.clear();
