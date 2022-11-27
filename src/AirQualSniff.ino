@@ -949,6 +949,8 @@ void init() {
     pmMassBox = new Box(&peripherals::Display::u8g2, 0, 1 * 23, 128, 24, u8g2_font_nerhoe_tf, "ug/", "m^3", u8g2_font_osb18_tf, 1);
     pmCountBox = new Box(&peripherals::Display::u8g2, 0, 2 * 23, 128, 24, u8g2_font_nerhoe_tf, "part/", "cm^3", u8g2_font_osb18_tf, 1);
     pmTypicalBox = new Box(&peripherals::Display::u8g2, 0, 3 * 23, 128, 24, u8g2_font_nerhoe_tf, "um", "typ", u8g2_font_osb18_tf, 1);
+
+    Particle.function("ManualSerial", ManualSerial);
 }
 
 } // namespace UX
@@ -1019,7 +1021,6 @@ void setup() {
     sensors::init();
     UX::init();
     flow::init();
-    Particle.function("ManualSerial", UX::ManualSerial);
 }
 
 void loop() {
