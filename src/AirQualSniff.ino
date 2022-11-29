@@ -939,6 +939,18 @@ int ManualSerial(String s) {
     return 33;
 }
 
+int Report(String s) {
+    char *buf;
+    constexpr size_t bufLen = 2048;
+    buf = malloc(bufLen);
+    snprintf(buf, bufLen, "Nv v%d tvoc:%04x co2:%04x",
+             peripherals::NvStorage::NvSettings.version,
+             peripherals::NvStorage::NvSettings.vocBaselineTvoc,
+             peripherals::NvStorage::NvSettings.vocBaselineCo2);
+    Particle.publish("Report", buf);
+    return millis();
+}
+
 void init() {
     PressureBox = new Box(&peripherals::Display::u8g2, 0, 0 * 23, 128, 24, u8g2_font_bitcasual_tf, "hPa", "", u8g2_font_osb18_tf, 0);
     TempBox = new Box(&peripherals::Display::u8g2, 0, 1 * 23, 128, 24, u8g2_font_bitcasual_tf, /*"\u00b0" actual degree symbol */"deg", "F", u8g2_font_osb18_tf, 1);
@@ -951,6 +963,7 @@ void init() {
     pmTypicalBox = new Box(&peripherals::Display::u8g2, 0, 3 * 23, 128, 24, u8g2_font_nerhoe_tf, "um", "typ", u8g2_font_osb18_tf, 1);
 
     Particle.function("ManualSerial", ManualSerial);
+    Particle.function("Report", Report);
 }
 
 } // namespace UX
