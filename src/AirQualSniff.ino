@@ -944,14 +944,20 @@ int ManualSerial(String s) {
 
 int Report(String s) {
     char *buf;
-    constexpr size_t bufLen = 2048;
-    buf = malloc(bufLen);
-    snprintf(buf, bufLen, "Nv v%d tvoc:%04x co2:%04x",
-             peripherals::NvStorage::NvSettings.version,
-             peripherals::NvStorage::NvSettings.vocBaselineTvoc,
-             peripherals::NvStorage::NvSettings.vocBaselineCo2);
+    constexpr size_t bufLen = 622; // limit on Particle Photon running OS 2.3.0
+    buf = (char*)malloc(bufLen);
+    memset(buf, 0, bufLen);
+    JSONBufferWriter writer(buf, bufLen-1); // always null-terminated
+    writer.beginObject();
+        writer.name("nv").beginObject();
+            writer.name("ver").value(peripherals::NvStorage::NvSettings.version);
+            writer.name("tvocBase").value(peripherals::NvStorage::NvSettings.vocBaselineTvoc);
+            writer.name("co2Base").value(peripherals::NvStorage::NvSettings.vocBaselineCo2);
+        writer.endObject();
+        writer.name("uptime").value(millis());
+    writer.endObject();
     Particle.publish("Report", buf);
-    return millis();
+    return 0;
 }
 
 void init() {
