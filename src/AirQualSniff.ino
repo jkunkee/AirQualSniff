@@ -952,6 +952,7 @@ int Report(String s) {
 }
 
 void init() {
+    FontData *candidates[] = {u8g2_font_6x10_tf, u8g2_font_profont11_tf, u8g2_font_simple1_tf, u8g2_font_NokiaSmallPlain_tf };
     PressureBox = new Box(&peripherals::Display::u8g2, 0, 0 * 23, 128, 24, u8g2_font_bitcasual_tf, "hPa", "", u8g2_font_osb18_tf, 0);
     TempBox = new Box(&peripherals::Display::u8g2, 0, 1 * 23, 128, 24, u8g2_font_bitcasual_tf, /*"\u00b0" actual degree symbol */"deg", "F", u8g2_font_osb18_tf, 1);
     Co2Box = new Box(&peripherals::Display::u8g2, 0, 2 * 23, 128, 24, u8g2_font_bitcasual_tf, "ppm", "CO2", u8g2_font_osb18_tf, 0);
