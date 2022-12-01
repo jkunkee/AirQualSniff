@@ -343,6 +343,7 @@ namespace NvStorage {
         EEPROM.get(NvSettingsAddress, NvSettings);
         if (NvSettings.version != currentVersion) {
             EEPROM.clear();
+            EEPROM.get(NvSettingsAddress, NvSettings);
             NvSettings.version = currentVersion;
             EEPROM.put(NvSettingsAddress, NvSettings);
         }
@@ -359,6 +360,8 @@ namespace NvStorage {
 
 void init() {
     Serial.begin(115200);
+
+    NvStorage::begin();
 
     Wire.setSpeed(I2C_SAFE_SPEED);
     Wire.begin();
