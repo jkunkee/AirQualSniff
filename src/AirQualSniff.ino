@@ -345,6 +345,8 @@ namespace NvStorage {
             EEPROM.clear();
             EEPROM.get(NvSettingsAddress, NvSettings);
             NvSettings.version = currentVersion;
+            NvSettings.vocBaselineCo2 = 40014;  // eco2 39917,40076,40014
+            NvSettings.vocBaselineTvoc = 41427; // tvoc 41061,41336,41427
             EEPROM.put(NvSettingsAddress, NvSettings);
         }
     }
