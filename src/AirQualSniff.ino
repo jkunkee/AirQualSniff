@@ -26,7 +26,7 @@
 // Split application execution into its own thread
 SYSTEM_THREAD(ENABLED);
 // Always connect and stay connected
-SYSTEM_MODE(AUTOMATIC);
+SYSTEM_MODE(SEMI_AUTOMATIC);
 
 //SerialLogHandler logHandler(LOG_LEVEL_ALL);
 
@@ -113,6 +113,33 @@ void SlowDownI2c() {
     Wire.setSpeed(I2C_SAFE_SPEED); // SPS30 only supports 100KHz
     Wire.begin();
     i2cMux.enablePort(PM_MUX_PORT);
+}
+
+typedef struct _KnownNetworkPresenceData {
+    bool KnownNetworkPresent;
+    WiFiAccessPoint *creds;
+    int credsFound;
+} KnownNetworkPresenceData;
+
+void KnownNetworkScanCallback(WiFiAccessPoint* ap, void* context) {
+    KnownNetworkPresenceData *data = (KnownNetworkPresenceData*)context;
+    String apString(ap->ssid, ap->ssidLength);
+    for (int idx = 0; idx < data->credsFound; idx++) {
+        String credString(data->creds[idx].ssid, data->creds[idx].ssidLength);
+        if (credString.equals(apString)) {
+            data->KnownNetworkPresent = true;
+        }
+    }
+}
+
+bool IsKnownNetworkPresent() {
+    KnownNetworkPresenceData data = { 0 };
+    data.creds = (WiFiAccessPoint *)malloc(sizeof(WiFiAccessPoint) * 5);
+    data.credsFound = WiFi.getCredentials(data.creds, 5);
+    data.KnownNetworkPresent = false;
+    WiFi.scan(KnownNetworkScanCallback);
+    free(data.creds);
+    return data.KnownNetworkPresent;
 }
 
 namespace Display {
@@ -981,8 +1008,12 @@ void init() {
     pmCountBox = new Box(&peripherals::Display::u8g2, 0, 2 * 23, 128, 24, u8g2_font_nerhoe_tf, "part/", "cm^3", u8g2_font_osb18_tf, 1);
     pmTypicalBox = new Box(&peripherals::Display::u8g2, 0, 3 * 23, 128, 24, u8g2_font_nerhoe_tf, "um", "typ", u8g2_font_osb18_tf, 1);
 
-    Particle.function("ManualSerial", ManualSerial);
-    Particle.function("Report", Report);
+    // This can be anywhere as long as we're not in AUTOMATIC mode since the OS is >= 1.5.0.
+    if (peripherals::IsKnownNetworkPresent()) {
+        Particle.function("ManualSerial", ManualSerial);
+        Particle.function("Report", Report);
+        Particle.connect();
+    }
 }
 
 } // namespace UX
