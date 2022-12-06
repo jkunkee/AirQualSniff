@@ -819,6 +819,7 @@ Box *TempBox;
 Box *Co2Box;
 Box *RhBox;
 Box *TvocBox;
+Box *Eco2Box;
 
 Box *pmMassBox;
 Box *pmCountBox;
@@ -830,6 +831,7 @@ bool RenderOled(Eventing::PointerList<Eventing::EventTrigger>& triggers, Eventin
     static uint16_t co2ppm = -1;
     static float rh = -NAN;
     static uint16_t tvoc = -1;
+    static uint16_t eco2 = -1;
     static SPS30_DATA_FLOAT pm = { .typical_size_um = -NAN };
     for (size_t evt_idx = 0; evt_idx < triggers.count; evt_idx++) {
         Eventing::EventTrigger* trigger = triggers.list[evt_idx];
@@ -846,6 +848,8 @@ bool RenderOled(Eventing::PointerList<Eventing::EventTrigger>& triggers, Eventin
                 pm = *((SPS30_DATA_FLOAT*)trigger->data.ptr);
             } else if (trigger->event_id.equalsIgnoreCase(String("SGP30 tVOC ppb"))) {
                 tvoc = trigger->data.uin16;
+            } else if (trigger->event_id.equalsIgnoreCase(String("SGP30 eCO2 ppm"))) {
+                eco2 = trigger->data.uin16;
             } else if (trigger->event_id.equalsIgnoreCase(String("Joystick Direction Change"))) {
                 peripherals::Joystick::JOYSTICK_DIRECTION joyDir = (peripherals::Joystick::JOYSTICK_DIRECTION)trigger->data.uin16;
                 switch (joyDir) {
@@ -895,8 +899,10 @@ bool RenderOled(Eventing::PointerList<Eventing::EventTrigger>& triggers, Eventin
             }
             if (sensors::vocSensorPresent) {
                 TvocBox->UpdateValue((uint32_t)tvoc);
+                Eco2Box->UpdateValue((uint32_t)eco2);
             } else {
                 TvocBox->UpdateValue(9999UL);
+                Eco2Box->UpdateValue(9999UL);
             }
         }
         break;
@@ -968,7 +974,8 @@ void init() {
     TempBox = new Box(&peripherals::Display::u8g2, 0, 1 * 23, 128, 24, u8g2_font_bitcasual_tf, /*"\u00b0" actual degree symbol */"deg", "F", u8g2_font_osb18_tf, 1);
     Co2Box = new Box(&peripherals::Display::u8g2, 0, 2 * 23, 128, 24, u8g2_font_bitcasual_tf, "ppm", "CO2", u8g2_font_osb18_tf, 0);
     RhBox = new Box(&peripherals::Display::u8g2, 0, 3 * 23, 128, 24, u8g2_font_bitcasual_tf, "%", "rh", u8g2_font_osb18_tf, 1);
-    TvocBox = new Box(&peripherals::Display::u8g2, 0, 4 * 23, 128, 24, u8g2_font_bitcasual_tf, "ppb", "tVOC", u8g2_font_osb18_tf, 1);
+    TvocBox = new Box(&peripherals::Display::u8g2, 0, 4 * 23, 64, 24, u8g2_font_bitcasual_tf, "ppb", "tVOC", u8g2_font_osb18_tf, 1);
+    Eco2Box = new Box(&peripherals::Display::u8g2, 64, 4 * 23, 64, 24, u8g2_font_bitcasual_tf, "ppb", "tVOC", u8g2_font_osb18_tf, 1);
 
     pmMassBox = new Box(&peripherals::Display::u8g2, 0, 1 * 23, 128, 24, u8g2_font_nerhoe_tf, "ug/", "m^3", u8g2_font_osb18_tf, 1);
     pmCountBox = new Box(&peripherals::Display::u8g2, 0, 2 * 23, 128, 24, u8g2_font_nerhoe_tf, "part/", "cm^3", u8g2_font_osb18_tf, 1);
