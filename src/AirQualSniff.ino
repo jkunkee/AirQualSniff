@@ -134,10 +134,11 @@ void KnownNetworkScanCallback(WiFiAccessPoint* ap, void* context) {
 
 bool IsKnownNetworkPresent() {
     KnownNetworkPresenceData data = { 0 };
+    // Particle Photon can hold up to 5 sets of WiFi creds at once.
     data.creds = (WiFiAccessPoint *)malloc(sizeof(WiFiAccessPoint) * 5);
     data.credsFound = WiFi.getCredentials(data.creds, 5);
     data.KnownNetworkPresent = false;
-    WiFi.scan(KnownNetworkScanCallback);
+    WiFi.scan(KnownNetworkScanCallback, (void*)&data);
     free(data.creds);
     return data.KnownNetworkPresent;
 }
