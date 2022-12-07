@@ -1009,11 +1009,17 @@ void init() {
     pmCountBox = new Box(&peripherals::Display::u8g2, 0, 2 * 23, 128, 24, u8g2_font_nerhoe_tf, "part/", "cm^3", u8g2_font_osb18_tf, 1);
     pmTypicalBox = new Box(&peripherals::Display::u8g2, 0, 3 * 23, 128, 24, u8g2_font_nerhoe_tf, "um", "typ", u8g2_font_osb18_tf, 1);
 
+    // Apparently .connect() will call .on() for me, but if I want to call .scan() first
+    // then I need to call it myself.
+    WiFi.on();
+    delay(1000); // allow the module to finish its initial scan
     // This can be anywhere as long as we're not in AUTOMATIC mode since the OS is >= 1.5.0.
     if (peripherals::IsKnownNetworkPresent()) {
         Particle.function("ManualSerial", ManualSerial);
         Particle.function("Report", Report);
         Particle.connect();
+    } else {
+        WiFi.off();
     }
 }
 
