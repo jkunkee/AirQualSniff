@@ -737,6 +737,81 @@ void init() {
  * Decimators and other global storage for sensor data flow
 \*****************************************************************************/
 
+namespace Data {
+
+// TODO: statically allocated buffers
+// fine: every 10 seconds
+float pressureInst = -NAN;
+// Instead of doing the EPA careful route right now, go for pretty/useful displays.
+// data is 1 Hz
+// fine is last minute
+// medium is last hour
+// coarse is last day
+// TODO: predecimate to every 10s
+//Decimator pressureDecimator(60, 60, 24);
+float tempFInst = -NAN;
+//Decimator tempFDecimator(60, 60, 24);
+float tempCInst = -NAN;
+//Decimator tempCDecimator(60, 60, 24);
+float altitudeInst = -NAN;
+//Decimator altitudeDecimator(60, 60, 24);
+uint16_t co2ppmInst = -1;
+//Decimator co2ppmDecimator(12, 60, 24); // every 5s
+float rhInst = -NAN;
+//Decimator rhDecimator(60, 60, 24);
+// pm is too complicated to decimate for now
+SPS30_DATA_FLOAT pmInst = { 0 };
+uint16_t eco2Inst = -1;
+//Decimator eco2Decimator(12, 60, 24); // every 5s
+uint16_t tvocInst = -1;
+//Decimator tvocDecimator(12, 60, 24); // every 5s
+uint16_t abshumInst = -1;
+//Decimator abshumDecimator(12, 60, 24); // every 5s
+
+bool GatherData(Eventing::PointerList<Eventing::EventTrigger>& triggers, Eventing::EventData& out) {
+    static system_tick_t lastUpdate = 0;
+    system_tick_t currentUpdate = millis();
+    for (size_t evt_idx = 0; evt_idx < triggers.count; evt_idx++) {
+        Eventing::EventTrigger* trigger = triggers.list[evt_idx];
+        if (trigger->data_ready) {
+            if (trigger->event_id.equalsIgnoreCase(String("LPS25HB Pressure hPa"))) {
+                pressureInst = trigger->data.fl;
+                return false;
+            } else if (trigger->event_id.equalsIgnoreCase(String("LPS25HB Altitude m"))) {
+                altitudeInst = trigger->data.fl;
+                return false;
+            } else if (trigger->event_id.equalsIgnoreCase(String("LPS25HB Temp C"))) {
+                tempCInst = trigger->data.fl;
+                return false;
+            } else if (trigger->event_id.equalsIgnoreCase(String("LPS25HB Temp F"))) {
+                tempFInst = trigger->data.fl;
+            } else if (trigger->event_id.equalsIgnoreCase(String("SCD30 CO2 ppm"))) {
+                co2ppmInst = trigger->data.uin16;
+            } else if (trigger->event_id.equalsIgnoreCase(String("AHT20 Relative Humidity %%"))) {
+                rhInst = trigger->data.fl;
+            } else if (trigger->event_id.equalsIgnoreCase(String("SPS30 Raw"))) {
+                pmInst = *((SPS30_DATA_FLOAT*)trigger->data.ptr);
+            } else if (trigger->event_id.equalsIgnoreCase(String("SGP30 tVOC ppb"))) {
+                tvocInst = trigger->data.uin16;
+            } else if (trigger->event_id.equalsIgnoreCase(String("SGP30 eCO2 ppm"))) {
+                eco2Inst = trigger->data.uin16;
+            } else if (trigger->event_id.equalsIgnoreCase(String("Absolute Humidity 8.8 g/m^3"))) {
+                abshumInst = trigger->data.uin16;
+            } else {
+                Serial.printlnf("Unhandled event \"%s\" %0.2f/%u/%d/%x/%p", trigger->event_id.c_str(), trigger->data.fl, trigger->data.uin16, trigger->data.in16, trigger->data.uin16, trigger->data.ptr);
+            }
+        }
+    }
+    // Fire at most every 1000ms
+    if (currentUpdate - lastUpdate < 1000) {
+        return false;
+    }
+    out.in16 = 32;
+    return true;
+}
+
+} // namespace Data
+
 /*****************************************************************************/
 /*****************************************************************************/
 
@@ -748,86 +823,50 @@ void init() {
 
 namespace UX {
 
+using namespace Data;
+
 bool RenderSerial(Eventing::PointerList<Eventing::EventTrigger>& triggers, Eventing::EventData& out) {
-    static float press = -NAN, tempF = -NAN, tempC = -NAN, alt = -NAN;
-    static uint16_t co2ppm = -1;
-    static float rh = -NAN;
-    static SPS30_DATA_FLOAT pm = { 0 };
-    static uint16_t eco2 = 0;
-    static uint16_t tvoc = 0;
-    static uint16_t absHum = -1;
     static system_tick_t lastFire = 0;
     system_tick_t currentFire = millis();
-    for (size_t evt_idx = 0; evt_idx < triggers.count; evt_idx++) {
-        Eventing::EventTrigger* trigger = triggers.list[evt_idx];
-        if (trigger->data_ready) {
-            if (trigger->event_id.equalsIgnoreCase(String("LPS25HB Pressure hPa"))) {
-                press = trigger->data.fl;
-                return false;
-            } else if (trigger->event_id.equalsIgnoreCase(String("LPS25HB Altitude m"))) {
-                alt = trigger->data.fl;
-                return false;
-            } else if (trigger->event_id.equalsIgnoreCase(String("LPS25HB Temp C"))) {
-                tempC = trigger->data.fl;
-                return false;
-            } else if (trigger->event_id.equalsIgnoreCase(String("LPS25HB Temp F"))) {
-                tempF = trigger->data.fl;
-            } else if (trigger->event_id.equalsIgnoreCase(String("SCD30 CO2 ppm"))) {
-                co2ppm = trigger->data.uin16;
-            } else if (trigger->event_id.equalsIgnoreCase(String("AHT20 Relative Humidity %%"))) {
-                rh = trigger->data.fl;
-            } else if (trigger->event_id.equalsIgnoreCase(String("SPS30 Raw"))) {
-                pm = *((SPS30_DATA_FLOAT*)trigger->data.ptr);
-            } else if (trigger->event_id.equalsIgnoreCase(String("SGP30 tVOC ppb"))) {
-                tvoc = trigger->data.uin16;
-            } else if (trigger->event_id.equalsIgnoreCase(String("SGP30 eCO2 ppm"))) {
-                eco2 = trigger->data.uin16;
-            } else if (trigger->event_id.equalsIgnoreCase(String("Absolute Humidity 8.8 g/m^3"))) {
-                absHum = trigger->data.uin16;
-            } else {
-                Serial.printlnf("Unhandled event \"%s\" %0.2f/%u/%d/%x/%p", trigger->event_id.c_str(), trigger->data.fl, trigger->data.uin16, trigger->data.in16, trigger->data.uin16, trigger->data.ptr);
-            }
-        }
-    }
     // Fire at most every 5000ms
     if (currentFire - lastFire < 5000) {
         return false;
     }
     lastFire = currentFire;
     if (sensors::lps25hb_pressure_sensor_present) {
-        Serial.printlnf("LPS25HB: %0.2fhPa, %0.1fm, %0.2fF, %0.2fC", press, alt, tempF, tempC);
+        Serial.printlnf("LPS25HB: %0.2fhPa, %0.1fm, %0.2fF, %0.2fC", pressureInst, altitudeInst, tempFInst, tempCInst);
     } else {
         Serial.println("LPS25HB not present");
     }
     if (sensors::co2SensorPresent) {
-        Serial.printlnf("SCD30: %u ppm CO2", co2ppm);
+        Serial.printlnf("SCD30: %u ppm CO2", co2ppmInst);
     } else {
         Serial.println("SCD30 not present");
     }
     if (sensors::humiditySensorPresent) {
-        Serial.printlnf("AHT20: %0.1f%%", rh);
+        Serial.printlnf("AHT20: %0.1f%%", rhInst);
     } else {
         Serial.println("AHT20 not present");
     }
     if (sensors::vocSensorPresent) {
-        Serial.printlnf("SGP30 tVOC:%uppb eCO2:%uppm abshum:0x%x.%02xg/m^3", tvoc, eco2, absHum >> 8, absHum & 0xFF);
+        Serial.printlnf("SGP30 tVOC:%uppb eCO2:%uppm abshum:0x%x.%02xg/m^3", tvocInst, eco2Inst, abshumInst >> 8, abshumInst & 0xFF);
     } else {
         Serial.println("SGP30 not present");
     }
     if (sensors::pmSensorPresent) {
         String str;
-        float totalugcm3 = pm.pm_1_0_ug_m3 + pm.pm_2_5_ug_m3 + pm.pm_4_0_ug_m3 + pm.pm_10_ug_m3;
-        float totalcm3 = pm.pm_0_5_n_cm3 + pm.pm_1_0_n_cm3 + pm.pm_2_5_n_cm3 + pm.pm_4_0_n_cm3 + pm.pm_10_n_cm3;
+        float totalugcm3 = pmInst.pm_1_0_ug_m3 + pmInst.pm_2_5_ug_m3 + pmInst.pm_4_0_ug_m3 + pmInst.pm_10_ug_m3;
+        float totalcm3 = pmInst.pm_0_5_n_cm3 + pmInst.pm_1_0_n_cm3 + pmInst.pm_2_5_n_cm3 + pmInst.pm_4_0_n_cm3 + pmInst.pm_10_n_cm3;
         str += "SPS30: ";
         str += String(totalugcm3, 1);
         str += "ug/cm3 ";
         str += String(totalcm3, 1);
         str += "n/cm3 ";
-        str += String(pm.typical_size_um, 1);
+        str += String(pmInst.typical_size_um, 1);
         str += "um typical ";
         Serial.printlnf("%s", str.c_str());
-        Serial.printlnf("  n .5um:%0.0f,1:%0.0f,2.5:%0.0f,4.0:%0.0f,10:%0.0f", pm.pm_0_5_n_cm3, pm.pm_1_0_n_cm3, pm.pm_2_5_n_cm3, pm.pm_4_0_n_cm3, pm.pm_10_n_cm3);
-        Serial.printlnf("  ug 1um:%0.0f,2.5:%0.0f,4.0:%0.0f,10:%0.0f", pm.pm_1_0_ug_m3, pm.pm_2_5_ug_m3, pm.pm_4_0_ug_m3, pm.pm_10_ug_m3);
+        Serial.printlnf("  n .5um:%0.0f,1:%0.0f,2.5:%0.0f,4.0:%0.0f,10:%0.0f", pmInst.pm_0_5_n_cm3, pmInst.pm_1_0_n_cm3, pmInst.pm_2_5_n_cm3, pmInst.pm_4_0_n_cm3, pmInst.pm_10_n_cm3);
+        Serial.printlnf("  ug 1um:%0.0f,2.5:%0.0f,4.0:%0.0f,10:%0.0f", pmInst.pm_1_0_ug_m3, pmInst.pm_2_5_ug_m3, pmInst.pm_4_0_ug_m3, pmInst.pm_10_ug_m3);
     } else {
         Serial.println("SPS30 not present");
     }
@@ -855,30 +894,10 @@ Box *pmTypicalBox;
 
 bool RenderOled(Eventing::PointerList<Eventing::EventTrigger>& triggers, Eventing::EventData& out) {
     static OledMode mode = HOME;
-    static float press = -NAN, tempF = -NAN;
-    static uint16_t co2ppm = -1;
-    static float rh = -NAN;
-    static uint16_t tvoc = -1;
-    static uint16_t eco2 = -1;
-    static SPS30_DATA_FLOAT pm = { .typical_size_um = -NAN };
     for (size_t evt_idx = 0; evt_idx < triggers.count; evt_idx++) {
         Eventing::EventTrigger* trigger = triggers.list[evt_idx];
         if (trigger->data_ready) {
-            if (trigger->event_id.equalsIgnoreCase(String("LPS25HB Pressure hPa"))) {
-                press = trigger->data.fl;
-            } else if (trigger->event_id.equalsIgnoreCase(String("LPS25HB Temp F"))) {
-                tempF = trigger->data.fl;
-            } else if (trigger->event_id.equalsIgnoreCase(String("SCD30 CO2 ppm"))) {
-                co2ppm = trigger->data.uin16;
-            } else if (trigger->event_id.equalsIgnoreCase(String("AHT20 Relative Humidity %%"))) {
-                rh = trigger->data.fl;
-            } else if (trigger->event_id.equalsIgnoreCase(String("SPS30 Raw"))) {
-                pm = *((SPS30_DATA_FLOAT*)trigger->data.ptr);
-            } else if (trigger->event_id.equalsIgnoreCase(String("SGP30 tVOC ppb"))) {
-                tvoc = trigger->data.uin16;
-            } else if (trigger->event_id.equalsIgnoreCase(String("SGP30 eCO2 ppm"))) {
-                eco2 = trigger->data.uin16;
-            } else if (trigger->event_id.equalsIgnoreCase(String("Joystick Direction Change"))) {
+            if (trigger->event_id.equalsIgnoreCase(String("Joystick Direction Change"))) {
                 peripherals::Joystick::JOYSTICK_DIRECTION joyDir = (peripherals::Joystick::JOYSTICK_DIRECTION)trigger->data.uin16;
                 switch (joyDir) {
                 default:
@@ -909,25 +928,25 @@ bool RenderOled(Eventing::PointerList<Eventing::EventTrigger>& triggers, Eventin
     default:
     case HOME: {
             if (sensors::lps25hb_pressure_sensor_present) {
-                PressureBox->UpdateValue(press);
-                TempBox->UpdateValue(tempF);
+                PressureBox->UpdateValue(pressureInst);
+                TempBox->UpdateValue(tempFInst);
             } else {
                 PressureBox->UpdateValue(-NAN);
                 TempBox->UpdateValue(-NAN);
             }
             if (sensors::co2SensorPresent) {
-                Co2Box->UpdateValue((uint32_t)co2ppm);
+                Co2Box->UpdateValue((uint32_t)co2ppmInst);
             } else {
                 Co2Box->UpdateValue(9999UL);
             }
             if (sensors::humiditySensorPresent) {
-                RhBox->UpdateValue(rh);
+                RhBox->UpdateValue(rhInst);
             } else {
                 RhBox->UpdateValue(-NAN);
             }
             if (sensors::vocSensorPresent) {
-                TvocBox->UpdateValue((uint32_t)tvoc);
-                Eco2Box->UpdateValue((uint32_t)eco2);
+                TvocBox->UpdateValue((uint32_t)tvocInst);
+                Eco2Box->UpdateValue((uint32_t)eco2Inst);
             } else {
                 TvocBox->UpdateValue(9999UL);
                 Eco2Box->UpdateValue(9999UL);
@@ -935,13 +954,13 @@ bool RenderOled(Eventing::PointerList<Eventing::EventTrigger>& triggers, Eventin
         }
         break;
     case PM_DISPLAY: {
-            float totalugm3 = pm.pm_1_0_ug_m3 + pm.pm_2_5_ug_m3 + pm.pm_4_0_ug_m3 + pm.pm_10_ug_m3;
+            float totalugm3 = pmInst.pm_1_0_ug_m3 + pmInst.pm_2_5_ug_m3 + pmInst.pm_4_0_ug_m3 + pmInst.pm_10_ug_m3;
             pmMassBox->UpdateValue(totalugm3);
 
-            float totalcm3 = pm.pm_0_5_n_cm3 + pm.pm_1_0_n_cm3 + pm.pm_2_5_n_cm3 + pm.pm_4_0_n_cm3 + pm.pm_10_n_cm3;
+            float totalcm3 = pmInst.pm_0_5_n_cm3 + pmInst.pm_1_0_n_cm3 + pmInst.pm_2_5_n_cm3 + pmInst.pm_4_0_n_cm3 + pmInst.pm_10_n_cm3;
             pmCountBox->UpdateValue(totalcm3);
 
-            pmTypicalBox->UpdateValue(pm.typical_size_um);
+            pmTypicalBox->UpdateValue(pmInst.typical_size_um);
         }
         break;
     case BLANK:
@@ -1052,24 +1071,21 @@ void init() {
     infrastructure::event_hub.AddHandlerTrigger("Absolute Humidity 8.8 g/m^3", "AHT20 Relative Humidity %%");
     infrastructure::event_hub.AddHandler("SGP30 Update Absolute Humidity", sensors::SetSGP30AbsoluteHumidity, Eventing::TRIGGER_ON_ANY);
     infrastructure::event_hub.AddHandlerTrigger("SGP30 Update Absolute Humidity", "Absolute Humidity 8.8 g/m^3");
+    infrastructure::event_hub.AddHandler("GatherDataFired", Data::GatherData, Eventing::TRIGGER_ON_ANY);
+    infrastructure::event_hub.AddHandlerTrigger("GatherDataFired", "LPS25HB Pressure hPa");
+    infrastructure::event_hub.AddHandlerTrigger("GatherDataFired", "LPS25HB Altitude m");
+    infrastructure::event_hub.AddHandlerTrigger("GatherDataFired", "LPS25HB Temp C");
+    infrastructure::event_hub.AddHandlerTrigger("GatherDataFired", "LPS25HB Temp F");
+    infrastructure::event_hub.AddHandlerTrigger("GatherDataFired", "SCD30 CO2 ppm");
+    infrastructure::event_hub.AddHandlerTrigger("GatherDataFired", "AHT20 Relative Humidity %%");
+    infrastructure::event_hub.AddHandlerTrigger("GatherDataFired", "SPS30 Raw");
+    infrastructure::event_hub.AddHandlerTrigger("GatherDataFired", "Absolute Humidity 8.8 g/m^3");
+    infrastructure::event_hub.AddHandlerTrigger("GatherDataFired", "SGP30 tVOC ppb");
+    infrastructure::event_hub.AddHandlerTrigger("GatherDataFired", "SGP30 eCO2 ppm");
     infrastructure::event_hub.AddHandler("RenderSerialEvent", UX::RenderSerial, Eventing::TRIGGER_ON_ANY);
-    infrastructure::event_hub.AddHandlerTrigger("RenderSerialEvent", "LPS25HB Pressure hPa");
-    infrastructure::event_hub.AddHandlerTrigger("RenderSerialEvent", "LPS25HB Altitude m");
-    infrastructure::event_hub.AddHandlerTrigger("RenderSerialEvent", "LPS25HB Temp C");
-    infrastructure::event_hub.AddHandlerTrigger("RenderSerialEvent", "LPS25HB Temp F");
-    infrastructure::event_hub.AddHandlerTrigger("RenderSerialEvent", "SCD30 CO2 ppm");
-    infrastructure::event_hub.AddHandlerTrigger("RenderSerialEvent", "AHT20 Relative Humidity %%");
-    infrastructure::event_hub.AddHandlerTrigger("RenderSerialEvent", "SPS30 Raw");
-    infrastructure::event_hub.AddHandlerTrigger("RenderSerialEvent", "Absolute Humidity 8.8 g/m^3");
-    infrastructure::event_hub.AddHandlerTrigger("RenderSerialEvent", "SGP30 tVOC ppb");
-    infrastructure::event_hub.AddHandlerTrigger("RenderSerialEvent", "SGP30 eCO2 ppm");
+    infrastructure::event_hub.AddHandlerTrigger("RenderSerialEvent", "GatherDataFired");
     infrastructure::event_hub.AddHandler("RenderOledEvent", UX::RenderOled, Eventing::TRIGGER_ON_ANY);
-    infrastructure::event_hub.AddHandlerTrigger("RenderOledEvent", "LPS25HB Temp F");
-    infrastructure::event_hub.AddHandlerTrigger("RenderOledEvent", "LPS25HB Pressure hPa");
-    infrastructure::event_hub.AddHandlerTrigger("RenderOledEvent", "SCD30 CO2 ppm");
-    infrastructure::event_hub.AddHandlerTrigger("RenderOledEvent", "AHT20 Relative Humidity %%");
-    infrastructure::event_hub.AddHandlerTrigger("RenderOledEvent", "SPS30 Raw");
-    infrastructure::event_hub.AddHandlerTrigger("RenderOledEvent", "SGP30 tVOC ppb");
+    infrastructure::event_hub.AddHandlerTrigger("RenderOledEvent", "GatherDataFired");
     infrastructure::event_hub.AddHandlerTrigger("RenderOledEvent", "Joystick Direction Change");
     infrastructure::event_hub.AddHandler("PaintOled", peripherals::Display::Paint, Eventing::TRIGGER_TEMPORAL, 1200); // long enough for the longest loop to prevent delta clock recursion
     //infrastructure::event_hub.AddHandler("DumpOsState", infrastructure::DumpOsState, Eventing::TRIGGER_TEMPORAL, 5000);
