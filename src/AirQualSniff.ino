@@ -144,53 +144,54 @@ bool IsKnownNetworkPresent() {
 }
 
 namespace Display {
-    static u8g2_t u8g2 = { 0 };
+    static u8g2_t u8g2Buf = { 0 };
+    static u8g2_t *u8g2 = &u8g2Buf;
 
     static constexpr u8g2_uint_t WIDTH = 128;
     static constexpr u8g2_uint_t HEIGHT = 128;
 
     void u8g2_ssd1327_lock() {
-        u8g2_SendF(&peripherals::Display::u8g2, "ca", 0xFD, 0x12 | (1<<2));
+        u8g2_SendF(peripherals::Display::u8g2, "ca", 0xFD, 0x12 | (1<<2));
     }
 
     void u8g2_ssd1327_unlock() {
-        u8g2_SendF(&peripherals::Display::u8g2, "ca", 0xFD, 0x12 | (0<<2));
+        u8g2_SendF(peripherals::Display::u8g2, "ca", 0xFD, 0x12 | (0<<2));
     }
 
     void u8g2_ssd1327_register_reset() {
         // SSD1327 All Register Reset
         // Set Column Address
-        u8g2_SendF(&peripherals::Display::u8g2, "caa", 0x15, 0x00, 0x3F);
+        u8g2_SendF(peripherals::Display::u8g2, "caa", 0x15, 0x00, 0x3F);
         // Set Row Address
-        u8g2_SendF(&peripherals::Display::u8g2, "caa", 0x75, 0x00, 0x7f);
+        u8g2_SendF(peripherals::Display::u8g2, "caa", 0x75, 0x00, 0x7f);
         // Set Contrast Control
-        u8g2_SendF(&peripherals::Display::u8g2, "ca", 0x81, 0x7F);
+        u8g2_SendF(peripherals::Display::u8g2, "ca", 0x81, 0x7F);
         // Set Re-map
-        //u8g2_SendF(&u8g2, "ca", 0xA0, (0<<7)|(0<<6)|(0<<5)|(0<<4)|(0<<3)|(1<<2)|(0<<1)|(0<<0)); // screws it up more
+        //u8g2_SendF(u8g2, "ca", 0xA0, (0<<7)|(0<<6)|(0<<5)|(0<<4)|(0<<3)|(1<<2)|(0<<1)|(0<<0)); // screws it up more
         // Set Display Start Line
-        u8g2_SendF(&peripherals::Display::u8g2, "ca", 0xA1, 0x00);
+        u8g2_SendF(peripherals::Display::u8g2, "ca", 0xA1, 0x00);
         // Set Display Offset
-        u8g2_SendF(&peripherals::Display::u8g2, "ca", 0xA2, 0x00);
+        u8g2_SendF(peripherals::Display::u8g2, "ca", 0xA2, 0x00);
         // Set Display Mode
-        u8g2_SendF(&peripherals::Display::u8g2, "c", 0xA4);
+        u8g2_SendF(peripherals::Display::u8g2, "c", 0xA4);
         // Set MUX Ratio
-        u8g2_SendF(&peripherals::Display::u8g2, "ca", 0xA8, 127);
+        u8g2_SendF(peripherals::Display::u8g2, "ca", 0xA8, 127);
         // Function Selection A
         // Needs schematic analysis
         // Set Display ON/OFF
-        u8g2_SendF(&peripherals::Display::u8g2, "c", 0xAF);
+        u8g2_SendF(peripherals::Display::u8g2, "c", 0xAF);
         // Set Phase Length
         // Needs datasheet analysis
         // Set Front Clock Divider/Oscillator Frequency
         // Needs datasheet analysis
         // GPIO
-        u8g2_SendF(&peripherals::Display::u8g2, "ca", 0xB5, (1<<1) | (1<<0));
+        u8g2_SendF(peripherals::Display::u8g2, "ca", 0xB5, (1<<1) | (1<<0));
         // Set Second pre-charge Period (depends on 0xD5)
         // Needs datasheet analysis
         // Set Gray Scale Table
-        //u8g2_SendF(&u8g2, "ca", 0xB8, ); // Needs datasheet analysis
+        //u8g2_SendF(u8g2, "ca", 0xB8, ); // Needs datasheet analysis
         // Linear LUT
-        u8g2_SendF(&peripherals::Display::u8g2, "caaaaaaaaaaaaaaaa", 0xB9,
+        u8g2_SendF(peripherals::Display::u8g2, "caaaaaaaaaaaaaaaa", 0xB9,
             0,
             0,
             2,
@@ -214,9 +215,9 @@ namespace Display {
         // Function Select B
         // Needs datasheet analysis
         // Set Command Lock
-        //u8g2_SendF(&u8g2, "ca", 0xFD, 0x12 | (1<<2)); // lock isn't the issue
+        //u8g2_SendF(u8g2, "ca", 0xFD, 0x12 | (1<<2)); // lock isn't the issue
         // Continuous Horizontal Scroll Setup
-        u8g2_SendF(&peripherals::Display::u8g2, "caaaaaaa", 0xB9,
+        u8g2_SendF(peripherals::Display::u8g2, "caaaaaaa", 0xB9,
             0, // dummy
             0, // start row
             0, // step freq
@@ -225,19 +226,19 @@ namespace Display {
             0x3F, // end column
             0); // dummy
         // Deactivate scroll
-        u8g2_SendF(&peripherals::Display::u8g2, "c", 0x2E);
-        //u8g2_SendF(&u8g2, "c", 0x2F); // yup, that was it
+        u8g2_SendF(peripherals::Display::u8g2, "c", 0x2E);
+        //u8g2_SendF(u8g2, "c", 0x2F); // yup, that was it
 
         // blink inverted so I know things are working
-        u8g2_SendF(&peripherals::Display::u8g2, "c", 0xA7);
+        u8g2_SendF(peripherals::Display::u8g2, "c", 0xA7);
         delay(500);
-        u8g2_SendF(&peripherals::Display::u8g2, "c", 0xA4);
+        u8g2_SendF(peripherals::Display::u8g2, "c", 0xA4);
     }
 
     void u8g2_ssd1327_errata_workaround() {
         // Somehow some configuration bits sometimes get flipped; fix just the ones I know are busted:
         // Deactivate scroll
-        u8g2_SendF(&peripherals::Display::u8g2, "c", 0x2E);
+        u8g2_SendF(peripherals::Display::u8g2, "c", 0x2E);
     }
 
     bool BufferIsDirty = false;
@@ -246,7 +247,7 @@ namespace Display {
             //unsigned long drawStart = millis();
             u8g2_ssd1327_unlock();
             u8g2_ssd1327_errata_workaround();
-            u8g2_SendBuffer(&u8g2);
+            u8g2_SendBuffer(u8g2);
             u8g2_ssd1327_lock();
             //unsigned long drawEnd = millis();
             //Serial.printlnf("draw latency: %lu ms", drawEnd - drawStart);
@@ -263,16 +264,16 @@ namespace Display {
         // I thought something about u8x8_gpio_and_delay_arduino caused lockups too;
         // replacing it with a do-nothing 'return 0;' worked when I encountered that.
 
-        //u8g2_Setup_ssd1327_i2c_ws_128x128_f(&u8g2, U8G2_R0, u8x8_byte_arduino_hw_i2c, u8x8_gpio_and_delay_arduino);
-        u8g2_Setup_ssd1327_i2c_midas_128x128_f(&u8g2, U8G2_R3, u8x8_byte_arduino_hw_i2c, u8x8_gpio_and_delay_arduino);
-        //u8g2_Setup_ssd1327_i2c_ea_w128128_f(&u8g2, U8G2_R0, u8x8_byte_arduino_hw_i2c, u8x8_gpio_and_delay_arduino);
-        u8g2_InitDisplay(&u8g2);
-        u8g2_SetPowerSave(&u8g2, 0);
+        //u8g2_Setup_ssd1327_i2c_ws_128x128_f(u8g2, U8G2_R0, u8x8_byte_arduino_hw_i2c, u8x8_gpio_and_delay_arduino);
+        u8g2_Setup_ssd1327_i2c_midas_128x128_f(u8g2, U8G2_R3, u8x8_byte_arduino_hw_i2c, u8x8_gpio_and_delay_arduino);
+        //u8g2_Setup_ssd1327_i2c_ea_w128128_f(u8g2, U8G2_R0, u8x8_byte_arduino_hw_i2c, u8x8_gpio_and_delay_arduino);
+        u8g2_InitDisplay(u8g2);
+        u8g2_SetPowerSave(u8g2, 0);
         u8g2_ssd1327_register_reset();
-        u8g2_SetFont(&u8g2, u8g2_font_nerhoe_tf);
-        //u8g2_SetDrawColor(&u8g2, 0x8);
-        u8g2_ClearBuffer(&u8g2);
-        u8g2_SendBuffer(&u8g2);
+        u8g2_SetFont(u8g2, u8g2_font_nerhoe_tf);
+        //u8g2_SetDrawColor(u8g2, 0x8);
+        u8g2_ClearBuffer(u8g2);
+        u8g2_SendBuffer(u8g2);
     }
 } // namespace Display
 
@@ -921,7 +922,7 @@ bool RenderOled(Eventing::PointerList<Eventing::EventTrigger>& triggers, Eventin
         }
     }
 
-    u8g2_ClearBuffer(&peripherals::Display::u8g2);
+    u8g2_ClearBuffer(peripherals::Display::u8g2);
 
     switch (mode) {
     default:
@@ -968,20 +969,20 @@ bool RenderOled(Eventing::PointerList<Eventing::EventTrigger>& triggers, Eventin
     case DEBUG_RETICLE:
         for (int n = 0; n < 128; n++) {
             if (n % 5 == 0) {
-                u8g2_DrawPixel(&peripherals::Display::u8g2, n, 0);
-                u8g2_DrawPixel(&peripherals::Display::u8g2, 0, n);
+                u8g2_DrawPixel(peripherals::Display::u8g2, n, 0);
+                u8g2_DrawPixel(peripherals::Display::u8g2, 0, n);
             }
             if (n % 10 == 0) {
-                u8g2_DrawPixel(&peripherals::Display::u8g2, n, 1);
-                u8g2_DrawPixel(&peripherals::Display::u8g2, 1, n);
+                u8g2_DrawPixel(peripherals::Display::u8g2, n, 1);
+                u8g2_DrawPixel(peripherals::Display::u8g2, 1, n);
             }
         }
-        u8g2_DrawPixel(&peripherals::Display::u8g2, 126, 94);
-        u8g2_DrawPixel(&peripherals::Display::u8g2, 127, 95);
-        u8g2_DrawPixel(&peripherals::Display::u8g2, 128, 96);
-        u8g2_DrawPixel(&peripherals::Display::u8g2, 126, 126);
-        u8g2_DrawPixel(&peripherals::Display::u8g2, 127, 127);
-        u8g2_DrawPixel(&peripherals::Display::u8g2, 128, 128);
+        u8g2_DrawPixel(peripherals::Display::u8g2, 126, 94);
+        u8g2_DrawPixel(peripherals::Display::u8g2, 127, 95);
+        u8g2_DrawPixel(peripherals::Display::u8g2, 128, 96);
+        u8g2_DrawPixel(peripherals::Display::u8g2, 126, 126);
+        u8g2_DrawPixel(peripherals::Display::u8g2, 127, 127);
+        u8g2_DrawPixel(peripherals::Display::u8g2, 128, 128);
         break;
     }
     peripherals::Display::BufferIsDirty = true;
@@ -1016,16 +1017,16 @@ int Report(String s) {
 
 void init() {
     //FontData *candidates[] = {u8g2_font_6x10_tf, u8g2_font_profont11_tf, u8g2_font_simple1_tf, u8g2_font_NokiaSmallPlain_tf };
-    PressureBox = new Box(&peripherals::Display::u8g2, 0, 0 * 23, 128, 24, u8g2_font_bitcasual_tf, "hPa", "", u8g2_font_osb18_tf, 0);
-    TempBox = new Box(&peripherals::Display::u8g2, 0, 1 * 23, 128, 24, u8g2_font_bitcasual_tf, /*"\u00b0" actual degree symbol */"deg", "F", u8g2_font_osb18_tf, 1);
-    Co2Box = new Box(&peripherals::Display::u8g2, 0, 2 * 23, 128, 24, u8g2_font_bitcasual_tf, "ppm", "CO2", u8g2_font_osb18_tf, 0);
-    RhBox = new Box(&peripherals::Display::u8g2, 0, 3 * 23, 128, 24, u8g2_font_bitcasual_tf, "%", "rh", u8g2_font_osb18_tf, 1);
-    TvocBox = new Box(&peripherals::Display::u8g2, 64, 4 * 23 + 11, 64, 12, u8g2_font_nerhoe_tf, "ppb tVOC", "", u8g2_font_nerhoe_tf, 1);
-    Eco2Box = new Box(&peripherals::Display::u8g2, 64, 4 * 23, 64, 12, u8g2_font_nerhoe_tf, "ppm eCO2", "", u8g2_font_nerhoe_tf, 1);
+    PressureBox = new Box(peripherals::Display::u8g2, 0, 0 * 23, 128, 24, u8g2_font_bitcasual_tf, "hPa", "", u8g2_font_osb18_tf, 0);
+    TempBox = new Box(peripherals::Display::u8g2, 0, 1 * 23, 128, 24, u8g2_font_bitcasual_tf, /*"\u00b0" actual degree symbol */"deg", "F", u8g2_font_osb18_tf, 1);
+    Co2Box = new Box(peripherals::Display::u8g2, 0, 2 * 23, 128, 24, u8g2_font_bitcasual_tf, "ppm", "CO2", u8g2_font_osb18_tf, 0);
+    RhBox = new Box(peripherals::Display::u8g2, 0, 3 * 23, 128, 24, u8g2_font_bitcasual_tf, "%", "rh", u8g2_font_osb18_tf, 1);
+    TvocBox = new Box(peripherals::Display::u8g2, 64, 4 * 23 + 11, 64, 12, u8g2_font_nerhoe_tf, "ppb tVOC", "", u8g2_font_nerhoe_tf, 1);
+    Eco2Box = new Box(peripherals::Display::u8g2, 64, 4 * 23, 64, 12, u8g2_font_nerhoe_tf, "ppm eCO2", "", u8g2_font_nerhoe_tf, 1);
 
-    pmMassBox = new Box(&peripherals::Display::u8g2, 0, 1 * 23, 128, 24, u8g2_font_nerhoe_tf, "ug/", "m^3", u8g2_font_osb18_tf, 1);
-    pmCountBox = new Box(&peripherals::Display::u8g2, 0, 2 * 23, 128, 24, u8g2_font_nerhoe_tf, "part/", "cm^3", u8g2_font_osb18_tf, 1);
-    pmTypicalBox = new Box(&peripherals::Display::u8g2, 0, 3 * 23, 128, 24, u8g2_font_nerhoe_tf, "um", "typ", u8g2_font_osb18_tf, 1);
+    pmMassBox = new Box(peripherals::Display::u8g2, 0, 1 * 23, 128, 24, u8g2_font_nerhoe_tf, "ug/", "m^3", u8g2_font_osb18_tf, 1);
+    pmCountBox = new Box(peripherals::Display::u8g2, 0, 2 * 23, 128, 24, u8g2_font_nerhoe_tf, "part/", "cm^3", u8g2_font_osb18_tf, 1);
+    pmTypicalBox = new Box(peripherals::Display::u8g2, 0, 3 * 23, 128, 24, u8g2_font_nerhoe_tf, "um", "typ", u8g2_font_osb18_tf, 1);
 
     // Apparently .connect() will call .on() for me, but if I want to call .scan() first
     // then I need to call it myself.
