@@ -144,13 +144,7 @@ bool IsKnownNetworkPresent() {
 }
 
 namespace Display {
-    // FUll U8G2, SSD1327 controller, EA_128128 display, full framebuffer, First Arduino Hardware I2C, not rotated
-    // Something about the C++ process causes lockups
-    //U8G2_SSD1327_EA_W128128_F_HW_I2C u8g2(U8G2_R0, U8X8_PIN_NONE, U8X8_PIN_NONE, U8X8_PIN_NONE);
     static u8g2_t u8g2 = { 0 };
-
-    // I thought something about u8x8_gpio_and_delay_arduino caused lockups too;
-    // replacing it with a do-nothing return 0; works too.
 
     static constexpr u8g2_uint_t WIDTH = 128;
     static constexpr u8g2_uint_t HEIGHT = 128;
@@ -262,8 +256,13 @@ namespace Display {
     }
 
     void init() {
+        // FUll U8G2, SSD1327 controller, Midas 128x128 display, full framebuffer, First Arduino Hardware I2C, rotated so USB is on left
         // Docs say U8G2_SSD1327_EA_W128128_F_HW_I2C, but it chops off the top and bottom 16 rows.
         // u8g2_Setup_ssd1327_i2c_ws_128x128_f seems to work well, at least empirically.
+        // Something about the C++ process causes lockups, at least on toolchain 3.3.0.
+        // I thought something about u8x8_gpio_and_delay_arduino caused lockups too;
+        // replacing it with a do-nothing 'return 0;' worked when I encountered that.
+
         //u8g2_Setup_ssd1327_i2c_ws_128x128_f(&u8g2, U8G2_R0, u8x8_byte_arduino_hw_i2c, u8x8_gpio_and_delay_arduino);
         u8g2_Setup_ssd1327_i2c_midas_128x128_f(&u8g2, U8G2_R3, u8x8_byte_arduino_hw_i2c, u8x8_gpio_and_delay_arduino);
         //u8g2_Setup_ssd1327_i2c_ea_w128128_f(&u8g2, U8G2_R0, u8x8_byte_arduino_hw_i2c, u8x8_gpio_and_delay_arduino);
