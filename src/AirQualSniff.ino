@@ -144,6 +144,7 @@ bool IsKnownNetworkPresent() {
 }
 
 namespace Display {
+    static U8G2 *u8g2_oo;
     static u8g2_t u8g2Buf = { 0 };
     static u8g2_t *u8g2 = &u8g2Buf;
 
@@ -264,9 +265,10 @@ namespace Display {
         // I thought something about u8x8_gpio_and_delay_arduino caused lockups too;
         // replacing it with a do-nothing 'return 0;' worked when I encountered that.
 
-        //u8g2_Setup_ssd1327_i2c_ws_128x128_f(u8g2, U8G2_R0, u8x8_byte_arduino_hw_i2c, u8x8_gpio_and_delay_arduino);
         u8g2_Setup_ssd1327_i2c_midas_128x128_f(u8g2, U8G2_R3, u8x8_byte_arduino_hw_i2c, u8x8_gpio_and_delay_arduino);
-        //u8g2_Setup_ssd1327_i2c_ea_w128128_f(u8g2, U8G2_R0, u8x8_byte_arduino_hw_i2c, u8x8_gpio_and_delay_arduino);
+        //u8g2_oo = new U8G2_SSD1327_MIDAS_128X128_F_HW_I2C(U8G2_R1);
+        //u8g2_oo->beginSimple();
+        //u8g2 = u8g2_oo->getU8g2();
         u8g2_InitDisplay(u8g2);
         u8g2_SetPowerSave(u8g2, 0);
         u8g2_ssd1327_register_reset();
