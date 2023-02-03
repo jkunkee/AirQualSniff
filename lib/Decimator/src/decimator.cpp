@@ -10,6 +10,7 @@ FIFO::FIFO(int depth) {
     m_head_idx = 0; // index into storage for next insertion
     m_tail_idx = 0; // index into storage for next removal
     m_size = 0;
+    m_bookmark = 0;
 }
 
 FIFO::FIFO(float* buf, int depth) {
@@ -19,6 +20,7 @@ FIFO::FIFO(float* buf, int depth) {
     m_head_idx = 0; // index into storage for next insertion
     m_tail_idx = 0; // index into storage for next removal
     m_size = 0;
+    m_bookmark = 0;
 }
 
 FIFO::~FIFO() {
@@ -141,6 +143,14 @@ bool FIFO::discretize(int num_buckets, int *results, int results_size) {
     return success;
 }
 
+bool FIFO::is_at_bookmark() {
+    return m_head_idx == m_bookmark;
+}
+
+void FIFO::set_bookmark(int m) {
+    m_bookmark = m % m_storage_size;
+}
+
 Decimator::Decimator(int fine_tier_count, int mid_tier_count, int coarse_tier_count) :
     fine(fine_tier_count), mid(mid_tier_count), coarse(coarse_tier_count),
     m_decimation_complete(false), m_decimated_value(0.0f) {}
@@ -156,23 +166,27 @@ Decimator::Decimator(float* fine_tier_buf, int fine_tier_count,
 Decimator::~Decimator() {}
 
 bool Decimator::push(float in) {
-    if (is_full()) {
-        return false;
+    float f;
+    if (fine.is_full()) {
+        fine.pop(&f);
     }
     fine.push(in);
     // rotate up
-    if (fine.is_full()) {
+    if (fine.is_full() && fine.is_at_bookmark()) {
+        if (mid.is_full()) {
+            mid.pop(&f);
+        }
         mid.push(fine.mean_val());
-        fine.clear();
-    }
-    if (mid.is_full()) {
-        coarse.push(mid.mean_val());
-        mid.clear();
-    }
-    if (coarse.is_full()) {
-        m_decimated_value = coarse.mean_val();
-        coarse.clear();
-        m_decimation_complete = true;
+        if (mid.is_full() && mid.is_at_bookmark()) {
+            if (coarse.is_full()) {
+                coarse.pop(&f);
+            }
+            coarse.push(mid.mean_val());
+            if (coarse.is_full() && coarse.is_at_bookmark()) {
+                m_decimated_value = coarse.mean_val();
+                m_decimation_complete = true;
+            }
+        }
     }
     return true;
 }
