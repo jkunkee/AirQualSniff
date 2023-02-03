@@ -134,7 +134,7 @@ bool FIFO::discretize(int num_buckets, int *results, int results_size) {
         results[idx] = 0;
 
         for (int bucket_idx = 0; bucket_idx < num_buckets; bucket_idx++) {
-            if (val < local_min + (bucket_idx + 1) * step) {
+            if (val <= local_min + (bucket_idx + 1) * step) {
                 results[idx] = bucket_idx;
                 break;
             }
