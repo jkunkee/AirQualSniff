@@ -28,6 +28,11 @@ public:
     void clear();
     bool discretize(int num_buckets, int *result, int result_size);
 
+    // Allow calling analysis functions when buffer has been fully
+    // overwritten
+    bool is_at_bookmark();
+    void set_bookmark(int bookmark);
+
     bool peek_raw(int idx, float* out);
 
 private:
@@ -37,6 +42,7 @@ private:
     int m_head_idx; // index into storage for next insertion
     int m_tail_idx; // index into storage for next removal
     int m_size;
+    int m_bookmark;
 };
 
 class Decimator {
