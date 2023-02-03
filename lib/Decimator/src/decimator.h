@@ -26,6 +26,8 @@ public:
     bool pop(float* out);
     bool peek(int idx, float* out);
     void clear();
+    // discretize: write a bucket number integer for each data point
+    // into an m_size int array
     bool discretize(int num_buckets, int *result, int result_size);
 
     // Allow calling analysis functions when buffer has been fully
