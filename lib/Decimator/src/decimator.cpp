@@ -116,13 +116,13 @@ void FIFO::clear() {
 }
 
 bool FIFO::discretize(int num_buckets, int *results, int results_size) {
-    if (size() == 0 || results_size < size() || num_buckets <= 0) {
+    if (size() == 0 || results_size < size() || num_buckets <= 1) {
         return false;
     }
 
     float local_min = min_val();
     float local_max = max_val();
-    float step = (local_max - local_min) / num_buckets;
+    float step = (local_max - local_min) / (num_buckets - 1);
 
     bool success = true;
     for (int idx = 0; idx < size(); idx++) {
@@ -134,7 +134,7 @@ bool FIFO::discretize(int num_buckets, int *results, int results_size) {
         results[idx] = 0;
 
         for (int bucket_idx = 0; bucket_idx < num_buckets; bucket_idx++) {
-            if (val <= local_min + (bucket_idx + 1) * step) {
+            if (val < local_min + (bucket_idx + 1) * step) {
                 results[idx] = bucket_idx;
                 break;
             }
