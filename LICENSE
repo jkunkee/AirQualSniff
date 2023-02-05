@@ -1,15 +1,14 @@
-To easily work with the Particle.io build system, several external modules
+To easily work with the Particle.io build system, some external modules
 with their own licensing have been checked in:
 
 * lib/SparkFun_SGP30_Arduino_Library - MIT
-* lib/u8g2* - 2-clause BSD for code, mix for fonts including X11; see lib/U8g2_Arduino-2.32.6/LICENSE
-* lib/ssd1327 - GPLv3
+* lib/u8g2_Arduino-2.32.6 - 2-clause BSD for code, mix for fonts including X11; see lib/U8g2_Arduino-2.32.6/LICENSE
 
 For all other content:
 
 MIT License
 
-Copyright (c) 2021 Jon Kunkee
+Copyright (c) 2023 Jon Kunkee (jkunkee)
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
