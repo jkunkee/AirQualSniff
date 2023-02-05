@@ -12,7 +12,6 @@
 #include "boxen.h"
 
 // Particle-style dependencies
-// (Get-Content .\project.properties) -match 'dependencies.*' | % { (($_ -isplit '\.')[1] -isplit '=')[0] } | % { particle library copy $_ }
 #include <photon-vbat.h>
 #include <SparkFun_SCD30_Arduino_Library.h>
 #include <SparkFun_LPS25HB_Arduino_Library.h>
