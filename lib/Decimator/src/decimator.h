@@ -28,7 +28,7 @@ public:
     void clear();
     // discretize: write a bucket number integer for each data point
     // into an m_size int array
-    bool discretize(int num_buckets, int *result, int result_size);
+    bool discretize(int num_buckets, int *result, int result_size, float min_step);
 
     // Allow calling analysis functions when buffer has been fully
     // overwritten

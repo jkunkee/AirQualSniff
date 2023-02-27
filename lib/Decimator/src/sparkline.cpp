@@ -1,7 +1,7 @@
 
 #include "sparkline.h"
 
-void RenderSparkline(u8g2_t *u, FIFO &f, uint8_t x, uint8_t y, uint8_t w, uint8_t h, bool squish_instead_of_truncate) {
+void RenderSparkline(u8g2_t *u, FIFO &f, uint8_t x, uint8_t y, uint8_t w, uint8_t h, bool squish_instead_of_truncate, float min_h_step) {
     bool success;
     int pixel_idx = 0;
 
@@ -18,7 +18,7 @@ void RenderSparkline(u8g2_t *u, FIFO &f, uint8_t x, uint8_t y, uint8_t w, uint8_
         // OOM
         goto cleanup;
     }
-    success = f.discretize(value_bins, binned_values, f.size());
+    success = f.discretize(value_bins, binned_values, f.size(), min_h_step);
     if (!success) {
         // FIFO is empty or binned_values was too small
         goto cleanup;
