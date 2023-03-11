@@ -750,7 +750,7 @@ float pressureInst = -NAN;
 // medium is last hour
 // coarse is last day
 // TODO: predecimate to every 10s
-//Decimator pressureDecimator(60, 60, 24);
+Decimator pressureDecimator(60, 60, 24);
 float tempFInst = -NAN;
 //Decimator tempFDecimator(60, 60, 24);
 float tempCInst = -NAN;
@@ -778,6 +778,7 @@ bool GatherData(Eventing::PointerList<Eventing::EventTrigger>& triggers, Eventin
         if (trigger->data_ready) {
             if (trigger->event_id.equalsIgnoreCase(String("LPS25HB Pressure hPa"))) {
                 pressureInst = trigger->data.fl;
+                pressureDecimator.push(pressureInst);
                 return false;
             } else if (trigger->event_id.equalsIgnoreCase(String("LPS25HB Altitude m"))) {
                 altitudeInst = trigger->data.fl;
@@ -999,6 +1000,31 @@ int ManualSerial(String s) {
     return 33;
 }
 
+// Each RenderCloud is one Data Operation.
+// Current free tier is 100,000 Data Operations per month.
+// Render every 10 minutes for ~4320/mo
+constexpr time_t RenderCloudInterval_ms = 10 * 60 * 1000;
+
+bool RenderCloud(Eventing::PointerList<Eventing::EventTrigger>& triggers, Eventing::EventData& out) {
+    if (!Particle.connected()) {
+        return false;
+    }
+    char *buf;
+    constexpr size_t bufLen = 622; // limit on Particle Photon running OS 2.3.0
+    buf = (char*)malloc(bufLen);
+    memset(buf, 0, bufLen);
+    float data_buf = 0.0f;
+    JSONBufferWriter writer(buf, bufLen-1); // always null-terminated
+    writer.beginObject();
+        writer.name("instantaneous").beginObject();
+            Data::pressureDecimator.mid.peek(0, &data_buf);
+            writer.name("press_hPa").value(data_buf);
+        writer.endObject();
+    writer.endObject();
+    Particle.publish("HourlyData", buf);
+    return false;
+}
+
 int Report(String s) {
     char *buf;
     constexpr size_t bufLen = 622; // limit on Particle Photon running OS 2.3.0
@@ -1090,6 +1116,7 @@ void init() {
     infrastructure::event_hub.AddHandlerTrigger("RenderOledEvent", "GatherDataFired");
     infrastructure::event_hub.AddHandlerTrigger("RenderOledEvent", "Joystick Direction Change");
     infrastructure::event_hub.AddHandler("PaintOled", peripherals::Display::Paint, Eventing::TRIGGER_TEMPORAL, 1200); // long enough for the longest loop to prevent delta clock recursion
+    infrastructure::event_hub.AddHandler("RenderCloud", UX::RenderCloud, Eventing::TRIGGER_TEMPORAL, UX::RenderCloudInterval_ms);
     //infrastructure::event_hub.AddHandler("DumpOsState", infrastructure::DumpOsState, Eventing::TRIGGER_TEMPORAL, 5000);
 }
 
