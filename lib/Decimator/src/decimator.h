@@ -57,7 +57,6 @@ public:
 
     bool push(float in);
     bool is_full();
-    bool decimate_and_clear(float *out);
     void clear();
     int capacity();
 
@@ -68,4 +67,5 @@ public:
 private:
     bool m_decimation_complete;
     float m_decimated_value;
+    bool decimate_and_clear(float *out);
 };
