@@ -754,13 +754,13 @@ Decimator pressureDecimator(60, 60, 24);
 float tempFInst = -NAN;
 //Decimator tempFDecimator(60, 60, 24);
 float tempCInst = -NAN;
-//Decimator tempCDecimator(60, 60, 24);
+Decimator tempCDecimator(60, 60, 24);
 float altitudeInst = -NAN;
 //Decimator altitudeDecimator(60, 60, 24);
 uint16_t co2ppmInst = -1;
-//Decimator co2ppmDecimator(12, 60, 24); // every 5s
+Decimator co2ppmDecimator(12, 60, 24); // every 5s
 float rhInst = -NAN;
-//Decimator rhDecimator(60, 60, 24);
+Decimator rhDecimator(60, 60, 24);
 // pm is too complicated to decimate for now
 SPS30_DATA_FLOAT pmInst = { 0 };
 uint16_t eco2Inst = -1;
@@ -785,13 +785,16 @@ bool GatherData(Eventing::PointerList<Eventing::EventTrigger>& triggers, Eventin
                 return false;
             } else if (trigger->event_id.equalsIgnoreCase(String("LPS25HB Temp C"))) {
                 tempCInst = trigger->data.fl;
+                tempCDecimator.push(tempCInst);
                 return false;
             } else if (trigger->event_id.equalsIgnoreCase(String("LPS25HB Temp F"))) {
                 tempFInst = trigger->data.fl;
             } else if (trigger->event_id.equalsIgnoreCase(String("SCD30 CO2 ppm"))) {
                 co2ppmInst = trigger->data.uin16;
+                co2ppmDecimator.push(co2ppmInst);
             } else if (trigger->event_id.equalsIgnoreCase(String("AHT20 Relative Humidity %%"))) {
                 rhInst = trigger->data.fl;
+                rhDecimator.push(rhInst);
             } else if (trigger->event_id.equalsIgnoreCase(String("SPS30 Raw"))) {
                 pmInst = *((SPS30_DATA_FLOAT*)trigger->data.ptr);
             } else if (trigger->event_id.equalsIgnoreCase(String("SGP30 tVOC ppb"))) {
@@ -1016,12 +1019,19 @@ bool RenderCloud(Eventing::PointerList<Eventing::EventTrigger>& triggers, Eventi
     float data_buf = 0.0f;
     JSONBufferWriter writer(buf, bufLen-1); // always null-terminated
     writer.beginObject();
-        writer.name("instantaneous").beginObject();
-            Data::pressureDecimator.mid.peek(0, &data_buf);
+        writer.name("ver").value(1); // versioning allows for easier mass-parsing later
+        writer.name("inst").beginObject();
+            Data::pressureDecimator.fine.peek(0, &data_buf);
             writer.name("press_hPa").value(data_buf);
+            Data::tempCDecimator.fine.peek(0, &data_buf);
+            writer.name("T_C").value(data_buf);
+            Data::rhDecimator.fine.peek(0, &data_buf);
+            writer.name("rh_%").value(data_buf);
+            Data::co2ppmDecimator.fine.peek(0, &data_buf);
+            writer.name("co2_ppm").value(data_buf);
         writer.endObject();
     writer.endObject();
-    Particle.publish("HourlyData", buf);
+    Particle.publish("AirQualSniff/data/10min", buf);
     return false;
 }
 
