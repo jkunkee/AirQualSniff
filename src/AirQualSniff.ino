@@ -1050,6 +1050,12 @@ int Report(String s) {
         writer.name("uptime").value(millis());
     writer.endObject();
     Particle.publish("Report", buf);
+
+    {
+        Eventing::PointerList<Eventing::EventTrigger> triggers;
+        Eventing::EventData out;
+        RenderCloud(triggers, out);
+    }
     return 0;
 }
 
