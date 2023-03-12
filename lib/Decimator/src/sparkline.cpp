@@ -6,7 +6,7 @@ void RenderSparkline(u8g2_t *u, FIFO &f, uint8_t x, uint8_t y, uint8_t w, uint8_
     int pixel_idx = 0;
 
     // Clear graph area
-    uint8_t curColor = u8g2_GetDrawColor(u);
+    uint8_t curColor = 1;//u8g2_GetDrawColor(u); // somehow this returns 0 when it should return 1
     u8g2_SetDrawColor(u, 0);
     u8g2_DrawBox(u, x, y, w, h);
     u8g2_SetDrawColor(u, curColor);
