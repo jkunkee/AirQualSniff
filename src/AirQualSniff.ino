@@ -1,6 +1,7 @@
 
 // checked-in dependencies
 #include "decimator.h"
+#include "sparkline.h"
 #include "Atmospherics.h"
 #include "sps30.h"
 //#define EVENTHUB_DEBUG
@@ -273,7 +274,7 @@ namespace Display {
         u8g2_SetPowerSave(u8g2, 0);
         u8g2_ssd1327_register_reset();
         u8g2_SetFont(u8g2, u8g2_font_nerhoe_tf);
-        //u8g2_SetDrawColor(u8g2, 0x8);
+        //u8g2_SetDrawColor(u8g2, 1); // GetDrawColor returns 0 anyways
         u8g2_ClearBuffer(u8g2);
         u8g2_SendBuffer(u8g2);
     }
@@ -752,7 +753,7 @@ float pressureInst = -NAN;
 // TODO: predecimate to every 10s
 Decimator pressureDecimator(60, 60, 24);
 float tempFInst = -NAN;
-//Decimator tempFDecimator(60, 60, 24);
+Decimator tempFDecimator(60, 60, 24);
 float tempCInst = -NAN;
 Decimator tempCDecimator(60, 60, 24);
 float altitudeInst = -NAN;
@@ -789,6 +790,7 @@ bool GatherData(Eventing::PointerList<Eventing::EventTrigger>& triggers, Eventin
                 return false;
             } else if (trigger->event_id.equalsIgnoreCase(String("LPS25HB Temp F"))) {
                 tempFInst = trigger->data.fl;
+                tempFDecimator.push(tempFInst);
             } else if (trigger->event_id.equalsIgnoreCase(String("SCD30 CO2 ppm"))) {
                 co2ppmInst = trigger->data.uin16;
                 co2ppmDecimator.push(co2ppmInst);
@@ -935,18 +937,22 @@ bool RenderOled(Eventing::PointerList<Eventing::EventTrigger>& triggers, Eventin
     case HOME: {
             if (sensors::lps25hb_pressure_sensor_present) {
                 PressureBox->UpdateValue(pressureInst);
+                RenderSparkline(peripherals::Display::u8g2, pressureDecimator.coarse, 0, 0*23, 32, 23, true, 1.0f);
                 TempBox->UpdateValue(tempFInst);
+                RenderSparkline(peripherals::Display::u8g2, tempFDecimator.mid, 0, 1*23, 32, 23, true, 0.1f);
             } else {
                 PressureBox->UpdateValue(-NAN);
                 TempBox->UpdateValue(-NAN);
             }
             if (sensors::co2SensorPresent) {
                 Co2Box->UpdateValue((uint32_t)co2ppmInst);
+                RenderSparkline(peripherals::Display::u8g2, co2ppmDecimator.mid, 0, 2*23, 32, 23, true, 10.0f);
             } else {
                 Co2Box->UpdateValue(9999UL);
             }
             if (sensors::humiditySensorPresent) {
                 RhBox->UpdateValue(rhInst);
+                RenderSparkline(peripherals::Display::u8g2, rhDecimator.mid, 0, 3*23, 32, 23, true, 0.5f);
             } else {
                 RhBox->UpdateValue(-NAN);
             }
@@ -1061,10 +1067,10 @@ int Report(String s) {
 
 void init() {
     //FontData *candidates[] = {u8g2_font_6x10_tf, u8g2_font_profont11_tf, u8g2_font_simple1_tf, u8g2_font_NokiaSmallPlain_tf };
-    PressureBox = new Box(peripherals::Display::u8g2, 0, 0 * 23, 128, 24, u8g2_font_bitcasual_tf, "hPa", "", u8g2_font_osb18_tf, 0);
-    TempBox = new Box(peripherals::Display::u8g2, 0, 1 * 23, 128, 24, u8g2_font_bitcasual_tf, /*"\u00b0" actual degree symbol */"deg", "F", u8g2_font_osb18_tf, 1);
-    Co2Box = new Box(peripherals::Display::u8g2, 0, 2 * 23, 128, 24, u8g2_font_bitcasual_tf, "ppm", "CO2", u8g2_font_osb18_tf, 0);
-    RhBox = new Box(peripherals::Display::u8g2, 0, 3 * 23, 128, 24, u8g2_font_bitcasual_tf, "%", "rh", u8g2_font_osb18_tf, 1);
+    PressureBox = new Box(peripherals::Display::u8g2, 32, 0 * 23, 128-32, 24, u8g2_font_bitcasual_tf, "hPa", "", u8g2_font_osb18_tf, 0);
+    TempBox = new Box(peripherals::Display::u8g2, 32, 1 * 23, 128-32, 24, u8g2_font_bitcasual_tf, /*"\u00b0" actual degree symbol */"deg", "F", u8g2_font_osb18_tf, 1);
+    Co2Box = new Box(peripherals::Display::u8g2, 32, 2 * 23, 128-32, 24, u8g2_font_bitcasual_tf, "ppm", "CO2", u8g2_font_osb18_tf, 0);
+    RhBox = new Box(peripherals::Display::u8g2, 32, 3 * 23, 128-32, 24, u8g2_font_bitcasual_tf, "%", "rh", u8g2_font_osb18_tf, 1);
     TvocBox = new Box(peripherals::Display::u8g2, 64, 4 * 23 + 11, 64, 12, u8g2_font_nerhoe_tf, "ppb tVOC", "", u8g2_font_nerhoe_tf, 1);
     Eco2Box = new Box(peripherals::Display::u8g2, 64, 4 * 23, 64, 12, u8g2_font_nerhoe_tf, "ppm eCO2", "", u8g2_font_nerhoe_tf, 1);
 
