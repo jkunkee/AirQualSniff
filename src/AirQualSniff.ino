@@ -1087,6 +1087,7 @@ void init() {
         Particle.function("ManualSerial", ManualSerial);
         Particle.function("Report", Report);
         Particle.connect();
+        Particle.publishVitals(30min);
     } else {
         WiFi.off();
     }
