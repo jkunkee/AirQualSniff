@@ -1037,7 +1037,7 @@ bool RenderCloud(Eventing::PointerList<Eventing::EventTrigger>& triggers, Eventi
             writer.name("co2_ppm").value(data_buf);
         writer.endObject();
     writer.endObject();
-    Particle.publish("AirQualSniff/data/10min", buf);
+    Particle.publish("data/10min", buf);
     free(buf);
     return false;
 }
@@ -1056,7 +1056,7 @@ int Report(String s) {
         writer.endObject();
         writer.name("uptime").value(millis());
     writer.endObject();
-    Particle.publish("Report", buf);
+    Particle.publish("status", buf);
     free(buf);
 
     {
