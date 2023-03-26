@@ -68,7 +68,11 @@ namespace infrastructure {
         Serial.printlnf("ApplicationWatchdog triggered!");
         Serial.printlnf("######### FreeRAM: %lu Uptime: %ld", System.freeMemory(), millis());
         Serial.flush();
-        System.reset(RESET_NO_WAIT);
+        if (Particle.connected()) {
+            System.reset(RESET_REASON_WATCHDOG/*, not RESET_NO_WAIT*/);
+        } else {
+            System.reset(RESET_REASON_WATCHDOG, RESET_NO_WAIT);
+        }
     }
 
     static void init();
