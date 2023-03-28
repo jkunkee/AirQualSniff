@@ -398,6 +398,11 @@ namespace NvStorage {
 void init() {
     Serial.begin(115200);
 
+    // Enable reset reason storage
+    if (!System.featureEnabled(FEATURE_RESET_INFO)) {
+        System.enableFeature(FEATURE_RESET_INFO);
+    }
+
     NvStorage::begin();
 
     Wire.setSpeed(I2C_SAFE_SPEED);
@@ -1094,6 +1099,35 @@ void init() {
         Particle.function("Report", Report);
         Particle.connect();
         Particle.publishVitals(30min);
+        // Handle/report various reset reasons as soon as network comes up
+        switch (System.resetReason()) {
+            case RESET_REASON_PANIC:
+                // No point in blinking red when I can't see it
+                Particle.publish("reset", "panic");
+                System.enterSafeMode();
+                break;
+            case RESET_REASON_POWER_BROWNOUT:
+                Particle.publish("reset", "brownout");
+                break;
+            case RESET_REASON_WATCHDOG:
+                Particle.publish("reset", "hw watchdog");
+                break;
+            case RESET_REASON_USER:
+                switch (System.resetReasonData()) {
+                    case RESET_REASON_WATCHDOG:
+                        Particle.publish("reset by user", "sw watchdog");
+                        break;
+                    default:
+                        Particle.publish("reset by user", String(System.resetReason()));
+                        break;
+                }
+                break;
+            case RESET_REASON_NONE:
+                break;
+            default:
+                Particle.publish("reset", String(System.resetReason()));
+                break;
+        }
     } else {
         WiFi.off();
     }
