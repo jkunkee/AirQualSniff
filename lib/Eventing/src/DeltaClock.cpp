@@ -94,6 +94,15 @@ cleanup:
     return;
 }
 
+void DeltaClock::ToString(String& outString) {
+    outString += String::format("DelClk=%p,head=%p,lasUpd=%ld\n", this, head, lastUpdate);
+    for (DeltaClockEntry* entry = head; entry != nullptr; entry = entry->next) {
+        outString += "+";
+        outString += String::format("%p,ivl=%d,rem=%d,rep=%d", entry, entry->interval, entry->remaining, entry->repeating);
+        outString += "\n";
+    }
+}
+
 #ifdef DC_TEST
 void printEntry(DeltaClockEntry* entry) {
     Serial.printf("this: %p ", entry);
