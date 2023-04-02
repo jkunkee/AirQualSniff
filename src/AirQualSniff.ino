@@ -63,16 +63,20 @@ namespace infrastructure {
     static Eventing::EventHub event_hub;
 
     static ApplicationWatchdog *wd = NULL;
+    static int wd_count = 0;
 
     void watchdogHandler(void) {
         Serial.printlnf("ApplicationWatchdog triggered!");
         Serial.printlnf("######### FreeRAM: %lu Uptime: %ld", System.freeMemory(), millis());
         Serial.flush();
+        if (wd_count > 3) {
         if (Particle.connected()) {
             System.reset(RESET_REASON_WATCHDOG/*, not RESET_NO_WAIT*/);
         } else {
             System.reset(RESET_REASON_WATCHDOG, RESET_NO_WAIT);
         }
+    }
+        wd_count++;
     }
 
     static void init();
