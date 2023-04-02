@@ -39,6 +39,7 @@ public:
     void clear() {
         head = NULL;
     }
+    void ToString(String& outString);
 private:
     DeltaClockEntry* head;
     unsigned long lastUpdate;

@@ -347,6 +347,31 @@ public:
     }
   }
 #endif
+  void ToString(String& outString) {
+    // Make a string snapshot of the hub state
+    outString += "EventHub\n";
+    outString += "Handlers:\n";
+    for (int handlerIdx = 0; handlerIdx < handlers.count; handlerIdx++) {
+      EventHandler* handler = handlers.list[handlerIdx];
+      outString += handlerIdx;
+      outString += ":";
+      outString += handler->event_id;
+      outString += "\n";
+      for (int triggerIdx = 0; triggerIdx < handler->triggers.count; triggerIdx++) {
+        outString += handlerIdx;
+        outString += ":";
+        outString += triggerIdx;
+        outString += ">";
+        EventTrigger* trigger = handler->triggers.list[triggerIdx];
+        outString += trigger->event_id;
+        outString += ",rdy=";
+        outString += trigger->data_ready;
+        outString += "\n";
+      }
+    }
+    outString += "DeltaClock:\n";
+    clock.ToString(outString);
+  }
 };
 
 } // namespace Eventing
