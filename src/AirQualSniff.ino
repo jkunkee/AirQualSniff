@@ -78,8 +78,6 @@ namespace infrastructure {
             } else {
                 System.reset(RESET_REASON_WATCHDOG, RESET_NO_WAIT);
             }
-        } else {
-            UX::Report(String(""));
         }
         wd_count++;
     }
