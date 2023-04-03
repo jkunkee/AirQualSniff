@@ -68,6 +68,9 @@ namespace infrastructure {
     void watchdogHandler(void) {
         Serial.printlnf("ApplicationWatchdog triggered!");
         Serial.printlnf("######### FreeRAM: %lu Uptime: %ld", System.freeMemory(), millis());
+        String hubSummary;
+        event_hub.ToString(hubSummary);
+        Serial.print(hubSummary);
         Serial.flush();
         if (wd_count > 3) {
         if (Particle.connected()) {
