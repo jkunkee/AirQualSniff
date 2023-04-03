@@ -75,6 +75,8 @@ namespace infrastructure {
         } else {
             System.reset(RESET_REASON_WATCHDOG, RESET_NO_WAIT);
         }
+        } else {
+            UX::Report(String(""));
     }
         wd_count++;
     }
@@ -1059,6 +1061,7 @@ int Report(String s) {
     char *buf;
     constexpr size_t bufLen = 622; // limit on Particle Photon running OS 2.3.0
     buf = (char*)malloc(bufLen);
+
     memset(buf, 0, bufLen);
     JSONBufferWriter writer(buf, bufLen-1); // always null-terminated
     writer.beginObject();
@@ -1068,8 +1071,16 @@ int Report(String s) {
             writer.name("co2Base").value(peripherals::NvStorage::NvSettings.vocBaselineCo2);
         writer.endObject();
         writer.name("uptime").value(millis());
+        writer.name("watchdogTimeouts").value(infrastructure::wd_count);
     writer.endObject();
     Particle.publish("status", buf);
+
+    memset(buf, 0, bufLen);
+    String eventState;
+    infrastructure::event_hub.ToString(eventState);
+    memcpy(buf, eventState.c_str(), min(bufLen-1, eventState.length()));
+    Particle.publish("HubState", buf);
+
     free(buf);
 
     {
