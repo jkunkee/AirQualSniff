@@ -73,14 +73,14 @@ namespace infrastructure {
         Serial.print(hubSummary);
         Serial.flush();
         if (wd_count > 3) {
-        if (Particle.connected()) {
-            System.reset(RESET_REASON_WATCHDOG/*, not RESET_NO_WAIT*/);
-        } else {
-            System.reset(RESET_REASON_WATCHDOG, RESET_NO_WAIT);
-        }
+            if (Particle.connected()) {
+                System.reset(RESET_REASON_WATCHDOG/*, not RESET_NO_WAIT*/);
+            } else {
+                System.reset(RESET_REASON_WATCHDOG, RESET_NO_WAIT);
+            }
         } else {
             UX::Report(String(""));
-    }
+        }
         wd_count++;
     }
 
