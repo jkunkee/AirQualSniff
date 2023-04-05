@@ -1166,8 +1166,8 @@ void init() {
     infrastructure::event_hub.AddHandlerTrigger("GatherDataFired", "Absolute Humidity 8.8 g/m^3");
     infrastructure::event_hub.AddHandlerTrigger("GatherDataFired", "SGP30 tVOC ppb");
     infrastructure::event_hub.AddHandlerTrigger("GatherDataFired", "SGP30 eCO2 ppm");
-    infrastructure::event_hub.AddHandler("RenderSerialEvent", UX::RenderSerial, Eventing::TRIGGER_ON_ANY);
-    infrastructure::event_hub.AddHandlerTrigger("RenderSerialEvent", "GatherDataFired");
+    //infrastructure::event_hub.AddHandler("RenderSerialEvent", UX::RenderSerial, Eventing::TRIGGER_ON_ANY);
+    //infrastructure::event_hub.AddHandlerTrigger("RenderSerialEvent", "GatherDataFired");
     infrastructure::event_hub.AddHandler("RenderOledEvent", UX::RenderOled, Eventing::TRIGGER_ON_ANY);
     infrastructure::event_hub.AddHandlerTrigger("RenderOledEvent", "GatherDataFired");
     infrastructure::event_hub.AddHandlerTrigger("RenderOledEvent", "Joystick Direction Change");
