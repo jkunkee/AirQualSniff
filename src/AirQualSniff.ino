@@ -853,7 +853,7 @@ bool RenderSerial(Eventing::PointerList<Eventing::EventTrigger>& triggers, Event
     static system_tick_t lastFire = 0;
     system_tick_t currentFire = millis();
     // Fire at most every 5000ms
-    if (currentFire - lastFire < 5000) {
+    if (currentFire - lastFire < 10*60*1000) {
         return false;
     }
     lastFire = currentFire;
@@ -940,6 +940,8 @@ bool RenderOled(Eventing::PointerList<Eventing::EventTrigger>& triggers, Eventin
                     mode = DEBUG_RETICLE;
                     break;
                 }
+            } else if (trigger->event_id.equalsIgnoreCase(String("GatherDataFired"))) {
+                // TODO: only update screen when there's a change?
             } else {
                 Serial.printlnf("Unhandled event \"%s\" %0.2f/%u/%d/%x", trigger->event_id.c_str(), trigger->data.fl, trigger->data.uin16, trigger->data.in16, trigger->data.uin16);
             }
@@ -1194,7 +1196,7 @@ void loop() {
     infrastructure::event_hub.update();
     peripherals::Joystick::EmitChangeEvent();
     system_tick_t end = millis();
-    if (end - start > 100) {
+    if (end - start > 1000) {
         Serial.printlnf("###### Loop End; duration %lu", millis() - start);
     }
 }
