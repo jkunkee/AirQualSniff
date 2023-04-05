@@ -1075,6 +1075,10 @@ int Report(String s) {
         writer.endObject();
         writer.name("uptime").value(millis());
         writer.name("watchdogTimeouts").value(infrastructure::wd_count);
+        writer.name("resetData").beginObject();
+            writer.name("reason").value(System.resetReason());
+            writer.name("data").value(System.resetReasonData());
+        writer.endObject();
     writer.endObject();
     Particle.publish("status", buf);
 
