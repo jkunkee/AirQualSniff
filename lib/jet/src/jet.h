@@ -8,7 +8,7 @@
 
 #ifdef JET_TEST
 #ifdef PARTICLE_WIRING_ARDUINO_COMPATIBILTY
-#define jet_dbgprint(a, ...) Serial.printlnf(__VA_ARGS__)
+#define jet_dbgprint(...) Serial.printlnf(__VA_ARGS__)
 #elif defined(ARDUINO)
 // https://github.com/arduino-libraries/Arduino_DebugUtils/blob/master/src/Arduino_DebugUtils.h
 #include <Arduino_DebugUtils.h>
@@ -43,12 +43,13 @@ public:
     m_count(0),
     m_list_is_internally_managed(true)
   {
-    m_list = malloc(sizeof(T*)*initial_capacity);
+    m_list = (T**)malloc(sizeof(T*)*initial_capacity);
     m_capacity = initial_capacity;
     if (m_list == nullptr) {
       m_capacity = 0;
     }
   }
+  PointerList() : PointerList(5) {}
   ~PointerList()
   {
     if (m_list_is_internally_managed) {
@@ -107,7 +108,7 @@ public:
     m_list[idx] = item;
   }
   T* get(int idx) {
-    if (idx < 0 || m_count <= idx) {
+    if (idx < 0 || (signed)m_count <= idx) {
       return nullptr;
     }
     return m_list[idx];
