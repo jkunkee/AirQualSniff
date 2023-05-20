@@ -6,8 +6,6 @@
 // License: BSD 3-clause
 //
 
-#define JET_TEST
-
 #ifdef JET_TEST
 #ifdef PARTICLE_WIRING_ARDUINO_COMPATIBILTY
 #define dbgprint(a, ...) Serial.printlnf(__VA_ARGS__)

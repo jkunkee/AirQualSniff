@@ -1,4 +1,6 @@
 
+#define JET_TEST
+
 #include "jet.h"
 
 bool tests_have_run = false;
