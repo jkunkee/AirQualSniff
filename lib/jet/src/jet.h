@@ -8,15 +8,15 @@
 
 #ifdef JET_TEST
 #ifdef PARTICLE_WIRING_ARDUINO_COMPATIBILTY
-#define dbgprint(a, ...) Serial.printlnf(__VA_ARGS__)
+#define jet_dbgprint(a, ...) Serial.printlnf(__VA_ARGS__)
 #elif defined(ARDUINO)
 // https://github.com/arduino-libraries/Arduino_DebugUtils/blob/master/src/Arduino_DebugUtils.h
 #include <Arduino_DebugUtils.h>
 Arduino_DebugUtils eventhub_arduino_dbg;
-#define dbgprint(...) eventhub_arduino_dbg.print(0, __VA_ARGS__)
+#define jet_dbgprint(...) eventhub_arduino_dbg.print(0, __VA_ARGS__)
 #endif
 #else // JET_TEST
-#define dbgprint(...)
+#define jet_dbgprint(...)
 #endif // JET_TEST
 
 namespace jet {
@@ -57,9 +57,9 @@ public:
   }
   bool insert(int idx, T* item)
   {
-    dbgprint("insert idx:%d item:%p", idx, item);
+    jet_dbgprint("insert idx:%d item:%p", idx, item);
     if (item == nullptr) {
-      dbgprint("insert null check failed");
+      jet_dbgprint("insert null check failed");
       return false;
     }
     // Insertion can land at the end (-1) or at any existing index
@@ -67,17 +67,17 @@ public:
       idx = m_count;
     }
     if (idx < 0 || (signed)m_count < idx) {
-      dbgprint("insert range check failed");
+      jet_dbgprint("insert range check failed");
       return false;
     }
     // Is there room?
     if (m_count + 1 > m_capacity) {
       if (m_list_is_internally_managed) {
-      dbgprint("insert increase needed");
+      jet_dbgprint("insert increase needed");
         // Allocate a bigger buffer.
         set_capacity(m_capacity + 2);
       } else {
-        dbgprint("insert size check failed");
+        jet_dbgprint("insert size check failed");
         // We don't own the buffer, so fail and let the caller deal with it.
         return false;
       }
@@ -94,7 +94,7 @@ public:
     return true;
   }
   bool append(T* item) {
-    dbgprint("append %p", item);
+    jet_dbgprint("append %p", item);
     return insert(-1, item);
   }
   bool replace(int idx, T* item) {
@@ -114,16 +114,16 @@ public:
   }
   bool remove(int idx) {
     if (idx < -1 || (signed)m_count <= idx) {
-      dbgprint("remove failed range check %d", idx);
+      jet_dbgprint("remove failed range check %d", idx);
       return false;
     }
-    dbgprint("remove %d", idx);
+    jet_dbgprint("remove %d", idx);
     if (idx == -1) {
       idx = m_count-1;
     }
     for (int src_idx = idx + 1; src_idx < m_count; src_idx++) {
       int dst_idx = src_idx - 1;
-      dbgprint("remove collapse %d<-%d", dst_idx, src_idx);
+      jet_dbgprint("remove collapse %d<-%d", dst_idx, src_idx);
       m_list[dst_idx] = m_list[src_idx];
     }
     m_count -= 1;
@@ -271,9 +271,9 @@ static bool PointerListTest() {
   delete(list);
 
   if (success) {
-    dbgprint("Success!");
+    jet_dbgprint("Success!");
   } else {
-    dbgprint("Failure...");
+    jet_dbgprint("Failure...");
   }
 
   return success;
