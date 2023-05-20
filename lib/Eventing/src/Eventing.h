@@ -60,50 +60,13 @@ static Arduino_DebugUtils eventhub_arduino_dbg;
 //typedef unsigned long time_t;
 #endif
 
+#include "jet.h"
+
 #ifdef EVENTHUB_TEMPORAL
 #include "DeltaClock.h"
 #endif
 
 namespace Eventing {
-
-template <class T> class PointerList {
-public:
-  PointerList() {
-    list = new T*[5];
-    count = 0;
-    capacity = 5;
-  }
-  T** list;
-  size_t count;
-  size_t capacity;
-  bool Add(T* item) {
-    if (count > capacity) {
-        // something has gone horribly wrong
-#ifdef EVENTHUB_PTRLIST_DEBUG
-        dbg.print(DBG_ERROR, "PointList add encountered bad count/capacity values");
-#endif
-        return false;
-    }
-    if (count >= capacity) {
-      T** new_list = new T*[capacity+2];
-      memcpy(new_list, list, capacity*sizeof(T*));
-      delete(list);
-      list = new_list;
-      capacity = capacity+2;
-    }
-    list[count] = item;
-    count++;
-    return true; // maybe one day check for OOM and duplicates
-  }
-#ifdef EVENTHUB_PTRLIST_DEBUG
-  void print() {
-    dbg.print(DBG_INFO, "PointerList %p, %d entries:", this, count);
-    for (int idx = 0; idx < count; idx++) {
-      dbg.print(DBG_INFO, "  Item: %p", list[idx]);
-    }
-  }
-#endif
-};
 
 typedef union _EventData {
   float fl;
@@ -150,7 +113,7 @@ public:
 // rely on the parent EventHandler's ID string and filling out an output object
 // to allow it to do so.
 // Return true if data was generated.
-typedef bool (*EventHandlerFunc)(PointerList<EventTrigger>& triggers, EventData& out);
+typedef bool (*EventHandlerFunc)(jet::PointerList<EventTrigger>& triggers, EventData& out);
 
 class EventHandler {
 private:
@@ -166,12 +129,12 @@ public:
   String event_id;
   EventHandlerFunc action;
   EventTriggerType type;
-  PointerList<EventTrigger> triggers;
+  jet::PointerList<EventTrigger> triggers;
   time_t interval;
 
   EventTrigger* FindTrigger(String id) {
-    for (size_t triggerIdx = 0; triggerIdx < triggers.count; triggerIdx++) {
-      EventTrigger* trigger = triggers.list[triggerIdx];
+    for (size_t triggerIdx = 0; triggerIdx < triggers.size(); triggerIdx++) {
+      EventTrigger* trigger = triggers.get(triggerIdx);
       if (trigger->event_id.equalsIgnoreCase(id)) {
         return trigger;
       }
@@ -182,14 +145,14 @@ public:
   bool AddTrigger(String id) {
     EventTrigger* trigger = FindTrigger(id);
     if (trigger == NULL) {
-      return triggers.Add(new EventTrigger(id));
+      return triggers.append(new EventTrigger(id));
     } else {
       return true;
     }
   }
   void ResetTriggers() {
-    for (size_t triggerIdx = 0; triggerIdx < triggers.count; triggerIdx++) {
-      triggers.list[triggerIdx]->Reset();
+    for (size_t triggerIdx = 0; triggerIdx < triggers.size(); triggerIdx++) {
+      triggers.get(triggerIdx)->Reset();
     }
   }
   bool TriggerConditionMet() {
@@ -204,8 +167,8 @@ public:
       return true;
     case TRIGGER_ON_ALL: {
         bool AllTriggered = true;
-        for (size_t triggerIdx = 0; triggerIdx < triggers.count && AllTriggered; triggerIdx++) {
-          AllTriggered = AllTriggered && triggers.list[triggerIdx]->data_ready;
+        for (size_t triggerIdx = 0; triggerIdx < triggers.size() && AllTriggered; triggerIdx++) {
+          AllTriggered = AllTriggered && triggers.get(triggerIdx)->data_ready;
         }
         return AllTriggered;
       }
@@ -247,11 +210,11 @@ private:
 #ifdef EVENTHUB_TEMPORAL
   DeltaClock clock;
 #endif
-  PointerList<EventHandler> handlers;
+  jet::PointerList<EventHandler> handlers;
 
   EventHandler* FindHandler(String id) {
-    for (size_t handlerIdx = 0; handlerIdx < handlers.count; handlerIdx++) {
-      EventHandler* handler = handlers.list[handlerIdx];
+    for (size_t handlerIdx = 0; handlerIdx < handlers.size(); handlerIdx++) {
+      EventHandler* handler = handlers.get(handlerIdx);
       if (handler->event_id.equalsIgnoreCase(id)) {
         return handler;
       }
@@ -292,7 +255,7 @@ public:
     bool addStatus;
     if (eventHandler == nullptr) {
       eventHandler = new EventHandler(id, func, type, interval);
-      addStatus = handlers.Add(eventHandler);
+      addStatus = handlers.append(eventHandler);
 #ifdef EVENTHUB_TEMPORAL
       // could just be at the end, but I don't remember how DeltaClock handles
       // double-add
@@ -327,8 +290,8 @@ public:
   }
   bool Deliver(String id, EventData data) {
     dbgprint(DBG_INFO, "EventHub delivering %s %p at %lu", id.c_str(), data.ptr, millis());
-    for (size_t handlerIdx = 0; handlerIdx < handlers.count; handlerIdx++) {
-      EventHandler* eventHandler = handlers.list[handlerIdx];
+    for (size_t handlerIdx = 0; handlerIdx < handlers.size(); handlerIdx++) {
+      EventHandler* eventHandler = handlers.get(handlerIdx);
       EventData outData;
       bool eventFired = eventHandler->Deliver(id, data, outData);
       if (eventFired) {
@@ -351,18 +314,18 @@ public:
     // Make a string snapshot of the hub state
     outString += "EventHub\n";
     outString += "Handlers:\n";
-    for (int handlerIdx = 0; handlerIdx < handlers.count; handlerIdx++) {
-      EventHandler* handler = handlers.list[handlerIdx];
+    for (int handlerIdx = 0; handlerIdx < (signed)handlers.size(); handlerIdx++) {
+      EventHandler* handler = handlers.get(handlerIdx);
       outString += handlerIdx;
       outString += ":";
       outString += handler->event_id;
       outString += "\n";
-      for (int triggerIdx = 0; triggerIdx < handler->triggers.count; triggerIdx++) {
+      for (int triggerIdx = 0; triggerIdx < (signed)handler->triggers.size(); triggerIdx++) {
         outString += handlerIdx;
         outString += ":";
         outString += triggerIdx;
         outString += ">";
-        EventTrigger* trigger = handler->triggers.list[triggerIdx];
+        EventTrigger* trigger = handler->triggers.get(triggerIdx);
         outString += trigger->event_id;
         outString += ",rdy=";
         outString += trigger->data_ready;
