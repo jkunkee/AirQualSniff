@@ -166,7 +166,7 @@ public:
     if (m_count > new_capacity) {
       return false;
     }
-    T** new_buf = malloc(sizeof(T*) * new_capacity);
+    T** new_buf = (T**)malloc(sizeof(T*) * new_capacity);
     memcpy(new_buf, m_list, m_count * sizeof(T*));
     free(m_list);
     m_list = new_buf;
