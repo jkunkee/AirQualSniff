@@ -68,30 +68,30 @@ static Arduino_DebugUtils eventhub_arduino_dbg;
 
 namespace Eventing {
 
-typedef union _EventData {
+typedef union _Datum {
   float fl;
   int16_t in16;
   uint16_t uin16;
   void* ptr;
-} EventData;
+} Datum;
 
-typedef enum _EventTriggerType {
+typedef enum _TriggerType {
     TRIGGER_MANUAL,
     TRIGGER_ON_ANY,
     TRIGGER_ON_ALL,
 #ifdef EVENTHUB_TEMPORAL
     TRIGGER_TEMPORAL,
 #endif
-} EventTriggerType;
+} TriggerType;
 
-class EventTrigger {
+class Trigger {
   // James: maybe allow for decimation here with 'wait until N fires'
 public:
-  EventTrigger(String id) : event_id(id), data({0}), data_ready(false) {}
+  Trigger(String id) : event_id(id), data({0}), data_ready(false) {}
   String event_id;
-  EventData data;
+  Datum data;
   bool data_ready;
-  void Deliver(EventData dataIn) {
+  void Deliver(Datum dataIn) {
     dbgprint(DBG_INFO, "    EventTrigger %s got %p", event_id.c_str(), data.ptr);
     data = dataIn;
     data_ready = true;
@@ -109,18 +109,18 @@ public:
 #endif
 };
 
-typedef jet::PointerList<EventTrigger> EventTriggerList;
+typedef jet::PointerList<Trigger> TriggerList;
 
 // The called function has no way to know how to generate an event, so
 // rely on the parent EventHandler's ID string and filling out an output object
 // to allow it to do so.
 // Return true if data was generated.
-typedef bool (*EventHandlerFunc)(EventTriggerList& triggers, EventData& out);
+typedef bool (*HandlerFunc)(TriggerList& triggers, Datum& out);
 
-class EventHandler {
+class Handler {
 private:
 public:
-  EventHandler(String id, EventHandlerFunc func, EventTriggerType typeIn, time_t intervalIn = 0)
+  Handler(String id, HandlerFunc func, TriggerType typeIn, time_t intervalIn = 0)
   : event_id(id)
   {
     action = func;
@@ -129,14 +129,14 @@ public:
   }
 
   String event_id;
-  EventHandlerFunc action;
-  EventTriggerType type;
-  EventTriggerList triggers;
+  HandlerFunc action;
+  TriggerType type;
+  TriggerList triggers;
   time_t interval;
 
-  EventTrigger* FindTrigger(String id) {
+  Trigger* FindTrigger(String id) {
     for (size_t triggerIdx = 0; triggerIdx < triggers.size(); triggerIdx++) {
-      EventTrigger* trigger = triggers.get(triggerIdx);
+      Trigger* trigger = triggers.get(triggerIdx);
       if (trigger->event_id.equalsIgnoreCase(id)) {
         return trigger;
       }
@@ -145,9 +145,9 @@ public:
   }
   // TODO: sweep to pass by reference instead of value
   bool AddTrigger(String id) {
-    EventTrigger* trigger = FindTrigger(id);
+    Trigger* trigger = FindTrigger(id);
     if (trigger == NULL) {
-      return triggers.append(new EventTrigger(id));
+      return triggers.append(new Trigger(id));
     } else {
       return true;
     }
@@ -178,8 +178,8 @@ public:
     return false;
   }
   // return true if this EventHandler fired and generated data
-  bool Deliver(String id, EventData data, EventData& outData) {
-    EventTrigger* trigger = FindTrigger(id);
+  bool Deliver(String id, Datum data, Datum& outData) {
+    Trigger* trigger = FindTrigger(id);
     if (trigger == nullptr) {
       dbgprint(DBG_INFO, "  EventHandler %s did not find entry for trigger %s", event_id.c_str(), id.c_str());
       return false;
@@ -207,16 +207,16 @@ public:
 #endif
 };
 
-class EventHub {
+class Hub {
 private:
 #ifdef EVENTHUB_TEMPORAL
   DeltaClock clock;
 #endif
-  jet::PointerList<EventHandler> handlers;
+  jet::PointerList<Handler> handlers;
 
-  EventHandler* FindHandler(String id) {
+  Handler* FindHandler(String id) {
     for (size_t handlerIdx = 0; handlerIdx < handlers.size(); handlerIdx++) {
-      EventHandler* handler = handlers.get(handlerIdx);
+      Handler* handler = handlers.get(handlerIdx);
       if (handler->event_id.equalsIgnoreCase(id)) {
         return handler;
       }
@@ -227,8 +227,8 @@ private:
   class TemporalContext {
   public:
     TemporalContext() {}
-    EventHandler* handler;
-    EventHub* hub;
+    Handler* handler;
+    Hub* hub;
   };
 
 public:
@@ -245,18 +245,18 @@ public:
   static void TemporalAction(void* contextIn) {
     dbgprint(DBG_INFO, "Firing Temporal Handler");
     TemporalContext* context = (TemporalContext*)contextIn;
-    EventData data;
+    Datum data;
     bool produced = context->handler->action(context->handler->triggers, data);
     if (produced != false) {
       context->hub->Deliver(context->handler->event_id, data);
     }
   }
 #endif
-  bool AddHandler(String id, EventHandlerFunc func, EventTriggerType type, time_t interval = 0) {
-    EventHandler* eventHandler = FindHandler(id);
+  bool AddHandler(String id, HandlerFunc func, TriggerType type, time_t interval = 0) {
+    Handler* eventHandler = FindHandler(id);
     bool addStatus;
     if (eventHandler == nullptr) {
-      eventHandler = new EventHandler(id, func, type, interval);
+      eventHandler = new Handler(id, func, type, interval);
       addStatus = handlers.append(eventHandler);
 #ifdef EVENTHUB_TEMPORAL
       // could just be at the end, but I don't remember how DeltaClock handles
@@ -283,18 +283,18 @@ public:
     return addStatus;
   }
   bool AddHandlerTrigger(String handlerId, String triggerId) {
-    EventHandler* eventHandler = FindHandler(handlerId);
+    Handler* eventHandler = FindHandler(handlerId);
     if (eventHandler != nullptr) {
       return eventHandler->AddTrigger(triggerId);
     } else {
       return false;
     }
   }
-  bool Deliver(String id, EventData data) {
+  bool Deliver(String id, Datum data) {
     dbgprint(DBG_INFO, "EventHub delivering %s %p at %lu", id.c_str(), data.ptr, millis());
     for (size_t handlerIdx = 0; handlerIdx < handlers.size(); handlerIdx++) {
-      EventHandler* eventHandler = handlers.get(handlerIdx);
-      EventData outData;
+      Handler* eventHandler = handlers.get(handlerIdx);
+      Datum outData;
       bool eventFired = eventHandler->Deliver(id, data, outData);
       if (eventFired) {
         dbgprint(DBG_INFO, " Handler %s generated data: %p", eventHandler->event_id.c_str(), outData.ptr);
@@ -317,7 +317,7 @@ public:
     outString += "EventHub\n";
     outString += "Handlers:\n";
     for (int handlerIdx = 0; handlerIdx < (signed)handlers.size(); handlerIdx++) {
-      EventHandler* handler = handlers.get(handlerIdx);
+      Handler* handler = handlers.get(handlerIdx);
       outString += handlerIdx;
       outString += ":";
       outString += handler->event_id;
@@ -327,7 +327,7 @@ public:
         outString += ":";
         outString += triggerIdx;
         outString += ">";
-        EventTrigger* trigger = handler->triggers.get(triggerIdx);
+        Trigger* trigger = handler->triggers.get(triggerIdx);
         outString += trigger->event_id;
         outString += ",rdy=";
         outString += trigger->data_ready;
