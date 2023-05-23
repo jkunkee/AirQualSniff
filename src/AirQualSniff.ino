@@ -61,7 +61,7 @@ static constexpr int LED = D7;
 
 namespace infrastructure {
 
-    static Eventing::EventHub event_hub;
+    static Eventing::Hub event_hub;
 
     static ApplicationWatchdog *wd = NULL;
     static int wd_count = 0;
@@ -89,7 +89,7 @@ namespace infrastructure {
         wd = new ApplicationWatchdog(30000U, &watchdogHandler, 1536);
     }
 
-    bool DumpOsState(Eventing::EventTriggerList& triggers, Eventing::EventData& out) {
+    bool DumpOsState(Eventing::TriggerList& triggers, Eventing::Datum& out) {
         Serial.printlnf("######### FreeRAM: %lu Uptime: %ld", System.freeMemory(), millis());
         return false;
     }
@@ -256,7 +256,7 @@ namespace Display {
     }
 
     bool BufferIsDirty = false;
-    bool Paint(Eventing::EventTriggerList& triggers, Eventing::EventData& out) {
+    bool Paint(Eventing::TriggerList& triggers, Eventing::Datum& out) {
         if (BufferIsDirty != false) {
             //unsigned long drawStart = millis();
             u8g2_ssd1327_unlock();
@@ -356,7 +356,7 @@ namespace Joystick {
 
         //Serial.printlnf("Joy dir change check; joyDir1=%d joyDir2=%d old=%d", joyDir1, joyDir2, joyDirOld);
         if (joyDir1 == joyDir2 && joyDir1 != joyDirOld) {
-            Eventing::EventData joystickData;
+            Eventing::Datum joystickData;
             joystickData.uin16 = joyDir1;
             joyDirOld = joyDir1;
 
@@ -467,13 +467,13 @@ static bool LPS25HB_data_is_ready() {
             (status & STATUS_REG_P_DA);
 }
 
-static bool ReadLPS25HB(Eventing::EventTriggerList& triggers, Eventing::EventData& out);
-static bool ReadLPS25HB(Eventing::EventTriggerList& triggers, Eventing::EventData& out) {
+static bool ReadLPS25HB(Eventing::TriggerList& triggers, Eventing::Datum& out);
+static bool ReadLPS25HB(Eventing::TriggerList& triggers, Eventing::Datum& out) {
     if (lps25hb_pressure_sensor_present != false && LPS25HB_data_is_ready()) {
-        Eventing::EventData tempC;
-        Eventing::EventData tempF;
-        Eventing::EventData pressurehPa;
-        Eventing::EventData altitudem;
+        Eventing::Datum tempC;
+        Eventing::Datum tempF;
+        Eventing::Datum pressurehPa;
+        Eventing::Datum altitudem;
 
         tempC.fl = pressureSensor.getTemperature_degC() + pressureSensorTempFOffset * 5 / 9;
         tempF.fl = C_TO_F(tempC.fl);
@@ -511,12 +511,12 @@ static constexpr uint16_t co2SensorInterval = 10;
 // 70 deg F in actively cooled airstream was -1 deg F
 static constexpr float co2SensorTempFOffset = 80.1 - 79.0;
 
-static bool ReadSCD30(Eventing::EventTriggerList& triggers, Eventing::EventData& out);
-static bool ReadSCD30(Eventing::EventTriggerList& triggers, Eventing::EventData& out) {
+static bool ReadSCD30(Eventing::TriggerList& triggers, Eventing::Datum& out);
+static bool ReadSCD30(Eventing::TriggerList& triggers, Eventing::Datum& out) {
     if (co2SensorPresent && co2Sensor.dataAvailable()) {
-        Eventing::EventData rh;
-        Eventing::EventData tempC;
-        Eventing::EventData co2;
+        Eventing::Datum rh;
+        Eventing::Datum tempC;
+        Eventing::Datum co2;
 
         rh.fl = co2Sensor.getHumidity();
         tempC.fl = co2Sensor.getTemperature() + co2SensorTempFOffset * 5 / 9;
@@ -534,8 +534,8 @@ static AHT20 humiditySensor;
 static bool humiditySensorPresent = false;
 static constexpr float humiditySensorTempOffset = 0.0;
 
-static bool ReadAHT20(Eventing::EventTriggerList& triggers, Eventing::EventData& out);
-static bool ReadAHT20(Eventing::EventTriggerList& triggers, Eventing::EventData& out) {
+static bool ReadAHT20(Eventing::TriggerList& triggers, Eventing::Datum& out);
+static bool ReadAHT20(Eventing::TriggerList& triggers, Eventing::Datum& out) {
     if (humiditySensorPresent && humiditySensor.isCalibrated()) {
         humiditySensor.triggerMeasurement();
         out.fl = humiditySensor.getHumidity();
@@ -544,13 +544,13 @@ static bool ReadAHT20(Eventing::EventTriggerList& triggers, Eventing::EventData&
     return false;
 }
 
-static bool CalculateAbsoluteHumidity_8_8_g_m3(Eventing::EventTriggerList& triggers, Eventing::EventData& out);
-static bool CalculateAbsoluteHumidity_8_8_g_m3(Eventing::EventTriggerList& triggers, Eventing::EventData& out) {
+static bool CalculateAbsoluteHumidity_8_8_g_m3(Eventing::TriggerList& triggers, Eventing::Datum& out);
+static bool CalculateAbsoluteHumidity_8_8_g_m3(Eventing::TriggerList& triggers, Eventing::Datum& out) {
     float tempC = -NAN;
     float pressurehPa = -NAN;
     float rh = -NAN;
     for (size_t evt_idx = 0; evt_idx < triggers.size(); evt_idx++) {
-        Eventing::EventTrigger* trigger = triggers.get(evt_idx);
+        Eventing::Trigger* trigger = triggers.get(evt_idx);
         if (trigger->data_ready) {
             if (trigger->event_id.equalsIgnoreCase(String("LPS25HB Pressure hPa"))) {
                 pressurehPa = trigger->data.fl;
@@ -596,10 +596,10 @@ static SGP30 vocSensor;
 static bool vocSensorPresent = false;
 constexpr uint32_t vocReadInterval = 1000;
 
-static bool ReadSGP30(Eventing::EventTriggerList& triggers, Eventing::EventData& out);
-static bool ReadSGP30(Eventing::EventTriggerList& triggers, Eventing::EventData& out) {
+static bool ReadSGP30(Eventing::TriggerList& triggers, Eventing::Datum& out);
+static bool ReadSGP30(Eventing::TriggerList& triggers, Eventing::Datum& out) {
     if (vocSensorPresent) {
-        Eventing::EventData datum;
+        Eventing::Datum datum;
         vocSensor.measureAirQuality();
         if (vocSensor.CO2 == 400 && vocSensor.TVOC == 0) {
             // Sensor is still initializing (first 15s after init)
@@ -618,8 +618,8 @@ static bool ReadSGP30(Eventing::EventTriggerList& triggers, Eventing::EventData&
     return false;
 }
 
-static bool SaveSGP30Baselines(Eventing::EventTriggerList& triggers, Eventing::EventData& out);
-static bool SaveSGP30Baselines(Eventing::EventTriggerList& triggers, Eventing::EventData& out) {
+static bool SaveSGP30Baselines(Eventing::TriggerList& triggers, Eventing::Datum& out);
+static bool SaveSGP30Baselines(Eventing::TriggerList& triggers, Eventing::Datum& out) {
     if (vocSensorPresent) {
         vocSensor.getBaseline();
         peripherals::NvStorage::NvSettings.vocBaselineCo2 = vocSensor.baselineCO2;
@@ -629,8 +629,8 @@ static bool SaveSGP30Baselines(Eventing::EventTriggerList& triggers, Eventing::E
     return false;
 }
 
-static bool SetSGP30AbsoluteHumidity(Eventing::EventTriggerList& triggers, Eventing::EventData& out);
-static bool SetSGP30AbsoluteHumidity(Eventing::EventTriggerList& triggers, Eventing::EventData& out) {
+static bool SetSGP30AbsoluteHumidity(Eventing::TriggerList& triggers, Eventing::Datum& out);
+static bool SetSGP30AbsoluteHumidity(Eventing::TriggerList& triggers, Eventing::Datum& out) {
     if (vocSensorPresent && triggers.size() >= 1 && triggers.get(0)->data_ready) {
         vocSensor.setHumidity(triggers.get(0)->data.uin16);
     }
@@ -644,7 +644,7 @@ static uint8_t pmTickCounter = 0;
 static constexpr uint8_t pmMeasurementInterval = 60; // seconds
 
 static SPS30_DATA_FLOAT sps30_global_datum_struct;
-bool ReadSPS30(Eventing::EventTriggerList& triggers, Eventing::EventData& out) {
+bool ReadSPS30(Eventing::TriggerList& triggers, Eventing::Datum& out) {
     if (pmSensorPresent) {
         bool sendData = false;
         SPS30_ERR readyErr, retrieveErr;
@@ -788,11 +788,11 @@ uint16_t tvocInst = -1;
 uint16_t abshumInst = -1;
 //Decimator abshumDecimator(12, 60, 24); // every 5s
 
-bool GatherData(Eventing::EventTriggerList& triggers, Eventing::EventData& out) {
+bool GatherData(Eventing::TriggerList& triggers, Eventing::Datum& out) {
     static system_tick_t lastUpdate = 0;
     system_tick_t currentUpdate = millis();
     for (size_t evt_idx = 0; evt_idx < triggers.size(); evt_idx++) {
-        Eventing::EventTrigger* trigger = triggers.get(evt_idx);
+        Eventing::Trigger* trigger = triggers.get(evt_idx);
         if (trigger->data_ready) {
             if (trigger->event_id.equalsIgnoreCase(String("LPS25HB Pressure hPa"))) {
                 pressureInst = trigger->data.fl;
@@ -850,7 +850,7 @@ namespace UX {
 
 using namespace Data;
 
-bool RenderSerial(Eventing::EventTriggerList& triggers, Eventing::EventData& out) {
+bool RenderSerial(Eventing::TriggerList& triggers, Eventing::Datum& out) {
     static system_tick_t lastFire = 0;
     system_tick_t currentFire = millis();
     // Fire at most every 5000ms
@@ -917,10 +917,10 @@ Box *pmMassBox;
 Box *pmCountBox;
 Box *pmTypicalBox;
 
-bool RenderOled(Eventing::EventTriggerList& triggers, Eventing::EventData& out) {
+bool RenderOled(Eventing::TriggerList& triggers, Eventing::Datum& out) {
     static OledMode mode = HOME;
     for (size_t evt_idx = 0; evt_idx < triggers.size(); evt_idx++) {
-        Eventing::EventTrigger* trigger = triggers.get(evt_idx);
+        Eventing::Trigger* trigger = triggers.get(evt_idx);
         if (trigger->data_ready) {
             if (trigger->event_id.equalsIgnoreCase(String("Joystick Direction Change"))) {
                 peripherals::Joystick::JOYSTICK_DIRECTION joyDir = (peripherals::Joystick::JOYSTICK_DIRECTION)trigger->data.uin16;
@@ -1021,8 +1021,8 @@ bool RenderOled(Eventing::EventTriggerList& triggers, Eventing::EventData& out) 
 }
 
 int ManualSerial(String s) {
-    Eventing::EventTriggerList triggers;
-    Eventing::EventData data;
+    Eventing::TriggerList triggers;
+    Eventing::Datum data;
     RenderSerial(triggers, data);
     peripherals::NvStorage::Print();
     return 33;
@@ -1033,7 +1033,7 @@ int ManualSerial(String s) {
 // Render every 10 minutes for ~4320/mo
 constexpr time_t RenderCloudInterval_ms = 10 * 60 * 1000;
 
-bool RenderCloud(Eventing::EventTriggerList& triggers, Eventing::EventData& out) {
+bool RenderCloud(Eventing::TriggerList& triggers, Eventing::Datum& out) {
     if (!Particle.connected()) {
         return false;
     }
@@ -1092,8 +1092,8 @@ int Report(String s) {
     free(buf);
 
     {
-        Eventing::EventTriggerList triggers;
-        Eventing::EventData out;
+        Eventing::TriggerList triggers;
+        Eventing::Datum out;
         RenderCloud(triggers, out);
     }
     return 0;

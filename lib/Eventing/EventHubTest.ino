@@ -22,13 +22,13 @@ Arduino_DebugUtils d;
 
 //bool (*EventHandlerFunc)(PointerList<EventTrigger>& triggers, EventData& out);
 
-bool GenA(PointerList<EventTrigger>& triggers, EventData& out) {
+bool GenA(TriggerList& triggers, Datum& out) {
   out.in16 = 3;
   d.print(DBG_INFO, "GenA");
   return true;
 }
 
-bool AtoC(PointerList<EventTrigger>& triggers, EventData& out) {
+bool AtoC(TriggerList& triggers, Datum& out) {
   d.print(DBG_INFO, "AtoC fired");
   for (int trigIdx = 0; trigIdx < triggers.count; trigIdx++) {
     d.print(DBG_INFO, "AtoC checking %d", trigIdx);
@@ -50,7 +50,7 @@ typedef struct _D_DATA {
 
 D_DATA DataForD;
 
-bool GenD(PointerList<EventTrigger>& triggers, EventData& out) {
+bool GenD(TriggerList& triggers, Datum& out) {
   d.print(DBG_INFO, "GenD");
   DataForD.byte1 = 0x0f;
   DataForD.byte1 = 0xf0;
@@ -58,7 +58,7 @@ bool GenD(PointerList<EventTrigger>& triggers, EventData& out) {
   return true;
 }
 
-bool GenD1(PointerList<EventTrigger>& triggers, EventData& out) {
+bool GenD1(TriggerList& triggers, Datum& out) {
   d.print(DBG_INFO, "GenD1");
   D_DATA* data = triggers.list[0]->data.ptr;
   out.in16 = data->byte1;
@@ -105,7 +105,7 @@ bool PrintF(PointerList<EventTrigger>& triggers, EventData& out) {
 }
 
 // If this were declared before the EventHandlerFuncs, they could call it--but this way is less reentrant?
-EventHub hub;
+Hub hub;
 
 void LoopMessageAction() {
   static unsigned long LoopTimePassed = 0;
@@ -124,7 +124,7 @@ void setup() {
   d.print(DBG_INFO, "Begin Eventing Validation");
 
   { // Poke EventHandler
-    EventData outData, inData;
+    Datum outData, inData;
 
     EventHandler h1(String("hi"), GenA, TRIGGER_ON_ANY, 0);
     h1.AddTrigger(String("bye"));
@@ -166,7 +166,7 @@ void loop() {
 
   if (millis() % 1200 == 0) {
     d.print(DBG_INFO, "GenB");
-    EventData bData;
+    Datum bData;
     bData.in16 = 0xace5;
     hub.Deliver(String("B"), bData);
   }
