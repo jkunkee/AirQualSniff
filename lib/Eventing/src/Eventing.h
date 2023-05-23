@@ -109,11 +109,13 @@ public:
 #endif
 };
 
+typedef jet::PointerList<EventTrigger> EventTriggerList;
+
 // The called function has no way to know how to generate an event, so
 // rely on the parent EventHandler's ID string and filling out an output object
 // to allow it to do so.
 // Return true if data was generated.
-typedef bool (*EventHandlerFunc)(jet::PointerList<EventTrigger>& triggers, EventData& out);
+typedef bool (*EventHandlerFunc)(EventTriggerList& triggers, EventData& out);
 
 class EventHandler {
 private:
@@ -129,7 +131,7 @@ public:
   String event_id;
   EventHandlerFunc action;
   EventTriggerType type;
-  jet::PointerList<EventTrigger> triggers;
+  EventTriggerList triggers;
   time_t interval;
 
   EventTrigger* FindTrigger(String id) {
