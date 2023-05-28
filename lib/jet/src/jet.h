@@ -122,7 +122,7 @@ public:
     if (idx == -1) {
       idx = m_count-1;
     }
-    for (int src_idx = idx + 1; src_idx < m_count; src_idx++) {
+    for (unsigned int src_idx = idx + 1; src_idx < m_count; src_idx++) {
       int dst_idx = src_idx - 1;
       jet_dbgprint("remove collapse %d<-%d", dst_idx, src_idx);
       m_list[dst_idx] = m_list[src_idx];
@@ -131,7 +131,7 @@ public:
     return true;
   }
   int find_first(T* item) {
-    for (int idx = 0; idx < m_count; idx++) {
+    for (unsigned int idx = 0; idx < m_count; idx++) {
       if (m_list[idx] == item) {
         return idx;
       }
