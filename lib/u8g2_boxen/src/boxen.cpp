@@ -1,7 +1,7 @@
 
 #include "boxen.h"
 
-Box::Box(u8g2_t *u8g2, u8g2_int_t x, u8g2_int_t y, u8g2_int_t width, u8g2_int_t height, const uint8_t *labelFont, char *labelTop, char *labelBottom, const uint8_t *valueFont, uint8_t digits)
+Box::Box(u8g2_t *u8g2, u8g2_int_t x, u8g2_int_t y, u8g2_int_t width, u8g2_int_t height, const uint8_t *labelFont, const char *labelTop, const char *labelBottom, const uint8_t *valueFont, uint8_t digits)
 :
 m_u8g2(u8g2), m_x(x), m_y(y), m_width(width), m_height(height), m_labelFont(labelFont), m_labelTop(labelTop), m_labelBottom(labelBottom), m_valueFont(valueFont), m_digits(digits)
 {
