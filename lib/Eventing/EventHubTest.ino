@@ -20,7 +20,7 @@ Arduino_DebugUtils d;
 // Thing E depends on B and A->C
 // Thing F depends on A or B or D
 
-//bool (*EventHandlerFunc)(PointerList<EventTrigger>& triggers, EventData& out);
+//bool (*EventHandlerFunc)(TriggerList& triggers, Datum& out);
 
 bool GenA(TriggerList& triggers, Datum& out) {
   out.in16 = 3;
@@ -30,9 +30,9 @@ bool GenA(TriggerList& triggers, Datum& out) {
 
 bool AtoC(TriggerList& triggers, Datum& out) {
   d.print(DBG_INFO, "AtoC fired");
-  for (int trigIdx = 0; trigIdx < triggers.count; trigIdx++) {
+  for (int trigIdx = 0; trigIdx < triggers.size(); trigIdx++) {
     d.print(DBG_INFO, "AtoC checking %d", trigIdx);
-    EventTrigger* trig = triggers.list[trigIdx];
+    Trigger* trig = triggers.get(trigIdx);
     if (trig->data_ready && trig->event_id.equalsIgnoreCase(String("A"))) {
       out.in16 = trig->data.in16 + 2;
       d.print(DBG_INFO, "AtoC: %d+%d=%d", trig->data.in16, 2, out.in16);
@@ -60,23 +60,23 @@ bool GenD(TriggerList& triggers, Datum& out) {
 
 bool GenD1(TriggerList& triggers, Datum& out) {
   d.print(DBG_INFO, "GenD1");
-  D_DATA* data = triggers.list[0]->data.ptr;
+  D_DATA* data = triggers.get(0)->data.ptr;
   out.in16 = data->byte1;
   return true;
 }
 
-bool GenD2(PointerList<EventTrigger>& triggers, EventData& out) {
+bool GenD2(TriggerList& triggers, Datum& out) {
   d.print(DBG_INFO, "GenD2");
-  D_DATA* data = triggers.list[0]->data.ptr;
+  D_DATA* data = triggers.get(0)->data.ptr;
   out.in16 = data->byte2;
   return true;
 }
 
-bool PrintE(PointerList<EventTrigger>& triggers, EventData& out) {
+bool PrintE(TriggerList& triggers, Datum& out) {
   d.print(DBG_INFO, "PrintE");
 
-  for (int trigIdx = 0; trigIdx < triggers.count; trigIdx++) {
-    EventTrigger* trig = triggers.list[trigIdx];
+  for (int trigIdx = 0; trigIdx < triggers.size(); trigIdx++) {
+    Trigger* trig = triggers.get(trigIdx);
     if (trig->data_ready && trig->event_id.equalsIgnoreCase(String("B"))) {
       d.print(DBG_INFO, "  B: %x", trig->data.in16);
     } else if (trig->data_ready && trig->event_id.equalsIgnoreCase(String("C"))) {
@@ -87,11 +87,11 @@ bool PrintE(PointerList<EventTrigger>& triggers, EventData& out) {
   return false;
 }
 
-bool PrintF(PointerList<EventTrigger>& triggers, EventData& out) {
+bool PrintF(TriggerList& triggers, Datum& out) {
   d.print(DBG_INFO, "PrintF");
 
-  for (int trigIdx = 0; trigIdx < triggers.count; trigIdx++) {
-    EventTrigger* trig = triggers.list[trigIdx];
+  for (int trigIdx = 0; trigIdx < triggers.size(); trigIdx++) {
+    Trigger* trig = triggers.get(trigIdx);
     if (trig->data_ready && trig->event_id.equalsIgnoreCase(String("A"))) {
       d.print(DBG_INFO, "  A: %x", trig->data.in16);
     } else if (trig->data_ready && trig->event_id.equalsIgnoreCase(String("B"))) {
@@ -126,7 +126,7 @@ void setup() {
   { // Poke EventHandler
     Datum outData, inData;
 
-    EventHandler h1(String("hi"), GenA, TRIGGER_ON_ANY, 0);
+    Handler h1(String("hi"), GenA, TRIGGER_ON_ANY, 0);
     h1.AddTrigger(String("bye"));
     inData.in16 = 0x01;
     outData.in16 = 0xFF;
@@ -152,6 +152,8 @@ void setup() {
   hub.AddHandlerTrigger(String("F"), String("A"));
   hub.AddHandlerTrigger(String("F"), String("B"));
   hub.AddHandlerTrigger(String("F"), String("D2"));
+  //hub.AddHandlerTrigger(String("D"), String("F"));
+  //d.print(DBG_INFO, "IsDag: %d", hub.ValidateIsDAG());
 
   hub.print();
   d.print(DBG_INFO, "----------------------");

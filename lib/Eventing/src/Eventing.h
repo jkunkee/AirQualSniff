@@ -337,6 +337,43 @@ public:
     outString += "DeltaClock:\n";
     clock.ToString(outString);
   }
+  bool ValidateIsDAG() {
+    // Topological sort for cycle detection
+    // DFS
+    // https://en.wikipedia.org/wiki/Topological_sorting
+    // Handlers are Nodes
+    // Triggers are Edges
+    // My DFS
+    class VisitManager {
+    public:
+      static bool HasCycle(jet::PointerList<Handler>& SeenNodes, Hub* hub, Handler* CurrentNode) {
+        if (SeenNodes.find_first(CurrentNode) != -1) {
+          return true;
+        }
+        SeenNodes.append(CurrentNode);
+        for (int trig_idx = 0; trig_idx < CurrentNode->triggers.size(); trig_idx++) {
+          Trigger* trigger = CurrentNode->triggers.get(trig_idx);
+          Handler* handler = hub->FindHandler(trigger->event_id);
+          if (HasCycle(SeenNodes, hub, handler)) {
+            return true;
+          }
+        }
+        SeenNodes.remove_first(CurrentNode);
+        return false;
+      }
+    };
+    // For each node, do a full cycle-sensitive depth-first graph traversal
+    // There are faster or more theoretically sound ways to do this, but this
+    // is accurate and simple. It even handles disconnected graphs.
+    for (int handler_idx = 0; handler_idx < handlers.size(); handler_idx++) {
+      jet::PointerList<Handler> seen_nodes;
+      Handler* handler = handlers.get(handler_idx);
+      if (VisitManager::HasCycle(seen_nodes, this, handler)) {
+        return false;
+      }
+    }
+    return true;
+  }
 };
 
 } // namespace Eventing

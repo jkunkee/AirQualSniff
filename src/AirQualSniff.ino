@@ -1175,6 +1175,9 @@ void init() {
     infrastructure::event_hub.AddHandler("PaintOled", peripherals::Display::Paint, Eventing::TRIGGER_TEMPORAL, 1200); // long enough for the longest loop to prevent delta clock recursion
     infrastructure::event_hub.AddHandler("RenderCloud", UX::RenderCloud, Eventing::TRIGGER_TEMPORAL, UX::RenderCloudInterval_ms);
     //infrastructure::event_hub.AddHandler("DumpOsState", infrastructure::DumpOsState, Eventing::TRIGGER_TEMPORAL, 5000);
+    if (!infrastructure::event_hub.ValidateIsDAG()) {
+        Serial.println("Hub graph is not a DAG!!");
+    }
 }
 
 } // namespace Flow
