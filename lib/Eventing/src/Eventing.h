@@ -56,8 +56,8 @@ static Arduino_DebugUtils eventhub_arduino_dbg;
 #endif
 
 // https://arduino.stackexchange.com/questions/17639/the-difference-between-time-t-and-datetime#:~:text=A%20DateTime%20is%20a%20full%20class%20with%20lots,of%20the%20time%20stored%20in%20the%20DateTime%20object.
-#ifndef time_t
-//typedef unsigned long time_t;
+#if !defined(PARTICLE_WIRING_ARDUINO_COMPATIBILTY) && defined(ARDUINO) && !defined(time_t)
+typedef unsigned long time_t;
 #endif
 
 #include "jet.h"
@@ -351,7 +351,7 @@ public:
           return true;
         }
         SeenNodes.append(CurrentNode);
-        for (int trig_idx = 0; trig_idx < CurrentNode->triggers.size(); trig_idx++) {
+        for (unsigned int trig_idx = 0; trig_idx < CurrentNode->triggers.size(); trig_idx++) {
           Trigger* trigger = CurrentNode->triggers.get(trig_idx);
           Handler* handler = hub->FindHandler(trigger->event_id);
           if (HasCycle(SeenNodes, hub, handler)) {
@@ -365,7 +365,7 @@ public:
     // For each node, do a full cycle-sensitive depth-first graph traversal
     // There are faster or more theoretically sound ways to do this, but this
     // is accurate and simple. It even handles disconnected graphs.
-    for (int handler_idx = 0; handler_idx < handlers.size(); handler_idx++) {
+    for (unsigned int handler_idx = 0; handler_idx < handlers.size(); handler_idx++) {
       jet::PointerList<Handler> seen_nodes;
       Handler* handler = handlers.get(handler_idx);
       if (VisitManager::HasCycle(seen_nodes, this, handler)) {
