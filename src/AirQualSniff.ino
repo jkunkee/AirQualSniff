@@ -157,7 +157,7 @@ bool IsKnownNetworkPresent() {
 }
 
 namespace Display {
-    static U8G2 *u8g2_oo;
+    //static U8G2 *u8g2_oo;
     static u8g2_t u8g2Buf = { 0 };
     static u8g2_t *u8g2 = &u8g2Buf;
 
