@@ -199,9 +199,9 @@ public:
   }
 #ifdef EVENTHUB_DEBUG
   void print() {
-    dbgprint(DBG_INFO, "  Handler %s type %d has %d triggers:", event_id.c_str(), type, triggers.count);
-    for (int idx = 0; idx < triggers.count; idx++) {
-      triggers.list[idx]->print();
+    dbgprint(DBG_INFO, "  Handler %s type %d has %d triggers:", event_id.c_str(), type, triggers.size());
+    for (int idx = 0; idx < triggers.size(); idx++) {
+      triggers.get(idx)->print();
     }
   }
 #endif
@@ -306,9 +306,9 @@ public:
   }
 #ifdef EVENTHUB_DEBUG
   void print() {
-    dbgprint(DBG_INFO, "EventHub %p has %d handlers:", this, handlers.count);
-    for (int idx = 0; idx < handlers.count; idx++) {
-      handlers.list[idx]->print();
+    dbgprint(DBG_INFO, "EventHub %p has %d handlers:", this, handlers.size());
+    for (int idx = 0; idx < handlers.size(); idx++) {
+      handlers.get(idx)->print();
     }
   }
 #endif
