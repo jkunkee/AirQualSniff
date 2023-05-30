@@ -1,7 +1,7 @@
 
 #define JET_TEST
 
-#include "jet.h"
+#include "..\..\src\jet.h"
 
 bool tests_have_run = false;
 
@@ -13,7 +13,7 @@ void setup() {
 void loop() {
   // put your main code here, to run repeatedly:
   if (!tests_have_run) {
-    Serial.println(jet::PointerListTest());
+    Serial.println(String("PointerListTest returned ")+jet::PointerListTest());
     tests_have_run = true;
   }
 }
