@@ -1,0 +1,12 @@
+{
+    "version": 1,
+    "author": "Jon Kunkee",
+    "editor": "VS Code",
+    "parts": [
+        {
+            "id": "microcontroller",
+            "type": "wokwi-arduino-uno"
+        }
+    ],
+    "connections": []
+  }
