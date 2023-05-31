@@ -314,10 +314,16 @@ private:
   const time_t m_max_interval = (1UL << (sizeof(time_t) * 8 - 1)) - 1;
 public:
   DeltaClock() : m_head(nullptr), m_last_update(0) {}
-  ~DeltaClock() { m_head = nullptr; }
-  // typically called with millis()
+  ~DeltaClock() { clear(); }
+  // typically called with millis(), but works with any unsigned monotonic time value
   void update(time_t now) {
-    // TODO
+    time_t delta = now - m_last_update;
+    // monotonic time counter rollover
+    if (now < m_last_update) {
+      jet_dbgprint("DeltaClock monotonic timer wraparound");
+      // type math validated in test suite
+      delta = ((unsigned)-(signed)(m_last_update)) + now;
+    }
     m_last_update = now;
   }
   // If two events end up with the same expiration time, the first one inserted will run first.
@@ -370,7 +376,12 @@ public:
   }
   //bool unschedule(DeltaClockEntry* entry);
   //time_t get_remaining_time(DeltaClockEntry* entry);
-  void clear() { m_head = nullptr; }
+  void clear() {
+    for (Entry* current = m_head; current != nullptr; current = current->next) {
+      current->next = nullptr;
+    }
+    m_head = nullptr;
+  }
 #ifdef JET_TEST
   friend bool DeltaClockTest();
 #endif // JET_TEST
@@ -398,21 +409,48 @@ static bool DeltaClockTest() {
   CounterA = 0;
   CounterB = 0;
 
+  jet_dbgprint("time type properties");
+  time_t big_time = -1000;
+  time_t small_time = 1000;
+  success = success && big_time > small_time;
+  success = success && ((unsigned)-(signed)(big_time)) + small_time == 2000;
+
   DeltaClock* clock = new DeltaClock();
+  jet_dbgprint("constructor");
   success = success && clock->m_head == nullptr;
   success = success && clock->m_last_update == 0;
+  jet_dbgprint("empty list update");
   clock->update(5000);
   success = success && clock->m_last_update == 5000;
+  jet_dbgprint("scheduling one event");
   success = success && clock->schedule(&EntryA);
   success = success && clock->m_head == &EntryA;
   success = success && clock->m_head->remaining == EntryA.interval;
   success = success && clock->m_head->next == nullptr;
+  jet_dbgprint("schedule a second, following event");
   success = success && clock->schedule(&EntryB);
   success = success && clock->m_head == &EntryA;
   success = success && clock->m_head->remaining == EntryA.interval;
   success = success && clock->m_head->next == &EntryB;
   success = success && clock->m_head->next->remaining == EntryB.interval - EntryA.interval;
+  jet_dbgprint("clear the list, including next pointers");
+  clock->clear();
+  success = success && clock->m_head == nullptr;
+  success = success && EntryA.next == nullptr;
+  success = success && EntryB.next == nullptr;
+  jet_dbgprint("schedule a second, earlier event");
+  success = success && clock->schedule(&EntryB);
+  success = success && clock->m_head == &EntryB;
+  success = success && clock->m_head->remaining == EntryB.interval;
+  success = success && clock->schedule(&EntryA);
+  success = success && clock->m_head == &EntryA;
+  success = success && clock->m_head->remaining == EntryA.interval;
+  success = success && clock->m_head->next == &EntryB;
+  success = success && clock->m_head->next->remaining == EntryB.interval - EntryA.interval;
+  jet_dbgprint("destructor");
   delete(clock);
+  success = success && EntryA.next == nullptr;
+  success = success && EntryB.next == nullptr;
 
   return success;
 }
