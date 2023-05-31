@@ -19,6 +19,11 @@ Arduino_DebugUtils eventhub_arduino_dbg;
 #define jet_dbgprint(...)
 #endif // JET_TEST
 
+// https://arduino.stackexchange.com/questions/17639/the-difference-between-time-t-and-datetime#:~:text=A%20DateTime%20is%20a%20full%20class%20with%20lots,of%20the%20time%20stored%20in%20the%20DateTime%20object.
+#if !defined(PARTICLE_WIRING_ARDUINO_COMPATIBILTY) && defined(ARDUINO) && !defined(time_t)
+typedef unsigned long time_t;
+#endif
+
 namespace jet {
 
 // Pointer List
@@ -280,6 +285,149 @@ static bool PointerListTest() {
   return success;
 }
 
-#endif
+#endif // JET_TEST
+
+
+namespace evt {
+
+class DeltaClock {
+public:
+  // child types
+  typedef void (*Action)(void*);
+  class Entry {
+  public:
+    // Execution
+    Action action;
+    // A void* context structure allows for reuse of a single DeltaClockAction
+    // for multiple DeltaClockEntries--say, when an EventHub wraps their creation.
+    void* context;
+    // Bookkeeping
+    time_t interval;
+    boolean repeating;
+    time_t remaining;
+    Entry* next;
+  };
+private:
+  Entry* m_head;
+  time_t m_last_update;
+  // constant for detecting most rollover, overflow, and underflow conditions
+  const time_t m_max_interval = (1UL << (sizeof(time_t) * 8 - 1)) - 1;
+public:
+  DeltaClock() : m_head(nullptr), m_last_update(0) {}
+  ~DeltaClock() { m_head = nullptr; }
+  // typically called with millis()
+  void update(time_t now) {
+    // TODO
+    m_last_update = now;
+  }
+  // If two events end up with the same expiration time, the first one inserted will run first.
+  bool schedule(Entry* new_entry) {
+    // Input validation
+    if (new_entry == nullptr ||
+        new_entry->interval == 0 ||
+        new_entry->interval > m_max_interval ||
+        new_entry->action == nullptr ||
+        new_entry->next != nullptr) {
+      return false;
+    }
+    // Initialize
+    new_entry->remaining = new_entry->interval;
+    // Insert
+    // Empty list
+    if (m_head == nullptr) {
+      m_head = new_entry;
+      return true;
+    }
+    // Find insertion point
+    Entry* prev = nullptr;
+    Entry* next = m_head;
+    // find insertion point; start at head
+    while (true) {
+      // if this is the insertion point, insert
+      if (prev == nullptr && new_entry->remaining < next->remaining) {
+        // beginning
+        new_entry->next = next;
+        m_head = new_entry;
+        next->remaining -= new_entry->remaining;
+        break;
+      } else if (next == NULL) {
+        // end
+        prev->next = new_entry;
+        break;
+      } else if (new_entry->remaining < next->remaining) {
+        // middle
+        prev->next = new_entry;
+        new_entry->next = next;
+        next->remaining -= new_entry->remaining;
+        break;
+      }
+      // move to next entry
+      new_entry->remaining -= next->remaining;
+      prev = next;
+      next = next->next;
+    }
+    return true;
+  }
+  //bool unschedule(DeltaClockEntry* entry);
+  //time_t get_remaining_time(DeltaClockEntry* entry);
+  void clear() { m_head = nullptr; }
+#ifdef JET_TEST
+  friend bool DeltaClockTest();
+#endif // JET_TEST
+};
+
+#ifdef JET_TEST
+
+#define COUNTER_ENTRY(id, ivl, rep) \
+static int Counter##id; \
+static void Action##id(void*) { \
+  Counter##id++; \
+} \
+static DeltaClock::Entry Entry##id = { \
+  .action = &Action##id, \
+  .context = nullptr, \
+  .interval = ivl, \
+  .repeating = rep, \
+};
+
+COUNTER_ENTRY(A, 1000, false)
+COUNTER_ENTRY(B, 2000, false)
+
+static bool DeltaClockTest() {
+  bool success = true;
+  CounterA = 0;
+  CounterB = 0;
+
+  DeltaClock* clock = new DeltaClock();
+  success = success && clock->m_head == nullptr;
+  success = success && clock->m_last_update == 0;
+  clock->update(5000);
+  success = success && clock->m_last_update == 5000;
+  success = success && clock->schedule(&EntryA);
+  success = success && clock->m_head == &EntryA;
+  success = success && clock->m_head->remaining == EntryA.interval;
+  success = success && clock->m_head->next == nullptr;
+  success = success && clock->schedule(&EntryB);
+  success = success && clock->m_head == &EntryA;
+  success = success && clock->m_head->remaining == EntryA.interval;
+  success = success && clock->m_head->next == &EntryB;
+  success = success && clock->m_head->next->remaining == EntryB.interval - EntryA.interval;
+  delete(clock);
+
+  return success;
+}
+
+#endif // JET_TEST
+
+
+#ifdef JET_TEST
+
+static bool HubTest() {
+  return false;
+}
+
+#endif // JET_TEST
+
+} // namespace evt
 
 } // namespace jet
