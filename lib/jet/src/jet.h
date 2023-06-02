@@ -324,6 +324,28 @@ public:
       // type math validated in test suite
       delta = ((unsigned)-(signed)(m_last_update)) + now;
     }
+    // Update entries
+    while (m_head != NULL) {
+      if (m_head->remaining > delta) {
+        m_head->remaining -= delta;
+        break;
+      } else {
+        // The entry has expired.
+        Entry* entry = m_head;
+        // Charge it against the delta.
+        delta -= entry->remaining;
+        entry->remaining = 0;
+        // Dequeue it.
+        m_head = entry->next;
+        entry->next = nullptr;
+        // Execute it.
+        entry->action(entry->context);
+        // Requeue if repeating
+        if (entry->repeating) {
+          schedule(entry);
+        }
+      }
+    }
     m_last_update = now;
   }
   // If two events end up with the same expiration time, the first one inserted will run first.
@@ -404,41 +426,49 @@ static DeltaClock::Entry Entry##id = { \
 COUNTER_ENTRY(A, 1000, false)
 COUNTER_ENTRY(B, 2000, false)
 
+COUNTER_ENTRY(1, 1000, false);
+COUNTER_ENTRY(2, 10000, false);
+COUNTER_ENTRY(3, 1000, false);
+COUNTER_ENTRY(4, 1000, false);
+COUNTER_ENTRY(5, 1000, false);
+COUNTER_ENTRY(6, 12*60*60*1000, false);
+COUNTER_ENTRY(7, 1200, false);
+
 static bool DeltaClockTest() {
   bool success = true;
-  CounterA = 0;
-  CounterB = 0;
 
-  jet_dbgprint("time type properties");
+  if (success) { jet_dbgprint("time type properties"); }
   time_t big_time = -1000;
   time_t small_time = 1000;
   success = success && big_time > small_time;
   success = success && ((unsigned)-(signed)(big_time)) + small_time == 2000;
+  // My old method does not work the way it was
+  //success = success && (time_t)(-1) - big_time + small_time == 2000;
 
   DeltaClock* clock = new DeltaClock();
-  jet_dbgprint("constructor");
+  if (success) { jet_dbgprint("constructor"); }
   success = success && clock->m_head == nullptr;
   success = success && clock->m_last_update == 0;
-  jet_dbgprint("empty list update");
+  if (success) { jet_dbgprint("empty list update"); }
   clock->update(5000);
   success = success && clock->m_last_update == 5000;
-  jet_dbgprint("scheduling one event");
+  if (success) { jet_dbgprint("scheduling one event"); }
   success = success && clock->schedule(&EntryA);
   success = success && clock->m_head == &EntryA;
   success = success && clock->m_head->remaining == EntryA.interval;
   success = success && clock->m_head->next == nullptr;
-  jet_dbgprint("schedule a second, following event");
+  if (success) { jet_dbgprint("schedule a second, following event"); }
   success = success && clock->schedule(&EntryB);
   success = success && clock->m_head == &EntryA;
   success = success && clock->m_head->remaining == EntryA.interval;
   success = success && clock->m_head->next == &EntryB;
   success = success && clock->m_head->next->remaining == EntryB.interval - EntryA.interval;
-  jet_dbgprint("clear the list, including next pointers");
+  if (success) { jet_dbgprint("clear the list, including next pointers"); }
   clock->clear();
   success = success && clock->m_head == nullptr;
   success = success && EntryA.next == nullptr;
   success = success && EntryB.next == nullptr;
-  jet_dbgprint("schedule a second, earlier event");
+  if (success) { jet_dbgprint("schedule a second, earlier event"); }
   success = success && clock->schedule(&EntryB);
   success = success && clock->m_head == &EntryB;
   success = success && clock->m_head->remaining == EntryB.interval;
@@ -447,10 +477,58 @@ static bool DeltaClockTest() {
   success = success && clock->m_head->remaining == EntryA.interval;
   success = success && clock->m_head->next == &EntryB;
   success = success && clock->m_head->next->remaining == EntryB.interval - EntryA.interval;
-  jet_dbgprint("destructor");
+  if (success) { jet_dbgprint("destructor"); }
   delete(clock);
   success = success && EntryA.next == nullptr;
   success = success && EntryB.next == nullptr;
+
+  if (success) { jet_dbgprint("fire both"); }
+  clock = new DeltaClock();
+  success = success && clock->schedule(&EntryA);
+  success = success && clock->schedule(&EntryB);
+  CounterA = 0;
+  CounterB = 0;
+  clock->update(100);
+  success = success && clock->m_head->remaining == clock->m_head->interval - 100;
+  clock->update(200);
+  success = success && clock->m_head->remaining == clock->m_head->interval - 200;
+  clock->update(1000);
+  success = success && CounterA == 1;
+  success = success && CounterB == 0;
+  success = success && EntryA.next == nullptr;
+  clock->update(2000);
+  success = success && CounterA == 1;
+  success = success && CounterB == 1;
+  success = success && EntryA.next == nullptr;
+  success = success && EntryB.next == nullptr;
+  if (success) { jet_dbgprint("repeater requeue"); }
+  EntryA.repeating = true;
+  EntryB.repeating = true;
+  clock->m_last_update = 0;
+  success = success && clock->schedule(&EntryA);
+  success = success && clock->schedule(&EntryB);
+  CounterA = 0;
+  CounterB = 0;
+  clock->update(1000);
+  success = success && CounterA == 1;
+  success = success && CounterB == 0;
+  success = success && clock->m_head == &EntryB;
+  success = success && EntryA.next == nullptr;
+  success = success && EntryB.next == &EntryA;
+  clock->update(2000);
+  success = success && CounterA == 2;
+  success = success && CounterB == 1;
+  success = success && clock->m_head == &EntryA;
+  success = success && EntryA.next == &EntryB;
+  success = success && EntryB.next == nullptr;
+  if (success) { jet_dbgprint("repeater repeats"); }
+  clock->update(15000);
+  success = success && CounterA == 15;
+  success = success && CounterB == 7;
+  success = success && clock->m_head == &EntryB;
+  success = success && EntryA.next == nullptr;
+  success = success && EntryB.next == &EntryA;
+  delete(clock);
 
   return success;
 }
