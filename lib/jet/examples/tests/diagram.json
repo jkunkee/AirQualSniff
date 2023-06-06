@@ -5,7 +5,7 @@
     "parts": [
         {
             "id": "microcontroller",
-            "type": "wokwi-arduino-uno"
+            "type": "wokwi-arduino-mega"
         }
     ],
     "connections": []
