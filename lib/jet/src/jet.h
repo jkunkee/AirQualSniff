@@ -18,8 +18,8 @@ Arduino_DebugUtils eventhub_arduino_dbg;
 
 #define jet_assert_var bool success = true;
 #define jet_assert(expr) \
-  success = success && (expr); \
-  if (!success) { \
+  if (success && !(expr)) { \
+    success = false; \
     jet_dbgprint("Assertion failed: '%s' at line %d", #expr, __LINE__); \
   }
 
