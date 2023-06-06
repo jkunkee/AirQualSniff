@@ -325,6 +325,10 @@ public:
   ~DeltaClock() { clear(); }
   // typically called with millis(), but works with any unsigned monotonic time value
   void update(time_t now) {
+    // Constrain delta to be nonzero
+    if (now == m_last_update) {
+      return;
+    }
     time_t delta = now - m_last_update;
     // monotonic time counter rollover
     if (now < m_last_update) {
