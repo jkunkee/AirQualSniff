@@ -15,6 +15,7 @@ void loop() {
   if (!tests_have_run) {
     Serial.println(String("PointerListTest returned ")+jet::PointerListTest());
     Serial.println(String("evt::DeltaClockTest returned ")+jet::evt::DeltaClockTest());
+    Serial.println(String("evt::HubTest returned ")+jet::evt::HubTest());
     tests_have_run = true;
   }
 }
