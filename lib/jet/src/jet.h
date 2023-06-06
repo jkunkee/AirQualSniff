@@ -15,6 +15,14 @@
 Arduino_DebugUtils eventhub_arduino_dbg;
 #define jet_dbgprint(...) eventhub_arduino_dbg.print(0, __VA_ARGS__)
 #endif
+
+#define jet_assert_var bool success = true;
+#define jet_assert(expr) \
+  success = success && (expr); \
+  if (!success) { \
+    jet_dbgprint("Assertion failed: '%s' at line %d", #expr, __LINE__); \
+  }
+
 #else // JET_TEST
 #define jet_dbgprint(...)
 #endif // JET_TEST
@@ -187,93 +195,93 @@ public:
 #ifdef JET_TEST
 
 static bool PointerListTest() {
-  bool success = true;
+  jet_assert_var;
   PointerList<int>* list;
 
   int mem[4];
   int* ptrs[4];
 
   list = new PointerList<int>(ptrs, 4);
-  success = success && list->m_capacity == 4;
-  success = success && list->m_list == ptrs;
-  success = success && list->m_list_is_internally_managed == false;
-  success = success && list->m_count == 0;
-  success = success && list->append(&mem[0]);
-  success = success && list->m_count == 1;
-  success = success && list->append(&mem[1]);
-  success = success && list->m_count == 2;
-  success = success && list->append(&mem[2]);
-  success = success && list->m_count == 3;
-  success = success && list->append(&mem[3]);
-  success = success && list->m_count == 4;
-  success = success && !list->append(&mem[0]);
-  success = success && list->m_count == 4;
+  jet_assert(list->m_capacity == 4);
+  jet_assert(list->m_list == ptrs);
+  jet_assert(list->m_list_is_internally_managed == false);
+  jet_assert(list->m_count == 0);
+  jet_assert(list->append(&mem[0]));
+  jet_assert(list->m_count == 1);
+  jet_assert(list->append(&mem[1]));
+  jet_assert(list->m_count == 2);
+  jet_assert(list->append(&mem[2]));
+  jet_assert(list->m_count == 3);
+  jet_assert(list->append(&mem[3]));
+  jet_assert(list->m_count == 4);
+  jet_assert(!list->append(&mem[0]));
+  jet_assert(list->m_count == 4);
   delete(list);
 
   list = new PointerList<int>(4);
-  success = success && list->m_capacity == 4;
-  success = success && list->m_list != nullptr;
-  success = success && list->m_list_is_internally_managed == true;
-  success = success && list->is_empty();
-  success = success && list->size() == 0;
-  success = success && list->append(&mem[0]);
-  success = success && list->size() == 1;
-  success = success && list->m_list[0] == &mem[0];
-  success = success && list->append(&mem[1]);
-  success = success && list->size() == 2;
-  success = success && list->m_list[1] == &mem[1];
-  success = success && list->append(&mem[2]);
-  success = success && list->size() == 3;
-  success = success && list->append(&mem[3]);
-  success = success && list->size() == 4;
-  success = success && list->capacity() == 4;
-  success = success && list->is_full();
-  success = success && list->append(&mem[0]);
-  success = success && list->size() == 5;
-  success = success && list->capacity() == 4 + 2;
+  jet_assert(list->m_capacity == 4);
+  jet_assert(list->m_list != nullptr);
+  jet_assert(list->m_list_is_internally_managed == true);
+  jet_assert(list->is_empty());
+  jet_assert(list->size() == 0);
+  jet_assert(list->append(&mem[0]));
+  jet_assert(list->size() == 1);
+  jet_assert(list->m_list[0] == &mem[0]);
+  jet_assert(list->append(&mem[1]));
+  jet_assert(list->size() == 2);
+  jet_assert(list->m_list[1] == &mem[1]);
+  jet_assert(list->append(&mem[2]));
+  jet_assert(list->size() == 3);
+  jet_assert(list->append(&mem[3]));
+  jet_assert(list->size() == 4);
+  jet_assert(list->capacity() == 4);
+  jet_assert(list->is_full());
+  jet_assert(list->append(&mem[0]));
+  jet_assert(list->size() == 5);
+  jet_assert(list->capacity() == 4 + 2);
   list->clear();
-  success = success && list->size() == 0;
+  jet_assert(list->size() == 0);
 
-  success = success && list->capacity() == 4 + 2;
+  jet_assert(list->capacity() == 4 + 2);
   list->append(&mem[0]);
   list->append(&mem[1]);
-  success = success && list->m_list[0] == &mem[0];
-  success = success && list->m_list[1] == &mem[1];
-  success = success && list->swap(0, 1);
-  success = success && list->m_list[0] == &mem[1];
-  success = success && list->m_list[1] == &mem[0];
-  success = success && list->remove(0);
-  success = success && list->size() == 1;
-  success = success && list->m_list[0] == &mem[0];
-  success = success && list->remove(0);
-  success = success && list->size() == 0;
+  jet_assert(list->m_list[0] == &mem[0]);
+  jet_assert(list->m_list[1] == &mem[1]);
+  jet_assert(list->swap(0, 1));
+  jet_assert(list->m_list[0] == &mem[1]);
+  jet_assert(list->m_list[1] == &mem[0]);
+  jet_assert(list->remove(0));
+  jet_assert(list->size() == 1);
+  jet_assert(list->m_list[0] == &mem[0]);
+  jet_assert(list->remove(0));
+  jet_assert(list->size() == 0);
 
-  success = success && list->insert(0, &mem[0]);
-  success = success && list->m_list[0] == &mem[0];
-  success = success && list->insert(0, &mem[1]);
-  success = success && list->m_list[0] == &mem[1];
-  success = success && list->m_list[1] == &mem[0];
-  success = success && list->insert(1, &mem[2]);
-  success = success && list->m_list[0] == &mem[1];
-  success = success && list->m_list[1] == &mem[2];
-  success = success && list->m_list[2] == &mem[0];
-  success = success && list->get(0) == &mem[1];
-  success = success && list->get(1) == &mem[2];
-  success = success && list->get(2) == &mem[0];
-  success = success && list->get(3) == nullptr;
+  jet_assert(list->insert(0, &mem[0]));
+  jet_assert(list->m_list[0] == &mem[0]);
+  jet_assert(list->insert(0, &mem[1]));
+  jet_assert(list->m_list[0] == &mem[1]);
+  jet_assert(list->m_list[1] == &mem[0]);
+  jet_assert(list->insert(1, &mem[2]));
+  jet_assert(list->m_list[0] == &mem[1]);
+  jet_assert(list->m_list[1] == &mem[2]);
+  jet_assert(list->m_list[2] == &mem[0]);
+  jet_assert(list->get(0) == &mem[1]);
+  jet_assert(list->get(1) == &mem[2]);
+  jet_assert(list->get(2) == &mem[0]);
+  jet_assert(list->get(3) == nullptr);
   list->clear();
 
   list->insert(-1, &mem[0]);
   list->insert(-1, &mem[1]);
   list->insert(-1, &mem[2]);
   list->insert(-1, &mem[3]);
-  success = success && list->find_first(&mem[2]) == 2;
-  success = success && list->remove_first(&mem[2]);
-  success = success && list->find_first(&mem[2]) == -1;
-  success = success && list->find_first(&mem[3]) == 2;
-  success = success && !list->remove_first(&mem[2]);
-  success = success && list->find_first(&mem[3]) == 2;
-  success = success && list->size() == 3;
+  jet_assert(list->find_first(&mem[2]) == 2);
+  jet_assert(list->remove_first(&mem[2]));
+  jet_assert(list->find_first(&mem[2]) == -1);
+  jet_assert(list->find_first(&mem[3]) == 2);
+  jet_assert(!list->remove_first(&mem[2]));
+  jet_assert(list->find_first(&mem[3]) == 2);
+  jet_assert(list->size() == 3);
   delete(list);
 
   if (success) {
@@ -435,99 +443,120 @@ COUNTER_ENTRY(6, 12*60*60*1000, false);
 COUNTER_ENTRY(7, 1200, false);
 
 static bool DeltaClockTest() {
-  bool success = true;
+  jet_assert_var;
+  DeltaClock* clock;
 
-  if (success) { jet_dbgprint("time type properties"); }
-  time_t big_time = -1000;
-  time_t small_time = 1000;
-  success = success && big_time > small_time;
-  success = success && ((unsigned)-(signed)(big_time)) + small_time == 2000;
-  // My old method does not work the way it was
-  //success = success && (time_t)(-1) - big_time + small_time == 2000;
+  if (success) {
+    jet_dbgprint("time type properties");
+    time_t big_time = -1000;
+    time_t small_time = 1000;
+    jet_assert(big_time > small_time);
+    jet_assert(((unsigned)-(signed)(big_time)) + small_time == 2000);
+    // My old method does not work the way it was
+    //success = success && (time_t)(-1) - big_time + small_time == 2000;
+  }
 
-  DeltaClock* clock = new DeltaClock();
-  if (success) { jet_dbgprint("constructor"); }
-  success = success && clock->m_head == nullptr;
-  success = success && clock->m_last_update == 0;
-  if (success) { jet_dbgprint("empty list update"); }
-  clock->update(5000);
-  success = success && clock->m_last_update == 5000;
-  if (success) { jet_dbgprint("scheduling one event"); }
-  success = success && clock->schedule(&EntryA);
-  success = success && clock->m_head == &EntryA;
-  success = success && clock->m_head->remaining == EntryA.interval;
-  success = success && clock->m_head->next == nullptr;
-  if (success) { jet_dbgprint("schedule a second, following event"); }
-  success = success && clock->schedule(&EntryB);
-  success = success && clock->m_head == &EntryA;
-  success = success && clock->m_head->remaining == EntryA.interval;
-  success = success && clock->m_head->next == &EntryB;
-  success = success && clock->m_head->next->remaining == EntryB.interval - EntryA.interval;
-  if (success) { jet_dbgprint("clear the list, including next pointers"); }
-  clock->clear();
-  success = success && clock->m_head == nullptr;
-  success = success && EntryA.next == nullptr;
-  success = success && EntryB.next == nullptr;
-  if (success) { jet_dbgprint("schedule a second, earlier event"); }
-  success = success && clock->schedule(&EntryB);
-  success = success && clock->m_head == &EntryB;
-  success = success && clock->m_head->remaining == EntryB.interval;
-  success = success && clock->schedule(&EntryA);
-  success = success && clock->m_head == &EntryA;
-  success = success && clock->m_head->remaining == EntryA.interval;
-  success = success && clock->m_head->next == &EntryB;
-  success = success && clock->m_head->next->remaining == EntryB.interval - EntryA.interval;
+  clock = new DeltaClock();
+  if (success) {
+    jet_dbgprint("constructor");
+    jet_assert(clock->m_head == nullptr);
+    jet_assert(clock->m_last_update == 0);
+  }
+  if (success) {
+    jet_dbgprint("empty list update");
+    clock->update(5000);
+    jet_assert(clock->m_last_update == 5000);
+  }
+  if (success) {
+    jet_dbgprint("scheduling one event");
+  jet_assert(clock->schedule(&EntryA));
+  jet_assert(clock->m_head == &EntryA);
+  jet_assert(clock->m_head->remaining == EntryA.interval);
+  jet_assert(clock->m_head->next == nullptr);
+  }
+  if (success) {
+    jet_dbgprint("schedule a second, following event");
+    jet_assert(clock->schedule(&EntryB));
+    jet_assert(clock->m_head == &EntryA);
+    jet_assert(clock->m_head->remaining == EntryA.interval);
+    jet_assert(clock->m_head->next == &EntryB);
+    jet_assert(clock->m_head->next->remaining == EntryB.interval - EntryA.interval);
+  }
+  if (success) {
+    jet_dbgprint("clear the list, including next pointers");
+    clock->clear();
+    jet_assert(clock->m_head == nullptr);
+    jet_assert(EntryA.next == nullptr);
+    jet_assert(EntryB.next == nullptr);
+  }
+  if (success) {
+    jet_dbgprint("schedule a second, earlier event");
+    jet_assert(clock->schedule(&EntryB));
+    jet_assert(clock->m_head == &EntryB);
+    jet_assert(clock->m_head->remaining == EntryB.interval);
+    jet_assert(clock->schedule(&EntryA));
+    jet_assert(clock->m_head == &EntryA);
+    jet_assert(clock->m_head->remaining == EntryA.interval);
+    jet_assert(clock->m_head->next == &EntryB);
+    jet_assert(clock->m_head->next->remaining == EntryB.interval - EntryA.interval);
+  }
   if (success) { jet_dbgprint("destructor"); }
   delete(clock);
-  success = success && EntryA.next == nullptr;
-  success = success && EntryB.next == nullptr;
+  jet_assert(EntryA.next == nullptr);
+  jet_assert(EntryB.next == nullptr);
 
-  if (success) { jet_dbgprint("fire both"); }
   clock = new DeltaClock();
-  success = success && clock->schedule(&EntryA);
-  success = success && clock->schedule(&EntryB);
-  CounterA = 0;
-  CounterB = 0;
-  clock->update(100);
-  success = success && clock->m_head->remaining == clock->m_head->interval - 100;
-  clock->update(200);
-  success = success && clock->m_head->remaining == clock->m_head->interval - 200;
-  clock->update(1000);
-  success = success && CounterA == 1;
-  success = success && CounterB == 0;
-  success = success && EntryA.next == nullptr;
-  clock->update(2000);
-  success = success && CounterA == 1;
-  success = success && CounterB == 1;
-  success = success && EntryA.next == nullptr;
-  success = success && EntryB.next == nullptr;
-  if (success) { jet_dbgprint("repeater requeue"); }
-  EntryA.repeating = true;
-  EntryB.repeating = true;
-  clock->m_last_update = 0;
-  success = success && clock->schedule(&EntryA);
-  success = success && clock->schedule(&EntryB);
-  CounterA = 0;
-  CounterB = 0;
-  clock->update(1000);
-  success = success && CounterA == 1;
-  success = success && CounterB == 0;
-  success = success && clock->m_head == &EntryB;
-  success = success && EntryA.next == nullptr;
-  success = success && EntryB.next == &EntryA;
-  clock->update(2000);
-  success = success && CounterA == 2;
-  success = success && CounterB == 1;
-  success = success && clock->m_head == &EntryA;
-  success = success && EntryA.next == &EntryB;
-  success = success && EntryB.next == nullptr;
-  if (success) { jet_dbgprint("repeater repeats"); }
-  clock->update(15000);
-  success = success && CounterA == 15;
-  success = success && CounterB == 7;
-  success = success && clock->m_head == &EntryB;
-  success = success && EntryA.next == nullptr;
-  success = success && EntryB.next == &EntryA;
+  if (success) {
+    jet_dbgprint("fire both");
+    jet_assert(clock->schedule(&EntryA));
+    jet_assert(clock->schedule(&EntryB));
+    CounterA = 0;
+    CounterB = 0;
+    clock->update(100);
+    jet_assert(clock->m_head->remaining == clock->m_head->interval - 100);
+    clock->update(200);
+    jet_assert(clock->m_head->remaining == clock->m_head->interval - 200);
+    clock->update(1000);
+    jet_assert(CounterA == 1);
+    jet_assert(CounterB == 0);
+    jet_assert(EntryA.next == nullptr);
+    clock->update(2000);
+    jet_assert(CounterA == 1);
+    jet_assert(CounterB == 1);
+    jet_assert(EntryA.next == nullptr);
+    jet_assert(EntryB.next == nullptr);
+  }
+  if (success) {
+    jet_dbgprint("repeater requeue");
+    EntryA.repeating = true;
+    EntryB.repeating = true;
+    clock->m_last_update = 0;
+    jet_assert(clock->schedule(&EntryA));
+    jet_assert(clock->schedule(&EntryB));
+    CounterA = 0;
+    CounterB = 0;
+    clock->update(1000);
+    jet_assert(CounterA == 1);
+    jet_assert(CounterB == 0);
+    jet_assert(clock->m_head == &EntryB);
+    jet_assert(EntryA.next == nullptr);
+    jet_assert(EntryB.next == &EntryA);
+    clock->update(2000);
+    jet_assert(CounterA == 2);
+    jet_assert(CounterB == 1);
+    jet_assert(clock->m_head == &EntryA);
+    jet_assert(EntryA.next == &EntryB);
+    jet_assert(EntryB.next == nullptr);
+  }
+  if (success) {
+    jet_dbgprint("repeater repeats");
+    clock->update(15000);
+    jet_assert(CounterA == 15);
+    jet_assert(CounterB == 7);
+    jet_assert(clock->m_head == &EntryB);
+    jet_assert(EntryA.next == nullptr);
+    jet_assert(EntryB.next == &EntryA);
+  }
   delete(clock);
 
   return success;
