@@ -416,6 +416,19 @@ public:
     }
     m_head = nullptr;
   }
+  void debug_string(String& out) {
+    out += "DeltaClock "+String((uintptr_t)this, HEX)+"\n";
+    for (Entry* entry = m_head; entry != nullptr; entry = entry->next) {
+      out += "  ";
+      out += String((uintptr_t)entry, HEX);
+      out += " rem: ";
+      out += entry->remaining;
+      out += " next: ";
+      out += String((uintptr_t)entry->next, HEX);
+      out += "\n";
+    }
+    out += "  End DeltaClock";
+  }
 #ifdef JET_TEST
   friend bool DeltaClockTest();
 #endif // JET_TEST
@@ -437,14 +450,15 @@ static DeltaClock::Entry Entry##id = { \
 
 COUNTER_ENTRY(A, 1000, false)
 COUNTER_ENTRY(B, 2000, false)
+COUNTER_ENTRY(C, 1000, false)
 
-COUNTER_ENTRY(1, 1000, false);
-COUNTER_ENTRY(2, 10000, false);
-COUNTER_ENTRY(3, 1000, false);
-COUNTER_ENTRY(4, 1000, false);
-COUNTER_ENTRY(5, 1000, false);
-COUNTER_ENTRY(6, 12*60*60*1000, false);
-COUNTER_ENTRY(7, 1200, false);
+COUNTER_ENTRY(1, 1000, true);
+COUNTER_ENTRY(2, 10000, true);
+COUNTER_ENTRY(3, 1000, true);
+COUNTER_ENTRY(4, 1000, true);
+COUNTER_ENTRY(5, 1000, true);
+COUNTER_ENTRY(6, 12*60*60*1000, true);
+COUNTER_ENTRY(7, 1200, true);
 
 static bool DeltaClockTest() {
   jet_assert_var;
@@ -457,7 +471,7 @@ static bool DeltaClockTest() {
     jet_assert(big_time > small_time);
     jet_assert(((unsigned)-(signed)(big_time)) + small_time == 2000);
     // My old method does not work the way it was
-    //success = success && (time_t)(-1) - big_time + small_time == 2000;
+    //jet_assert((time_t)(-1) - big_time + small_time == 2000);
   }
 
   clock = new DeltaClock();
@@ -561,8 +575,74 @@ static bool DeltaClockTest() {
     jet_assert(EntryA.next == nullptr);
     jet_assert(EntryB.next == &EntryA);
   }
+  if (success) {
+    jet_dbgprint("simultaneous events");
+    clock->clear();
+    clock->m_last_update = 0;
+    CounterA = 0;
+    CounterC = 0;
+    jet_assert(clock->schedule(&EntryA));
+    jet_assert(clock->schedule(&EntryC));
+    jet_assert(clock->m_head == &EntryA);
+    jet_assert(EntryA.next == &EntryC);
+    jet_assert(EntryA.remaining == 1000);
+    jet_assert(EntryC.remaining == 0);
+    clock->update(1000);
+    jet_assert(clock->m_head == &EntryA);
+    jet_assert(EntryA.next == &EntryC);
+    jet_assert(EntryA.remaining == 1000);
+    jet_assert(EntryC.remaining == 0);
+    jet_assert(CounterA == 1);
+    jet_assert(CounterC == 1);
+  }
+  if (!success) {
+    String str;
+    clock->debug_string(str);
+    jet_dbgprint("%s", str.c_str());
+  }
   delete(clock);
 
+  if (success) {
+    jet_dbgprint("AirQualSniff Scenario");
+    clock = new DeltaClock();
+    clock->schedule(&Entry1);
+    clock->schedule(&Entry2);
+    clock->schedule(&Entry3);
+    clock->schedule(&Entry4);
+    clock->schedule(&Entry5);
+    clock->schedule(&Entry6);
+    clock->schedule(&Entry7);
+    Counter1 = 0;
+    Counter2 = 0;
+    Counter3 = 0;
+    Counter4 = 0;
+    Counter5 = 0;
+    Counter6 = 0;
+    Counter7 = 0;
+    time_t test_duration = /*18*60**/60*1000;
+    clock->update(test_duration);
+    jet_dbgprint("%d", Counter1);
+    jet_dbgprint("%d", Counter2);
+    jet_dbgprint("%d", Counter3);
+    jet_dbgprint("%d", Counter4);
+    jet_dbgprint("%d", Counter5);
+    jet_dbgprint("%d", Counter6);
+    jet_dbgprint("%d", Counter7);
+    jet_assert(Counter1 == (test_duration / Entry1.interval));
+    jet_assert(Counter2 == (test_duration / Entry2.interval));
+    jet_assert(Counter3 == (test_duration / Entry3.interval));
+    jet_assert(Counter4 == (test_duration / Entry4.interval));
+    jet_assert(Counter5 == (test_duration / Entry5.interval));
+    jet_assert(Counter6 == (test_duration / Entry6.interval));
+    jet_assert(Counter7 == (test_duration / Entry7.interval));
+  }
+  delete(clock);
+
+  if (!success) {
+    jet_dbgprint("EntryA: %p", &EntryA);
+    jet_dbgprint("EntryB: %p", &EntryB);
+    jet_dbgprint("EntryC: %p", &EntryC);
+  }
   return success;
 }
 
