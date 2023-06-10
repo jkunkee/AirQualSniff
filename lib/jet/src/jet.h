@@ -487,10 +487,10 @@ static bool DeltaClockTest() {
   }
   if (success) {
     jet_dbgprint("scheduling one event");
-  jet_assert(clock->schedule(&EntryA));
-  jet_assert(clock->m_head == &EntryA);
-  jet_assert(clock->m_head->remaining == EntryA.interval);
-  jet_assert(clock->m_head->next == nullptr);
+    jet_assert(clock->schedule(&EntryA));
+    jet_assert(clock->m_head == &EntryA);
+    jet_assert(clock->m_head->remaining == EntryA.interval);
+    jet_assert(clock->m_head->next == nullptr);
   }
   if (success) {
     jet_dbgprint("schedule a second, following event");
@@ -580,7 +580,9 @@ static bool DeltaClockTest() {
     clock->clear();
     clock->m_last_update = 0;
     CounterA = 0;
+    EntryA.repeating = true;
     CounterC = 0;
+    EntryC.repeating = true;
     jet_assert(clock->schedule(&EntryA));
     jet_assert(clock->schedule(&EntryC));
     jet_assert(clock->m_head == &EntryA);
