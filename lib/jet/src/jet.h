@@ -368,6 +368,7 @@ public:
         new_entry->interval > m_max_interval ||
         new_entry->action == nullptr ||
         new_entry->next != nullptr) {
+      jet_dbgprint("schedule failed with invalid arg");
       return false;
     }
     // Initialize
@@ -375,6 +376,7 @@ public:
     // Insert
     // Empty list
     if (m_head == nullptr) {
+      jet_dbgprint("schedule empty list case");
       m_head = new_entry;
       return true;
     }
@@ -386,16 +388,19 @@ public:
       // if this is the insertion point, insert
       if (prev == nullptr && new_entry->remaining < next->remaining) {
         // beginning
+        jet_dbgprint("schedule at beginning");
         new_entry->next = next;
         m_head = new_entry;
         next->remaining -= new_entry->remaining;
         break;
       } else if (next == NULL) {
         // end
+        jet_dbgprint("schedule at end");
         prev->next = new_entry;
         break;
       } else if (new_entry->remaining < next->remaining) {
         // middle
+        jet_dbgprint("schedule in middle");
         prev->next = new_entry;
         new_entry->next = next;
         next->remaining -= new_entry->remaining;
