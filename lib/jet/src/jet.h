@@ -14,6 +14,11 @@
 #include <Arduino_DebugUtils.h>
 Arduino_DebugUtils eventhub_arduino_dbg;
 #define jet_dbgprint(...) eventhub_arduino_dbg.print(0, __VA_ARGS__)
+#ifdef JET_TEST_TRACING
+#define jet_traceprint jet_dbgprint
+#else
+#define jet_traceprint(...)
+#endif
 #endif
 
 #define jet_assert_var bool success = true;
@@ -25,6 +30,7 @@ Arduino_DebugUtils eventhub_arduino_dbg;
 
 #else // JET_TEST
 #define jet_dbgprint(...)
+#define jet_traceprint(...)
 #endif // JET_TEST
 
 // https://arduino.stackexchange.com/questions/17639/the-difference-between-time-t-and-datetime#:~:text=A%20DateTime%20is%20a%20full%20class%20with%20lots,of%20the%20time%20stored%20in%20the%20DateTime%20object.
@@ -71,7 +77,7 @@ public:
   }
   bool insert(int idx, T* item)
   {
-    jet_dbgprint("insert idx:%d item:%p", idx, item);
+    jet_traceprint("insert idx:%d item:%p", idx, item);
     if (item == nullptr) {
       jet_dbgprint("insert null check failed");
       return false;
@@ -108,7 +114,7 @@ public:
     return true;
   }
   bool append(T* item) {
-    jet_dbgprint("append %p", item);
+    jet_traceprint("append %p", item);
     return insert(-1, item);
   }
   bool replace(int idx, T* item) {
@@ -131,13 +137,13 @@ public:
       jet_dbgprint("remove failed range check %d", idx);
       return false;
     }
-    jet_dbgprint("remove %d", idx);
+    jet_traceprint("remove %d", idx);
     if (idx == -1) {
       idx = m_count-1;
     }
     for (unsigned int src_idx = idx + 1; src_idx < m_count; src_idx++) {
       int dst_idx = src_idx - 1;
-      jet_dbgprint("remove collapse %d<-%d", dst_idx, src_idx);
+      jet_traceprint("remove collapse %d<-%d", dst_idx, src_idx);
       m_list[dst_idx] = m_list[src_idx];
     }
     m_count -= 1;
@@ -327,21 +333,30 @@ public:
   void update(time_t now) {
     // Constrain delta to be nonzero
     if (now == m_last_update) {
+      jet_dbgprint("no time has passed (or exactly one max-time_t time interval has passed)");
       return;
     }
     time_t delta = now - m_last_update;
     // monotonic time counter rollover
     if (now < m_last_update) {
-      jet_dbgprint("DeltaClock monotonic timer wraparound");
+      jet_traceprint("DeltaClock monotonic timer wraparound");
       // type math validated in test suite
       delta = ((unsigned)-(signed)(m_last_update)) + now;
     }
+    jet_traceprint("update from %lu", m_last_update);
+    jet_traceprint("       to %lu", now);
+    jet_traceprint("       delta %lu", delta);
     // Update entries
     while (m_head != NULL) {
+      jet_traceprint("  delta:%lu ---------------", delta);
+      jet_traceprint("  processing %p", m_head);
+      jet_traceprint("  remaining:%lu", m_head->remaining);
       if (m_head->remaining > delta) {
+        jet_traceprint("  charge and break");
         m_head->remaining -= delta;
         break;
       } else {
+        jet_traceprint("  retire");
         // The entry has expired.
         Entry* entry = m_head;
         // Charge it against the delta.
@@ -354,6 +369,7 @@ public:
         entry->action(entry->context);
         // Requeue if repeating
         if (entry->repeating) {
+          jet_traceprint("  reschedule");
           schedule(entry);
         }
       }
@@ -376,7 +392,7 @@ public:
     // Insert
     // Empty list
     if (m_head == nullptr) {
-      jet_dbgprint("schedule empty list case");
+      jet_traceprint("schedule empty list case");
       m_head = new_entry;
       return true;
     }
@@ -388,19 +404,19 @@ public:
       // if this is the insertion point, insert
       if (prev == nullptr && new_entry->remaining < next->remaining) {
         // beginning
-        jet_dbgprint("schedule at beginning");
+        jet_traceprint("schedule at beginning");
         new_entry->next = next;
         m_head = new_entry;
         next->remaining -= new_entry->remaining;
         break;
       } else if (next == NULL) {
         // end
-        jet_dbgprint("schedule at end");
+        jet_traceprint("schedule at end");
         prev->next = new_entry;
         break;
       } else if (new_entry->remaining < next->remaining) {
         // middle
-        jet_dbgprint("schedule in middle");
+        jet_traceprint("schedule in middle");
         prev->next = new_entry;
         new_entry->next = next;
         next->remaining -= new_entry->remaining;
