@@ -492,6 +492,7 @@ static bool DeltaClockTest() {
     jet_dbgprint("time type properties");
     time_t big_time = -1000;
     time_t small_time = 1000;
+    jet_assert(sizeof(time_t) >= 4);
     jet_assert(big_time > small_time);
     jet_assert(((unsigned)-(signed)(big_time)) + small_time == 2000);
     // My old method does not work the way it was
@@ -621,16 +622,52 @@ static bool DeltaClockTest() {
     jet_assert(CounterA == 1);
     jet_assert(CounterC == 1);
   }
-  if (!success) {
-    String str;
-    clock->debug_string(str);
-    jet_dbgprint("%s", str.c_str());
+  if (success) {
+    jet_dbgprint("partial repeater costing");
+    clock->clear();
+    clock->m_last_update = 0;
+    CounterA = 0;
+    EntryA.interval = 1000;
+    EntryA.repeating = true;
+    CounterB = 0;
+    EntryB.interval = 1000;
+    EntryB.repeating = true;
+    jet_assert(clock->schedule(&EntryA));
+    jet_assert(clock->schedule(&EntryB));
+    clock->update(200);
+    jet_assert(EntryA.remaining == 800);
+    jet_assert(EntryB.remaining == 0);
+    clock->update(1200);
+    jet_assert(CounterA == 1);
+    jet_assert(CounterB == 1);
+    jet_assert(EntryA.remaining == 800);
+    jet_assert(EntryB.remaining == 0);
   }
-  delete(clock);
-
+  if (success) {
+    jet_dbgprint("periodically simultaneous events");
+    clock->clear();
+    clock->m_last_update = 0;
+    CounterA = 0;
+    EntryA.interval = 1000;
+    EntryA.repeating = true;
+    CounterB = 0;
+    EntryB.interval = 1000;
+    EntryB.repeating = true;
+    CounterC = 0;
+    EntryC.interval = 1200;
+    EntryC.repeating = true;
+    jet_assert(clock->schedule(&EntryA));
+    jet_assert(clock->schedule(&EntryB));
+    jet_assert(clock->schedule(&EntryC));
+    clock->update(60UL*1000UL);
+    jet_assert(CounterA == 60);
+    jet_assert(CounterB == 60);
+    jet_assert(CounterC == 50);
+  }
   if (success) {
     jet_dbgprint("AirQualSniff Scenario");
-    clock = new DeltaClock();
+    clock->clear();
+    clock->m_last_update = 0;
     clock->schedule(&Entry1);
     clock->schedule(&Entry2);
     clock->schedule(&Entry3);
