@@ -7,6 +7,7 @@
 //
 
 #ifdef JET_TEST
+
 #ifdef PARTICLE_WIRING_ARDUINO_COMPATIBILTY
 #define jet_dbgprint(...) Serial.printlnf(__VA_ARGS__)
 #elif defined(ARDUINO)
@@ -14,11 +15,12 @@
 #include <Arduino_DebugUtils.h>
 Arduino_DebugUtils eventhub_arduino_dbg;
 #define jet_dbgprint(...) eventhub_arduino_dbg.print(0, __VA_ARGS__)
+#endif
+
 #ifdef JET_TEST_TRACING
 #define jet_traceprint jet_dbgprint
 #else
 #define jet_traceprint(...)
-#endif
 #endif
 
 #define jet_assert_var bool success = true;
@@ -200,7 +202,7 @@ public:
 
 #ifdef JET_TEST
 
-static bool PointerListTest() {
+bool PointerListTest() {
   jet_assert_var;
   PointerList<int>* list;
 
@@ -325,7 +327,7 @@ private:
   Entry* m_head;
   time_t m_last_update;
   // constant for detecting most rollover, overflow, and underflow conditions
-  const time_t m_max_interval = (1UL << (sizeof(time_t) * 8 - 1)) - 1;
+  const time_t m_max_interval = (((time_t)1) << (sizeof(time_t) * 8 - 1)) - 1;
 public:
   DeltaClock() : m_head(nullptr), m_last_update(0) {}
   ~DeltaClock() { clear(); }
@@ -443,7 +445,7 @@ public:
       out += "  ";
       out += String((uintptr_t)entry, HEX);
       out += " rem: ";
-      out += entry->remaining;
+      out += String((uint32_t)entry->remaining);
       out += " next: ";
       out += String((uintptr_t)entry->next, HEX);
       out += "\n";
@@ -469,8 +471,8 @@ static DeltaClock::Entry Entry##id = { \
 static void Action##id(void*) { \
   Counter##id++; \
 }
-//  jet_dbgprint("  "#id":%d", Counter##id); \
-//  if (Counter##id > 70) { Entry##id.repeating = false; } \
+//  jet_dbgprint("  "#id":%d", Counter##id);
+//  if (Counter##id > 70) { Entry##id.repeating = false; }
 
 COUNTER_ENTRY(A, 1000, false)
 COUNTER_ENTRY(B, 2000, false)
