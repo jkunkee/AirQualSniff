@@ -682,15 +682,8 @@ static bool DeltaClockTest() {
     Counter5 = 0;
     Counter6 = 0;
     Counter7 = 0;
-    time_t test_duration = /*18*60**/60*1000;
+    time_t test_duration = 36UL*60UL*60UL*1000UL;
     clock->update(test_duration);
-    jet_dbgprint("%d", Counter1);
-    jet_dbgprint("%d", Counter2);
-    jet_dbgprint("%d", Counter3);
-    jet_dbgprint("%d", Counter4);
-    jet_dbgprint("%d", Counter5);
-    jet_dbgprint("%d", Counter6);
-    jet_dbgprint("%d", Counter7);
     jet_assert(Counter1 == (test_duration / Entry1.interval));
     jet_assert(Counter2 == (test_duration / Entry2.interval));
     jet_assert(Counter3 == (test_duration / Entry3.interval));
@@ -698,6 +691,20 @@ static bool DeltaClockTest() {
     jet_assert(Counter5 == (test_duration / Entry5.interval));
     jet_assert(Counter6 == (test_duration / Entry6.interval));
     jet_assert(Counter7 == (test_duration / Entry7.interval));
+    if (!success) {
+      jet_dbgprint("Counter1: %lu / %lu", Counter1, test_duration / Entry1.interval);
+      jet_dbgprint("Counter2: %lu / %lu", Counter2, test_duration / Entry2.interval);
+      jet_dbgprint("Counter3: %lu / %lu", Counter3, test_duration / Entry3.interval);
+      jet_dbgprint("Counter4: %lu / %lu", Counter4, test_duration / Entry4.interval);
+      jet_dbgprint("Counter5: %lu / %lu", Counter5, test_duration / Entry5.interval);
+      jet_dbgprint("Counter6: %lu / %lu", Counter6, test_duration / Entry6.interval);
+      jet_dbgprint("Counter7: %lu / %lu", Counter7, test_duration / Entry7.interval);
+    }
+  }
+  if (!success) {
+    String str;
+    clock->debug_string(str);
+    jet_dbgprint("%s", str.c_str());
   }
   delete(clock);
 
