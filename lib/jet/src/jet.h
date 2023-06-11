@@ -644,6 +644,19 @@ static bool DeltaClockTest() {
     jet_assert(EntryB.remaining == 0);
   }
   if (success) {
+    jet_dbgprint("timer overflow");
+    clock->clear();
+    clock->m_last_update = 0;
+    CounterA = 0;
+    EntryA.interval = 1000;
+    EntryA.repeating = true;
+    clock->update(UINT32_MAX-500);
+    jet_assert(clock->schedule(&EntryA));
+    clock->update(500-1);
+    jet_assert(CounterA == 1);
+    jet_assert(EntryA.remaining = 1000);
+  }
+  if (success) {
     jet_dbgprint("periodically simultaneous events");
     clock->clear();
     clock->m_last_update = 0;
