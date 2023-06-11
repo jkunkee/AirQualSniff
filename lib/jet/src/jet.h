@@ -5,6 +5,41 @@
 // Copyright (C) 2023 Jon Kunkee jonathan.kunkee@gmail.com
 // License: BSD 3-clause
 //
+// jet: Jon's Embedded Library
+// A collection of data structures and algorithms I find generally helpful when
+// programming for embedded devices.
+//
+// Why not use the standard library? What about someone else's library?
+//
+// It comes down to "I'm picky", "I'm not getting paid for this", and "this is
+// fun". I wanted a library that was:
+// * Barely engineered, not overengineered -- so easy to understand
+// * Not using virtual functions
+// * Not using templates except How I Like To for Reasons
+// * Available and compatible wherever I want it
+// * Easy to use with static allocations
+// * Easy to add to a project
+// * Fit to my tasks
+// * Testable
+//
+// Table of Contents
+// * logging and testing ifdefs
+// * namespace jet
+//   * PointerList<T>
+//     - A simple list-of-pointers class backed by an array.
+//     - Storage can be allocated externally or managed internally using the heap.
+//     - Internal array management only grows the storage by a fixed amount per overflow.
+//     - Stored pointers are never freed or allocated -- this is left to the caller.
+//   * PointerListTest()
+//   * namespace evt
+//     * DeltaClock
+//       - A "delta clock", a straightforward and efficient event-scheduling data structure.
+//       - This implementation is not thread-safe, but the concept is intended for performant use in interrupt handlers.
+//       - Storage is entirely externally managed.
+//       - Time is managed externally as well.
+//     * DeltaClockTest
+//     * HubTest
+//
 
 #ifdef JET_TEST
 
