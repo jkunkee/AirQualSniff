@@ -458,16 +458,19 @@ public:
 #ifdef JET_TEST
 
 #define COUNTER_ENTRY(id, ivl, rep) \
-static int Counter##id; \
-static void Action##id(void*) { \
-  Counter##id++; \
-} \
+static time_t Counter##id; \
+static void Action##id(void*); \
 static DeltaClock::Entry Entry##id = { \
   .action = &Action##id, \
   .context = nullptr, \
   .interval = ivl, \
   .repeating = rep, \
-};
+}; \
+static void Action##id(void*) { \
+  Counter##id++; \
+}
+//  jet_dbgprint("  "#id":%d", Counter##id); \
+//  if (Counter##id > 70) { Entry##id.repeating = false; } \
 
 COUNTER_ENTRY(A, 1000, false)
 COUNTER_ENTRY(B, 2000, false)
