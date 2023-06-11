@@ -521,7 +521,7 @@ COUNTER_ENTRY(5, 1000, true);
 COUNTER_ENTRY(6, 12*60*60*1000, true);
 COUNTER_ENTRY(7, 1200, true);
 
-static bool DeltaClockTest() {
+bool DeltaClockTest() {
   jet_assert_var;
   DeltaClock* clock;
 
