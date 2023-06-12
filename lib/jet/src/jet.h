@@ -769,10 +769,222 @@ bool DeltaClockTest() {
 #endif // JET_TEST
 
 
+//
+// Event-driven programming library for Arduino
+//
+// (Probably trivially adaptable to any setup+loop C++ application)
+//
+// An Event is something that happens.
+//
+// Events are named in and referenced using EventNameEnum.
+//
+// Connections between Events are described in EventHandlers, which contain
+// the set of Events the EventHandler depends on and how to wait for those
+// Events. They also contain a pointer to an EventHandlerFunc function that
+// executes when the trigger conditions are met.
+//
+// EventHandlerFunc functions can, in turn, produce data and emit Events.
+//
+// No handling is currently provided to enforce it, but the directed Event
+// dependency graph should be acyclic.
+//
+// Data produced by an Event is copied into each listening EventHandler
+// in the list of triggers. Multiple data types are accommodated using
+// the EventData class; typically each Event name is associated with
+// one data type, which is then implicitly coded into the EventHandlerFuncs.
+// More complex data can be passed by having a global struct that is passed
+// by pointer in EventData.ptr, but this moves the data flow outside
+// the Eventing library's control.
+//
+// TODO:
+// Pass by reference instead of value as many places as makes sense
+// Use function pointers or enum as ID insead of String
+// no-alloc/pre-alloc option
+// debug dump of full state
+// pass handler func the full handler object to make event searching easy
+// shift type scopes inward to simplify interface
+// somehow tidy up EventHandlerFunc interface
+// make dbg.print levels meaningful (or hidden behind a macro)
+//
+
+class Trigger;
+class Event;
+class Hub;
+
+typedef jet::PointerList<Trigger> TriggerList;
+typedef jet::PointerList<Event> EventList;
+
+// Data transfer format
+typedef union _Datum {
+  float fl;
+  int16_t in16;
+  uint16_t uin16;
+  void* ptr;
+} Datum;
+
+// Function to call when an event fires.
+//
+// The called function has no way to know how to generate an event, so
+// rely on the parent EventHandler's ID string and filling out an output object
+// to allow it to do so.
+// Return true if data was generated.
+typedef bool (*HandlerFunc)(TriggerList& triggers, Datum& out);
+
+#ifndef EventIndex
+#define EventIndex String
+#endif
+
+typedef enum _TriggerType {
+    TRIGGER_MANUAL,
+    TRIGGER_ON_ANY,
+    TRIGGER_ON_ALL,
+#ifdef JET_EVT_HUB_TEMPORAL
+    TRIGGER_TEMPORAL,
+#endif
+} TriggerType;
+
+class Trigger {
+  // James: maybe allow for decimation here with 'wait until N fires'
+public:
+  Trigger(EventIndex id) : event_id(id), event_name(id), data({0}), data_ready(false) {}
+  EventIndex event_id;
+  String event_name;
+  Datum data;
+  bool data_ready;
+  void deliver(Datum data_in) {
+    jet_traceprint("    EventTrigger %s got %p", event_name.c_str(), data.ptr);
+    data = data_in;
+    data_ready = true;
+  }
+  void reset() {
+#ifdef JET_TEST
+    data.uin16 = 0xdead;
+#endif
+    data_ready = false;
+  }
+#ifdef JET_TEST
+  void debug_string(String& out);
+  friend bool HubTest();
+#endif
+};
+
+class Event {
+public:
+  Event(EventIndex id, HandlerFunc func, TriggerType type_in, time_t interval_in = 0) :
+    event_id(id), event_name(id), action(func), type(type_in), interval(interval_in) {}
+  EventIndex event_id;
+  String event_name;
+  HandlerFunc action;
+  TriggerType type;
+  TriggerList triggers;
+  time_t interval;
+  Trigger* find_trigger(EventIndex id) {
+    for (int trig_idx = 0; trig_idx < triggers.size(); trig_idx++) {
+      Trigger* trigger = triggers.get(trig_idx);
+      if (trigger != nullptr && trigger->event_id == id) {
+        return trigger;
+      }
+    }
+    return nullptr;
+  }
+  bool add_trigger(EventIndex id) {
+    Trigger* trigger = find_trigger(id);
+    if (trigger == nullptr) {
+      trigger = new Trigger(id);
+      triggers.append(trigger);
+      return true;
+    } else {
+      return false;
+    }
+  }
+  bool trigger_condition_met();
+  bool deliver(EventIndex id, Datum input, Datum& result);
+#ifdef JET_TEST
+  void debug_string(String& out);
+  friend bool HubTest();
+#endif
+};
+
+class Hub {
+public:
+#ifdef JET_TEST
+  void debug_string(String& out);
+  friend bool HubTest();
+#endif
+};
+
 #ifdef JET_TEST
 
-static bool HubTest() {
+int TestHandlerCounter = 0;
+bool TestHandler(TriggerList& triggers, Datum& out) {
+  TestHandlerCounter++;
   return false;
+}
+
+bool HubTest() {
+  jet_assert_var;
+
+  if (success) {
+    jet_dbgprint("hub trigger: constructor/destructor");
+    Trigger* tr = new Trigger("hello");
+    jet_assert(tr != nullptr);
+    jet_assert(tr->event_id == "hello");
+    jet_assert(tr->event_name.equals("hello"));
+    jet_assert(tr->data.in16 == 0);
+    jet_assert(tr->data_ready == false);
+    delete(tr);
+  }
+
+  if (success) {
+    jet_dbgprint("hub trigger: deliver/reset");
+    Trigger* tr = new Trigger("TestBareTrigger");
+    Datum d = { .in16 = 5 };
+    if (success) {
+      tr->deliver(d);
+      jet_assert(tr->data.in16 == 5);
+      jet_assert(tr->data_ready == true);
+      tr->reset();
+      jet_assert(tr->data.uin16 == 0xdead);
+      jet_assert(tr->data_ready == false);
+    }
+    delete(tr);
+  }
+
+  if (success) {
+    jet_dbgprint("hub event: constructor/destructor");
+    Event* ev = new Event("Halooo", &TestHandler, TRIGGER_ON_ALL, 1000UL);
+    jet_assert(ev->action == &TestHandler);
+    jet_assert(ev->event_id == "Halooo");
+    jet_assert(ev->event_name.equals("Halooo"));
+    jet_assert(ev->interval == 1000UL);
+    jet_assert(ev->type == TRIGGER_ON_ALL);
+    jet_assert(ev->triggers.size() == 0);
+    delete(ev);
+  }
+
+  if (success) {
+    jet_dbgprint("hub event: add/find trigger");
+    Event* ev = new Event("Halooo", &TestHandler, TRIGGER_ON_ANY);
+    jet_assert(ev->add_trigger("Partisan"));
+    jet_assert(ev->triggers.size() == 1);
+    jet_assert(ev->triggers.get(0) != nullptr);
+    jet_assert(ev->triggers.get(0)->event_name.equals("Partisan"));
+    Trigger* tr = ev->find_trigger("Partisan");
+    jet_assert(tr != nullptr);
+    jet_assert(tr->event_name.equals("Partisan"));
+    tr = ev->find_trigger("Lawrencium");
+    jet_assert(tr == nullptr);
+    delete(ev);
+  }
+
+  if (success) {
+    jet_dbgprint("hub: constructor/destructor");
+    Hub* hub = new Hub();
+    jet_assert(hub != nullptr);
+    delete(hub);
+  }
+
+  return success;
 }
 
 #endif // JET_TEST
