@@ -872,6 +872,11 @@ class Event {
 public:
   Event(EventIndex id, HandlerFunc func, TriggerType type_in, time_t interval_in = 0) :
     event_id(id), event_name(id), action(func), type(type_in), interval(interval_in) {}
+  ~Event() {
+    for (int trig_idx = 0; trig_idx < triggers.size(); trig_idx++) {
+      delete(triggers.get(trig_idx));
+    }
+  }
   EventIndex event_id;
   String event_name;
   HandlerFunc action;
@@ -881,7 +886,7 @@ public:
   Trigger* find_trigger(EventIndex id) {
     for (int trig_idx = 0; trig_idx < triggers.size(); trig_idx++) {
       Trigger* trigger = triggers.get(trig_idx);
-      if (trigger != nullptr && trigger->event_id == id) {
+      if (trigger->event_id == id) {
         return trigger;
       }
     }
@@ -897,8 +902,52 @@ public:
       return false;
     }
   }
-  bool trigger_condition_met();
-  bool deliver(EventIndex id, Datum input, Datum& result);
+  void reset_triggers() {
+    for (int trig_idx = 0; trig_idx < triggers.size(); trig_idx++) {
+      triggers.get(trig_idx)->reset();
+    }
+  }
+  bool trigger_condition_met() {
+    switch (type) {
+    default:
+    case TRIGGER_MANUAL:
+#ifdef JET_EVT_HUB_TEMPORAL
+    case TRIGGER_TEMPORAL:
+#endif
+      return false;
+    case TRIGGER_ON_ANY:
+      for (int trig_idx = 0; trig_idx < triggers.size(); trig_idx++) {
+        if (triggers.get(trig_idx)->data_ready) {
+          return true;
+        }
+      }
+      return false;
+    case TRIGGER_ON_ALL:
+      for (int trig_idx = 0; trig_idx < triggers.size(); trig_idx++) {
+        if (!triggers.get(trig_idx)->data_ready) {
+          return false;
+        }
+      }
+      return true;
+    }
+    return false;
+  }
+  bool take_action(Datum& result) {
+    bool data_generated = action(triggers, result);
+    reset_triggers();
+    return data_generated;
+  }
+  bool deliver_trigger(EventIndex id, Datum input, Datum& result) {
+    Trigger* trigger = find_trigger(id);
+    if (trigger != nullptr && trigger->event_id == id) {
+      trigger->data = input;
+      trigger->data_ready = true;
+      if (trigger_condition_met()) {
+        return take_action(result);
+      }
+    }
+    return false;
+  }
 #ifdef JET_TEST
   void debug_string(String& out);
   friend bool HubTest();
@@ -975,6 +1024,98 @@ bool HubTest() {
     tr = ev->find_trigger("Lawrencium");
     jet_assert(tr == nullptr);
     delete(ev);
+  }
+
+  if (success) {
+    Event* ev = new Event("Halooo", &TestHandler, TRIGGER_MANUAL);
+    jet_dbgprint("hub event: reset");
+    jet_assert(ev->add_trigger("Partisan"));
+    jet_assert(ev->triggers.get(0)->data_ready == false);
+    ev->triggers.get(0)->data_ready = true;
+    jet_assert(ev->triggers.get(0)->data_ready == true);
+    ev->reset_triggers();
+    jet_assert(ev->triggers.get(0)->data_ready == false);
+    delete(ev);
+  }
+
+  if (success) {
+    Event* ev = new Event("TestEvent", &TestHandler, TRIGGER_MANUAL);
+    if (success) {
+      TestHandlerCounter = 0;
+      Datum datum = { 0 };
+      jet_dbgprint("hub event: take_action");
+      jet_assert(ev->add_trigger("TestEventTrigger"));
+      ev->triggers.get(0)->data_ready = true;
+      jet_assert(!ev->take_action(datum));
+      jet_assert(ev->triggers.get(0)->data_ready == false);
+      jet_assert(TestHandlerCounter == 1);
+    }
+    if (success) {
+      TestHandlerCounter = 0;
+      Datum datum = { 0 };
+      ev->reset_triggers();
+      jet_dbgprint("hub event: deliver");
+      jet_assert(ev->triggers.get(0)->data_ready == false);
+      jet_assert(ev->triggers.get(0)->data.uin16 == 0xdead);
+      jet_assert(!ev->deliver_trigger("DoesNotExist", datum, datum));
+      jet_assert(ev->triggers.get(0)->data_ready == false);
+      jet_assert(ev->triggers.get(0)->data.uin16 == 0xdead);
+      jet_assert(TestHandlerCounter == 0);
+      datum.uin16 = 5;
+      jet_assert(!ev->deliver_trigger("TestEventTrigger", datum, datum));
+      jet_assert(ev->triggers.get(0)->data_ready == true);
+      jet_assert(ev->triggers.get(0)->data.uin16 == 5);
+      jet_assert(TestHandlerCounter == 0);
+    }
+    delete(ev);
+  }
+
+  if (success) {
+    jet_dbgprint("hub event: trigger firing and conditions");
+    Event* ev;
+    Datum datum;
+
+    TestHandlerCounter = 0;
+    ev = new Event("ManualEvent", &TestHandler, TRIGGER_MANUAL);
+    datum = { 0 };
+    jet_assert(ev->add_trigger("SingleTrigger"));
+    jet_assert(!ev->deliver_trigger("SingleTrigger", datum, datum));
+    jet_assert(TestHandlerCounter == 0);
+    delete(ev);
+
+    TestHandlerCounter = 0;
+    ev = new Event("AnyEvent", &TestHandler, TRIGGER_ON_ANY);
+    datum = { 0 };
+    jet_assert(ev->add_trigger("TriggerOne"));
+    jet_assert(ev->add_trigger("TriggerTwo"));
+    jet_assert(!ev->deliver_trigger("TriggerOne", datum, datum));
+    jet_assert(TestHandlerCounter == 1);
+    jet_assert(!ev->deliver_trigger("TriggerTwo", datum, datum));
+    jet_assert(TestHandlerCounter == 2);
+    delete(ev);
+
+    TestHandlerCounter = 0;
+    ev = new Event("AnyEvent", &TestHandler, TRIGGER_ON_ALL);
+    datum = { 0 };
+    jet_assert(ev->add_trigger("TriggerOne"));
+    jet_assert(ev->add_trigger("TriggerTwo"));
+    jet_assert(!ev->deliver_trigger("TriggerOne", datum, datum));
+    jet_assert(TestHandlerCounter == 0);
+    jet_assert(!ev->deliver_trigger("TriggerTwo", datum, datum));
+    jet_assert(TestHandlerCounter == 1);
+    delete(ev);
+
+#ifdef JET_EVT_HUB_TEMPORAL
+    TestHandlerCounter = 0;
+    ev = new Event("TemporalEvent", &TestHandler, TRIGGER_TEMPORAL);
+    datum = { 0 };
+    jet_assert(ev->add_trigger("SingleTrigger"));
+    jet_assert(!ev->deliver_trigger("SingleTrigger", datum, datum));
+    jet_assert(TestHandlerCounter == 0);
+    ev->take_action(datum);
+    jet_assert(TestHandlerCounter == 1);
+    delete(ev);
+#endif
   }
 
   if (success) {
