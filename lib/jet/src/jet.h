@@ -869,7 +869,14 @@ public:
 };
 
 class Event {
+private:
+  String event_name;
+  HandlerFunc action;
+  TriggerType type;
+  TriggerList triggers;
+  time_t interval;
 public:
+  EventIndex event_id;
   Event(EventIndex id, HandlerFunc func, TriggerType type_in, time_t interval_in = 0) :
     event_id(id), event_name(id), action(func), type(type_in), interval(interval_in) {}
   ~Event() {
@@ -877,12 +884,6 @@ public:
       delete(triggers.get(trig_idx));
     }
   }
-  EventIndex event_id;
-  String event_name;
-  HandlerFunc action;
-  TriggerType type;
-  TriggerList triggers;
-  time_t interval;
   Trigger* find_trigger(EventIndex id) {
     for (int trig_idx = 0; trig_idx < triggers.size(); trig_idx++) {
       Trigger* trigger = triggers.get(trig_idx);
@@ -955,7 +956,70 @@ public:
 };
 
 class Hub {
+private:
+  EventList m_event_list;
+  Event* find_event(EventIndex id) {
+    for (int idx = 0; idx < m_event_list.size(); idx++) {
+      Event* event = m_event_list.get(idx);
+      if (event->event_id == id) {
+        return event;
+      }
+    }
+    return nullptr;
+  }
+#ifdef JET_EVT_HUB_TEMPORAL
+  DeltaClock clock;
+  // Generic DeltaClock Event actions can take a void* context.
+  // Hub DeltaClock events use a wrapper action that lets the actions fire events.
+  typedef struct _TemporalContext {
+    Event* event;
+    Hub* hub;
+  } TemporalContext;
+  static void TemporalAction(void* context_in) {
+    TemporalContext* context = (TemporalContext*)context_in;
+    Datum datum;
+    bool produced = context->event->take_action(datum);
+    if (produced != false) {
+      //context->hub->deliver(context->event->event_id, datum);
+    }
+  }
+#endif
 public:
+  Hub() {}
+  ~Hub() {
+    for (int evt_idx = 0; evt_idx < m_event_list.size(); evt_idx++) {
+      delete(m_event_list.get(evt_idx));
+    }
+    // TODO: clean up allocations fed to DeltaClock
+  }
+#ifdef JET_EVT_HUB_TEMPORAL
+  void update(time_t new_now);
+#endif
+  bool add_event(EventIndex id, HandlerFunc func, TriggerType type, time_t interval = 0) {
+    Event* event = find_event(id);
+    if (event != nullptr) {
+      return false; // TODO considering overwrite
+    }
+    event = new Event(id, func, type, interval);
+    m_event_list.append(event);
+#ifdef JET_EVT_HUB_TEMPORAL
+    if (type == TRIGGER_TEMPORAL) {
+      DeltaClock::Entry* clock_entry = new DeltaClock::Entry();
+      clock_entry->action = &TemporalAction;
+      TemporalContext* context = new TemporalContext();
+      context->event = event;
+      context->hub = this;
+      clock_entry->context = context;
+      clock_entry->interval = interval;
+      clock_entry->repeating = true;
+      return clock.schedule(clock_entry);
+    }
+#endif
+    return true;
+  }
+  bool add_event_trigger(EventIndex event_id, EventIndex trigger_event_id);
+  bool deliver(EventIndex event_id, Datum datum);
+  bool is_dag();
 #ifdef JET_TEST
   void debug_string(String& out);
   friend bool HubTest();
@@ -1122,6 +1186,19 @@ bool HubTest() {
     jet_dbgprint("hub: constructor/destructor");
     Hub* hub = new Hub();
     jet_assert(hub != nullptr);
+    delete(hub);
+  }
+
+  if(success) {
+    Hub* hub = new Hub();
+    if (success) {
+      jet_dbgprint("hub: normal insertion");
+      TestHandlerCounter = 0;
+      jet_assert(hub->add_event("Event1", TestHandler, TRIGGER_ON_ANY));
+      jet_assert(hub->m_event_list.size() == 1);
+      jet_assert(hub->m_event_list.get(0)->event_id.equals("Event1"));
+      jet_assert(hub->m_event_list.get(0)->type == TRIGGER_ON_ANY);
+    }
     delete(hub);
   }
 
