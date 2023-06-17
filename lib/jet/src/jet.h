@@ -993,7 +993,9 @@ public:
     // TODO: clean up allocations fed to DeltaClock
   }
 #ifdef JET_EVT_HUB_TEMPORAL
-  void update(time_t new_now);
+  void update(time_t new_now) {
+    clock.update(new_now);
+  }
 #endif
   bool add_event(EventIndex id, HandlerFunc func, TriggerType type, time_t interval = 0) {
     Event* event = find_event(id);
@@ -1017,8 +1019,25 @@ public:
 #endif
     return true;
   }
-  bool add_event_trigger(EventIndex event_id, EventIndex trigger_event_id);
-  bool deliver(EventIndex event_id, Datum datum);
+  bool add_event_trigger(EventIndex event_id, EventIndex trigger_event_id) {
+    Event* event = find_event(event_id);
+    if (event != nullptr) {
+      return event->add_trigger(trigger_event_id);
+    }
+    return false;
+  }
+  bool deliver(EventIndex event_id, Datum datum) {
+    for (int event_idx = 0; event_idx < m_event_list.size(); event_idx++) {
+      Datum product = { 0 };
+      bool produced;
+      Event* event = m_event_list.get(event_idx);
+      produced = event->deliver_trigger(event_id, datum, product);
+      if (produced) {
+        deliver(event->event_id, product);
+      }
+    }
+    return true;
+  }
   bool is_dag();
 #ifdef JET_TEST
   void debug_string(String& out);
@@ -1032,6 +1051,11 @@ int TestHandlerCounter = 0;
 bool TestHandler(TriggerList& triggers, Datum& out) {
   TestHandlerCounter++;
   return false;
+}
+bool TestHandlerProducer(TriggerList& triggers, Datum& out) {
+  TestHandlerCounter++;
+  out.in16 = TestHandlerCounter;
+  return true;
 }
 
 bool HubTest() {
@@ -1192,13 +1216,63 @@ bool HubTest() {
   if(success) {
     Hub* hub = new Hub();
     if (success) {
-      jet_dbgprint("hub: normal insertion");
+      jet_dbgprint("hub: normal Event insertion");
       TestHandlerCounter = 0;
       jet_assert(hub->add_event("Event1", TestHandler, TRIGGER_ON_ANY));
       jet_assert(hub->m_event_list.size() == 1);
       jet_assert(hub->m_event_list.get(0)->event_id.equals("Event1"));
       jet_assert(hub->m_event_list.get(0)->type == TRIGGER_ON_ANY);
     }
+    if (success) {
+      jet_dbgprint("hub: trigger insertion");
+      jet_assert(hub->add_event_trigger("Event1", "Event1Trigger1"));
+      jet_assert(hub->find_event("Event1") != nullptr);
+      jet_assert(hub->find_event("Event1")->find_trigger("Event1Trigger1") != nullptr);
+    }
+    if (success) {
+      jet_dbgprint("hub: temporal insertion");
+      jet_assert(hub->add_event("Event2", TestHandler, TRIGGER_TEMPORAL, 1000UL));
+      jet_assert(hub->find_event("Event2") != nullptr);
+    }
+    if (success) {
+      TestHandlerCounter = 0;
+      jet_dbgprint("hub: update");
+      hub->update(1000);
+      jet_assert(TestHandlerCounter == 1);
+      hub->update(2000);
+      jet_assert(TestHandlerCounter == 2);
+    }
+    delete(hub);
+  }
+
+  if (success) {
+    TestHandlerCounter = 0;
+    Hub* hub = new Hub();
+    Datum datum = { 0 };
+    jet_dbgprint("hub: delivery");
+    jet_assert(hub->add_event("OnAny", &TestHandlerProducer, TRIGGER_ON_ANY));
+    jet_assert(hub->add_event_trigger("OnAny", "Trigger1"));
+    jet_assert(hub->add_event_trigger("OnAny", "Trigger2"));
+    jet_assert(hub->add_event("OnAll", &TestHandlerProducer, TRIGGER_ON_ALL));
+    jet_assert(hub->add_event_trigger("OnAll", "Trigger3"));
+    jet_assert(hub->add_event_trigger("OnAll", "Trigger4"));
+    jet_assert(hub->deliver("Trigger1", datum));
+    jet_assert(TestHandlerCounter == 1);
+    jet_assert(hub->deliver("Trigger2", datum));
+    jet_assert(TestHandlerCounter == 2);
+    jet_assert(hub->deliver("Trigger3", datum));
+    jet_assert(TestHandlerCounter == 2);
+    jet_assert(hub->deliver("Trigger4", datum));
+    jet_assert(TestHandlerCounter == 3);
+    jet_assert(hub->add_event("Tier2", &TestHandlerProducer, TRIGGER_ON_ALL));
+    jet_assert(hub->add_event_trigger("Tier2", "OnAll"));
+    jet_assert(hub->add_event_trigger("Tier2", "OnAny"));
+    jet_assert(hub->deliver("Trigger2", datum));
+    jet_assert(TestHandlerCounter == 4);
+    jet_assert(hub->deliver("Trigger3", datum));
+    jet_assert(TestHandlerCounter == 4);
+    jet_assert(hub->deliver("Trigger4", datum));
+    jet_assert(TestHandlerCounter == 6);
     delete(hub);
   }
 
