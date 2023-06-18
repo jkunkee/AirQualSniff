@@ -969,6 +969,8 @@ private:
   }
 #ifdef JET_EVT_HUB_TEMPORAL
   DeltaClock clock;
+  PointerList<void> m_clock_entries;
+  PointerList<void> m_clock_handler_contexts;
   // Generic DeltaClock Event actions can take a void* context.
   // Hub DeltaClock events use a wrapper action that lets the actions fire events.
   typedef struct _TemporalContext {
@@ -990,7 +992,14 @@ public:
     for (int evt_idx = 0; evt_idx < m_event_list.size(); evt_idx++) {
       delete(m_event_list.get(evt_idx));
     }
-    // TODO: clean up allocations fed to DeltaClock
+#ifdef JET_EVT_HUB_TEMPORAL
+    for (int idx = 0; idx < m_clock_entries.size(); idx++) {
+      free(m_clock_entries.get(idx));
+    }
+    for (int idx = 0; idx < m_clock_handler_contexts.size(); idx++) {
+      free(m_clock_handler_contexts.get(idx));
+    }
+#endif
   }
 #ifdef JET_EVT_HUB_TEMPORAL
   void update(time_t new_now) {
@@ -1007,8 +1016,10 @@ public:
 #ifdef JET_EVT_HUB_TEMPORAL
     if (type == TRIGGER_TEMPORAL) {
       DeltaClock::Entry* clock_entry = new DeltaClock::Entry();
+      m_clock_entries.append(clock_entry);
       clock_entry->action = &TemporalAction;
       TemporalContext* context = new TemporalContext();
+      m_clock_handler_contexts.append(context);
       context->event = event;
       context->hub = this;
       clock_entry->context = context;
