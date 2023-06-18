@@ -1231,7 +1231,7 @@ bool HubTest() {
       TestHandlerCounter = 0;
       jet_assert(hub->add_event("Event1", TestHandler, TRIGGER_ON_ANY));
       jet_assert(hub->m_event_list.size() == 1);
-      jet_assert(hub->m_event_list.get(0)->event_id.equals("Event1"));
+      jet_assert(hub->m_event_list.get(0)->event_id == "Event1");
       jet_assert(hub->m_event_list.get(0)->type == TRIGGER_ON_ANY);
     }
     if (success) {
