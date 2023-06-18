@@ -982,7 +982,7 @@ private:
     Datum datum;
     bool produced = context->event->take_action(datum);
     if (produced != false) {
-      //context->hub->deliver(context->event->event_id, datum);
+      context->hub->deliver(context->event->event_id, datum);
     }
   }
 #endif
@@ -1284,6 +1284,15 @@ bool HubTest() {
     jet_assert(TestHandlerCounter == 4);
     jet_assert(hub->deliver("Trigger4", datum));
     jet_assert(TestHandlerCounter == 6);
+    jet_dbgprint("hub: temporaldelivery");
+    jet_assert(hub->add_event("Timer1", &TestHandlerProducer, TRIGGER_TEMPORAL, 1000UL));
+    jet_assert(hub->add_event_trigger("OnAny", "Timer1"));
+    if (success) {
+      hub->update((time_t)1000);
+      // Timer1 TestHandlerProducer fires and
+      // triggers OnAny TestHandlerProducer
+      jet_assert(TestHandlerCounter == 8);
+    }
     delete(hub);
   }
 
