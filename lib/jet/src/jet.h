@@ -44,6 +44,8 @@
 #ifdef JET_TEST
 
 #ifdef PARTICLE_WIRING_ARDUINO_COMPATIBILTY
+#undef F
+#define F(X) (X)
 #define jet_dbgprint(...) Serial.printlnf(__VA_ARGS__)
 #elif defined(ARDUINO)
 // https://github.com/arduino-libraries/Arduino_DebugUtils/blob/master/src/Arduino_DebugUtils.h
@@ -362,7 +364,8 @@ private:
   Entry* m_head;
   time_t m_last_update;
   // constant for detecting most rollover, overflow, and underflow conditions
-  const time_t m_max_interval = (((time_t)1) << (sizeof(time_t) * 8 - 1)) - 1;
+  // max type value / 2
+  const time_t m_max_interval = ((time_t)0xffffffffffffffffULL) >> 1;
 public:
   DeltaClock() : m_head(nullptr), m_last_update(0) {}
   ~DeltaClock() { clear(); }
@@ -862,13 +865,26 @@ public:
 #endif
     data_ready = false;
   }
+  void debug_string(String& out) {
+    out += F("    ");
+    out += event_name;
+    out += F(": ");
+    out += data_ready;
+    if (data_ready) {
+      out += " (";
+      out += String(data.in16);
+      out += ")";
+    }
+    out += "\n";
+  }
 #ifdef JET_TEST
-  void debug_string(String& out);
   friend bool HubTest();
 #endif
 };
 
 class Event {
+public:
+  EventIndex event_id;
 private:
   String event_name;
   HandlerFunc action;
@@ -876,11 +892,10 @@ private:
   TriggerList triggers;
   time_t interval;
 public:
-  EventIndex event_id;
   Event(EventIndex id, HandlerFunc func, TriggerType type_in, time_t interval_in = 0) :
     event_id(id), event_name(id), action(func), type(type_in), interval(interval_in) {}
   ~Event() {
-    for (int trig_idx = 0; trig_idx < triggers.size(); trig_idx++) {
+    for (unsigned int trig_idx = 0; trig_idx < triggers.size(); trig_idx++) {
       delete(triggers.get(trig_idx));
     }
   }
@@ -896,7 +911,7 @@ public:
     return true;
   }
   Trigger* find_trigger(EventIndex id) {
-    for (int trig_idx = 0; trig_idx < triggers.size(); trig_idx++) {
+    for (unsigned int trig_idx = 0; trig_idx < triggers.size(); trig_idx++) {
       Trigger* trigger = triggers.get(trig_idx);
       if (trigger->event_id == id) {
         return trigger;
@@ -915,7 +930,7 @@ public:
     }
   }
   void reset_triggers() {
-    for (int trig_idx = 0; trig_idx < triggers.size(); trig_idx++) {
+    for (unsigned int trig_idx = 0; trig_idx < triggers.size(); trig_idx++) {
       triggers.get(trig_idx)->reset();
     }
   }
@@ -928,14 +943,14 @@ public:
 #endif
       return false;
     case TRIGGER_ON_ANY:
-      for (int trig_idx = 0; trig_idx < triggers.size(); trig_idx++) {
+      for (unsigned int trig_idx = 0; trig_idx < triggers.size(); trig_idx++) {
         if (triggers.get(trig_idx)->data_ready) {
           return true;
         }
       }
       return false;
     case TRIGGER_ON_ALL:
-      for (int trig_idx = 0; trig_idx < triggers.size(); trig_idx++) {
+      for (unsigned int trig_idx = 0; trig_idx < triggers.size(); trig_idx++) {
         if (!triggers.get(trig_idx)->data_ready) {
           return false;
         }
@@ -960,8 +975,41 @@ public:
     }
     return false;
   }
+  void debug_string(String& out) {
+    out += F("  ");
+    out += this->event_name;
+    out += ", type:";
+    switch (type) {
+      case TRIGGER_MANUAL:
+        out += "TRIGGER_MANUAL";
+        break;
+      case TRIGGER_ON_ALL:
+        out += "TRIGGER_ON_ALL";
+        break;
+      case TRIGGER_ON_ANY:
+        out += "TRIGGER_ON_ANY";
+        break;
+#ifdef JET_EVT_HUB_TEMPORAL
+      case TRIGGER_TEMPORAL:
+        out += "TRIGGER_TEMPORAL";
+        break;
+#endif
+      default:
+        out += "unknown!";
+        break;
+    }
+#ifdef JET_EVT_HUB_TEMPORAL
+    if (type == TRIGGER_TEMPORAL) {
+      out += " interval:";
+      out += String((uint32_t)this->interval);
+    }
+#endif
+    out += "\n";
+    for (unsigned int idx = 0; idx < this->triggers.size(); idx++) {
+      triggers.get(idx)->debug_string(out);
+    }
+  }
 #ifdef JET_TEST
-  void debug_string(String& out);
   friend bool HubTest();
 #endif
 };
@@ -970,7 +1018,7 @@ class Hub {
 private:
   EventList m_event_list;
   Event* find_event(EventIndex id) {
-    for (int idx = 0; idx < m_event_list.size(); idx++) {
+    for (unsigned int idx = 0; idx < m_event_list.size(); idx++) {
       Event* event = m_event_list.get(idx);
       if (event->event_id == id) {
         return event;
@@ -1000,14 +1048,14 @@ private:
 public:
   Hub() {}
   ~Hub() {
-    for (int evt_idx = 0; evt_idx < m_event_list.size(); evt_idx++) {
+    for (unsigned int evt_idx = 0; evt_idx < m_event_list.size(); evt_idx++) {
       delete(m_event_list.get(evt_idx));
     }
 #ifdef JET_EVT_HUB_TEMPORAL
-    for (int idx = 0; idx < m_clock_entries.size(); idx++) {
+    for (unsigned int idx = 0; idx < m_clock_entries.size(); idx++) {
       free(m_clock_entries.get(idx));
     }
-    for (int idx = 0; idx < m_clock_handler_contexts.size(); idx++) {
+    for (unsigned int idx = 0; idx < m_clock_handler_contexts.size(); idx++) {
       free(m_clock_handler_contexts.get(idx));
     }
 #endif
@@ -1051,7 +1099,7 @@ public:
     return false;
   }
   bool deliver(EventIndex event_id, Datum datum) {
-    for (int event_idx = 0; event_idx < m_event_list.size(); event_idx++) {
+    for (unsigned int event_idx = 0; event_idx < m_event_list.size(); event_idx++) {
       Datum product = { 0 };
       bool produced;
       Event* event = m_event_list.get(event_idx);
@@ -1063,8 +1111,20 @@ public:
     return true;
   }
   bool is_dag();
+  void debug_string(String& out) {
+    out += "jet::evt::Hub(@0x";
+    out += String((uintptr_t)this, HEX);
+    out += ")\n";
+    for (unsigned int idx = 0; idx < m_event_list.size(); idx++) {
+      m_event_list.get(idx)->debug_string(out);
+    }
+#ifdef JET_EVT_HUB_TEMPORAL
+    clock.debug_string(out);
+#endif
+//    out += (is_dag() ? "Is DAG." : "Is not DAG.");
+//    out += "\n";
+  }
 #ifdef JET_TEST
-  void debug_string(String& out);
   friend bool HubTest();
 #endif
 };

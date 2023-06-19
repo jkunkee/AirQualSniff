@@ -4,10 +4,8 @@
 #include "sparkline.h"
 #include "Atmospherics.h"
 #include "sps30.h"
+#define JET_EVT_HUB_TEMPORAL
 #include "jet.h"
-//#define EVENTHUB_DEBUG
-#define EVENTHUB_TEMPORAL
-#include "Eventing.h"
 // checked-in 3p dependencies
 #include "SparkFun_SGP30_Arduino_Library.h"
 #include "U8g2lib.h"
@@ -61,7 +59,7 @@ static constexpr int LED = D7;
 
 namespace infrastructure {
 
-    static Eventing::Hub event_hub;
+    static jet::evt::Hub event_hub;
 
     static ApplicationWatchdog *wd = NULL;
     static int wd_count = 0;
@@ -70,7 +68,7 @@ namespace infrastructure {
         Serial.printlnf("ApplicationWatchdog triggered!");
         Serial.printlnf("######### FreeRAM: %lu Uptime: %ld", System.freeMemory(), millis());
         String hubSummary;
-        event_hub.ToString(hubSummary);
+        event_hub.debug_string(hubSummary);
         Serial.print(hubSummary);
         Serial.flush();
         if (wd_count > 3) {
@@ -85,11 +83,11 @@ namespace infrastructure {
 
     static void init();
     static void init() {
-        event_hub.begin();
+        event_hub.update(millis());
         wd = new ApplicationWatchdog(30000U, &watchdogHandler, 1536);
     }
 
-    bool DumpOsState(Eventing::TriggerList& triggers, Eventing::Datum& out) {
+    bool DumpOsState(jet::evt::TriggerList& triggers, jet::evt::Datum& out) {
         Serial.printlnf("######### FreeRAM: %lu Uptime: %ld", System.freeMemory(), millis());
         return false;
     }
@@ -256,7 +254,7 @@ namespace Display {
     }
 
     bool BufferIsDirty = false;
-    bool Paint(Eventing::TriggerList& triggers, Eventing::Datum& out) {
+    bool Paint(jet::evt::TriggerList& triggers, jet::evt::Datum& out) {
         if (BufferIsDirty != false) {
             //unsigned long drawStart = millis();
             u8g2_ssd1327_unlock();
@@ -356,12 +354,12 @@ namespace Joystick {
 
         //Serial.printlnf("Joy dir change check; joyDir1=%d joyDir2=%d old=%d", joyDir1, joyDir2, joyDirOld);
         if (joyDir1 == joyDir2 && joyDir1 != joyDirOld) {
-            Eventing::Datum joystickData;
+            jet::evt::Datum joystickData;
             joystickData.uin16 = joyDir1;
             joyDirOld = joyDir1;
 
             //Serial.printlnf("Joy dir change event sent");
-            infrastructure::event_hub.Deliver("Joystick Direction Change", joystickData);
+            infrastructure::event_hub.deliver("Joystick Direction Change", joystickData);
         }
     }
 } // namespace Joystick
@@ -467,23 +465,23 @@ static bool LPS25HB_data_is_ready() {
             (status & STATUS_REG_P_DA);
 }
 
-static bool ReadLPS25HB(Eventing::TriggerList& triggers, Eventing::Datum& out);
-static bool ReadLPS25HB(Eventing::TriggerList& triggers, Eventing::Datum& out) {
+static bool ReadLPS25HB(jet::evt::TriggerList& triggers, jet::evt::Datum& out);
+static bool ReadLPS25HB(jet::evt::TriggerList& triggers, jet::evt::Datum& out) {
     if (lps25hb_pressure_sensor_present != false && LPS25HB_data_is_ready()) {
-        Eventing::Datum tempC;
-        Eventing::Datum tempF;
-        Eventing::Datum pressurehPa;
-        Eventing::Datum altitudem;
+        jet::evt::Datum tempC;
+        jet::evt::Datum tempF;
+        jet::evt::Datum pressurehPa;
+        jet::evt::Datum altitudem;
 
         tempC.fl = pressureSensor.getTemperature_degC() + pressureSensorTempFOffset * 5 / 9;
         tempF.fl = C_TO_F(tempC.fl);
         pressurehPa.fl = pressureSensor.getPressure_hPa();
         altitudem.fl = atmospherics::pressure_to_est_altitude(pressurehPa.fl);
 
-        infrastructure::event_hub.Deliver(String("LPS25HB Pressure hPa"), pressurehPa);
-        infrastructure::event_hub.Deliver(String("LPS25HB Altitude m"), altitudem);
-        infrastructure::event_hub.Deliver(String("LPS25HB Temp C"), tempC);
-        infrastructure::event_hub.Deliver(String("LPS25HB Temp F"), tempF);
+        infrastructure::event_hub.deliver(String("LPS25HB Pressure hPa"), pressurehPa);
+        infrastructure::event_hub.deliver(String("LPS25HB Altitude m"), altitudem);
+        infrastructure::event_hub.deliver(String("LPS25HB Temp C"), tempC);
+        infrastructure::event_hub.deliver(String("LPS25HB Temp F"), tempF);
     }
 
     // Data is delivered with Deliver, so out param is unused.
@@ -511,20 +509,20 @@ static constexpr uint16_t co2SensorInterval = 10;
 // 70 deg F in actively cooled airstream was -1 deg F
 static constexpr float co2SensorTempFOffset = 80.1 - 79.0;
 
-static bool ReadSCD30(Eventing::TriggerList& triggers, Eventing::Datum& out);
-static bool ReadSCD30(Eventing::TriggerList& triggers, Eventing::Datum& out) {
+static bool ReadSCD30(jet::evt::TriggerList& triggers, jet::evt::Datum& out);
+static bool ReadSCD30(jet::evt::TriggerList& triggers, jet::evt::Datum& out) {
     if (co2SensorPresent && co2Sensor.dataAvailable()) {
-        Eventing::Datum rh;
-        Eventing::Datum tempC;
-        Eventing::Datum co2;
+        jet::evt::Datum rh;
+        jet::evt::Datum tempC;
+        jet::evt::Datum co2;
 
         rh.fl = co2Sensor.getHumidity();
         tempC.fl = co2Sensor.getTemperature() + co2SensorTempFOffset * 5 / 9;
         co2.uin16 = co2Sensor.getCO2();
 
-        infrastructure::event_hub.Deliver(String("SCD30 CO2 ppm"), co2);
-        infrastructure::event_hub.Deliver(String("SCD30 temp C"), tempC);
-        infrastructure::event_hub.Deliver(String("SCD30 rh %"), rh);
+        infrastructure::event_hub.deliver(String("SCD30 CO2 ppm"), co2);
+        infrastructure::event_hub.deliver(String("SCD30 temp C"), tempC);
+        infrastructure::event_hub.deliver(String("SCD30 rh %"), rh);
     }
     // Data is delivered with Deliver, so out param is unused.
     return false;
@@ -534,8 +532,8 @@ static AHT20 humiditySensor;
 static bool humiditySensorPresent = false;
 static constexpr float humiditySensorTempOffset = 0.0;
 
-static bool ReadAHT20(Eventing::TriggerList& triggers, Eventing::Datum& out);
-static bool ReadAHT20(Eventing::TriggerList& triggers, Eventing::Datum& out) {
+static bool ReadAHT20(jet::evt::TriggerList& triggers, jet::evt::Datum& out);
+static bool ReadAHT20(jet::evt::TriggerList& triggers, jet::evt::Datum& out) {
     if (humiditySensorPresent && humiditySensor.isCalibrated()) {
         humiditySensor.triggerMeasurement();
         out.fl = humiditySensor.getHumidity();
@@ -544,13 +542,13 @@ static bool ReadAHT20(Eventing::TriggerList& triggers, Eventing::Datum& out) {
     return false;
 }
 
-static bool CalculateAbsoluteHumidity_8_8_g_m3(Eventing::TriggerList& triggers, Eventing::Datum& out);
-static bool CalculateAbsoluteHumidity_8_8_g_m3(Eventing::TriggerList& triggers, Eventing::Datum& out) {
+static bool CalculateAbsoluteHumidity_8_8_g_m3(jet::evt::TriggerList& triggers, jet::evt::Datum& out);
+static bool CalculateAbsoluteHumidity_8_8_g_m3(jet::evt::TriggerList& triggers, jet::evt::Datum& out) {
     float tempC = -NAN;
     float pressurehPa = -NAN;
     float rh = -NAN;
     for (size_t evt_idx = 0; evt_idx < triggers.size(); evt_idx++) {
-        Eventing::Trigger* trigger = triggers.get(evt_idx);
+        jet::evt::Trigger* trigger = triggers.get(evt_idx);
         if (trigger->data_ready) {
             if (trigger->event_id.equalsIgnoreCase(String("LPS25HB Pressure hPa"))) {
                 pressurehPa = trigger->data.fl;
@@ -596,30 +594,30 @@ static SGP30 vocSensor;
 static bool vocSensorPresent = false;
 constexpr uint32_t vocReadInterval = 1000;
 
-static bool ReadSGP30(Eventing::TriggerList& triggers, Eventing::Datum& out);
-static bool ReadSGP30(Eventing::TriggerList& triggers, Eventing::Datum& out) {
+static bool ReadSGP30(jet::evt::TriggerList& triggers, jet::evt::Datum& out);
+static bool ReadSGP30(jet::evt::TriggerList& triggers, jet::evt::Datum& out) {
     if (vocSensorPresent) {
-        Eventing::Datum datum;
+        jet::evt::Datum datum;
         vocSensor.measureAirQuality();
         if (vocSensor.CO2 == 400 && vocSensor.TVOC == 0) {
             // Sensor is still initializing (first 15s after init)
             return false;
         }
         datum.uin16 = vocSensor.TVOC;
-        infrastructure::event_hub.Deliver(String("SGP30 tVOC ppb"), datum);
+        infrastructure::event_hub.deliver(String("SGP30 tVOC ppb"), datum);
         datum.uin16 = vocSensor.CO2;
-        infrastructure::event_hub.Deliver(String("SGP30 eCO2 ppm"), datum);
+        infrastructure::event_hub.deliver(String("SGP30 eCO2 ppm"), datum);
         vocSensor.measureRawSignals();
         datum.uin16 = vocSensor.H2;
-        infrastructure::event_hub.Deliver(String("SGP30 H2"), datum);
+        infrastructure::event_hub.deliver(String("SGP30 H2"), datum);
         datum.uin16 = vocSensor.ethanol;
-        infrastructure::event_hub.Deliver(String("SGP30 ethanol"), datum);
+        infrastructure::event_hub.deliver(String("SGP30 ethanol"), datum);
     }
     return false;
 }
 
-static bool SaveSGP30Baselines(Eventing::TriggerList& triggers, Eventing::Datum& out);
-static bool SaveSGP30Baselines(Eventing::TriggerList& triggers, Eventing::Datum& out) {
+static bool SaveSGP30Baselines(jet::evt::TriggerList& triggers, jet::evt::Datum& out);
+static bool SaveSGP30Baselines(jet::evt::TriggerList& triggers, jet::evt::Datum& out) {
     if (vocSensorPresent) {
         vocSensor.getBaseline();
         peripherals::NvStorage::NvSettings.vocBaselineCo2 = vocSensor.baselineCO2;
@@ -629,8 +627,8 @@ static bool SaveSGP30Baselines(Eventing::TriggerList& triggers, Eventing::Datum&
     return false;
 }
 
-static bool SetSGP30AbsoluteHumidity(Eventing::TriggerList& triggers, Eventing::Datum& out);
-static bool SetSGP30AbsoluteHumidity(Eventing::TriggerList& triggers, Eventing::Datum& out) {
+static bool SetSGP30AbsoluteHumidity(jet::evt::TriggerList& triggers, jet::evt::Datum& out);
+static bool SetSGP30AbsoluteHumidity(jet::evt::TriggerList& triggers, jet::evt::Datum& out) {
     if (vocSensorPresent && triggers.size() >= 1 && triggers.get(0)->data_ready) {
         vocSensor.setHumidity(triggers.get(0)->data.uin16);
     }
@@ -644,7 +642,7 @@ static uint8_t pmTickCounter = 0;
 static constexpr uint8_t pmMeasurementInterval = 60; // seconds
 
 static SPS30_DATA_FLOAT sps30_global_datum_struct;
-bool ReadSPS30(Eventing::TriggerList& triggers, Eventing::Datum& out) {
+bool ReadSPS30(jet::evt::TriggerList& triggers, jet::evt::Datum& out) {
     if (pmSensorPresent) {
         bool sendData = false;
         SPS30_ERR readyErr, retrieveErr;
@@ -788,11 +786,11 @@ uint16_t tvocInst = -1;
 uint16_t abshumInst = -1;
 //Decimator abshumDecimator(12, 60, 24); // every 5s
 
-bool GatherData(Eventing::TriggerList& triggers, Eventing::Datum& out) {
+bool GatherData(jet::evt::TriggerList& triggers, jet::evt::Datum& out) {
     static system_tick_t lastUpdate = 0;
     system_tick_t currentUpdate = millis();
     for (size_t evt_idx = 0; evt_idx < triggers.size(); evt_idx++) {
-        Eventing::Trigger* trigger = triggers.get(evt_idx);
+        jet::evt::Trigger* trigger = triggers.get(evt_idx);
         if (trigger->data_ready) {
             if (trigger->event_id.equalsIgnoreCase(String("LPS25HB Pressure hPa"))) {
                 pressureInst = trigger->data.fl;
@@ -850,7 +848,7 @@ namespace UX {
 
 using namespace Data;
 
-bool RenderSerial(Eventing::TriggerList& triggers, Eventing::Datum& out) {
+bool RenderSerial(jet::evt::TriggerList& triggers, jet::evt::Datum& out) {
     static system_tick_t lastFire = 0;
     system_tick_t currentFire = millis();
     // Fire at most every 5000ms
@@ -917,10 +915,10 @@ Box *pmMassBox;
 Box *pmCountBox;
 Box *pmTypicalBox;
 
-bool RenderOled(Eventing::TriggerList& triggers, Eventing::Datum& out) {
+bool RenderOled(jet::evt::TriggerList& triggers, jet::evt::Datum& out) {
     static OledMode mode = HOME;
     for (size_t evt_idx = 0; evt_idx < triggers.size(); evt_idx++) {
-        Eventing::Trigger* trigger = triggers.get(evt_idx);
+        jet::evt::Trigger* trigger = triggers.get(evt_idx);
         if (trigger->data_ready) {
             if (trigger->event_id.equalsIgnoreCase(String("Joystick Direction Change"))) {
                 peripherals::Joystick::JOYSTICK_DIRECTION joyDir = (peripherals::Joystick::JOYSTICK_DIRECTION)trigger->data.uin16;
@@ -1021,8 +1019,8 @@ bool RenderOled(Eventing::TriggerList& triggers, Eventing::Datum& out) {
 }
 
 int ManualSerial(String s) {
-    Eventing::TriggerList triggers;
-    Eventing::Datum data;
+    jet::evt::TriggerList triggers;
+    jet::evt::Datum data;
     RenderSerial(triggers, data);
     peripherals::NvStorage::Print();
     return 33;
@@ -1033,7 +1031,7 @@ int ManualSerial(String s) {
 // Render every 10 minutes for ~4320/mo
 constexpr time_t RenderCloudInterval_ms = 10 * 60 * 1000;
 
-bool RenderCloud(Eventing::TriggerList& triggers, Eventing::Datum& out) {
+bool RenderCloud(jet::evt::TriggerList& triggers, jet::evt::Datum& out) {
     if (!Particle.connected()) {
         return false;
     }
@@ -1085,15 +1083,15 @@ int Report(String s) {
 
     memset(buf, 0, bufLen);
     String eventState;
-    infrastructure::event_hub.ToString(eventState);
+    infrastructure::event_hub.debug_string(eventState);
     memcpy(buf, eventState.c_str(), min(bufLen-1, eventState.length()));
     Particle.publish("HubState", buf);
 
     free(buf);
 
     {
-        Eventing::TriggerList triggers;
-        Eventing::Datum out;
+        jet::evt::TriggerList triggers;
+        jet::evt::Datum out;
         RenderCloud(triggers, out);
     }
     return 0;
@@ -1144,40 +1142,40 @@ namespace flow {
 
 // One Init To Rule Them All, And In The Setup, Bind Them
 void init() {
-    infrastructure::event_hub.AddHandler("LPS25HB Raw", sensors::ReadLPS25HB, Eventing::TRIGGER_TEMPORAL, 1000); // pre-decimated output is at 1 Hz
-    infrastructure::event_hub.AddHandler("SCD30 Raw", sensors::ReadSCD30, Eventing::TRIGGER_TEMPORAL, sensors::co2SensorInterval*1000);
-    infrastructure::event_hub.AddHandler("AHT20 Relative Humidity %%", sensors::ReadAHT20, Eventing::TRIGGER_TEMPORAL, 1000);
-    infrastructure::event_hub.AddHandler("SPS30 Raw", sensors::ReadSPS30, Eventing::TRIGGER_TEMPORAL, 1000);
-    infrastructure::event_hub.AddHandler("SGP30 Raw", sensors::ReadSGP30, Eventing::TRIGGER_TEMPORAL, sensors::vocReadInterval);
-    infrastructure::event_hub.AddHandler("SGP30 Save Baselines", sensors::SaveSGP30Baselines, Eventing::TRIGGER_TEMPORAL, 12*60*60*1000);
-    infrastructure::event_hub.AddHandler("Absolute Humidity 8.8 g/m^3", sensors::CalculateAbsoluteHumidity_8_8_g_m3, Eventing::TRIGGER_ON_ALL);
-    infrastructure::event_hub.AddHandlerTrigger("Absolute Humidity 8.8 g/m^3", "LPS25HB Temp C");
-    infrastructure::event_hub.AddHandlerTrigger("Absolute Humidity 8.8 g/m^3", "LPS25HB Pressure hPa");
-    infrastructure::event_hub.AddHandlerTrigger("Absolute Humidity 8.8 g/m^3", "AHT20 Relative Humidity %%");
-    infrastructure::event_hub.AddHandler("SGP30 Update Absolute Humidity", sensors::SetSGP30AbsoluteHumidity, Eventing::TRIGGER_ON_ANY);
-    infrastructure::event_hub.AddHandlerTrigger("SGP30 Update Absolute Humidity", "Absolute Humidity 8.8 g/m^3");
-    infrastructure::event_hub.AddHandler("GatherDataFired", Data::GatherData, Eventing::TRIGGER_ON_ANY);
-    infrastructure::event_hub.AddHandlerTrigger("GatherDataFired", "LPS25HB Pressure hPa");
-    infrastructure::event_hub.AddHandlerTrigger("GatherDataFired", "LPS25HB Altitude m");
-    infrastructure::event_hub.AddHandlerTrigger("GatherDataFired", "LPS25HB Temp C");
-    infrastructure::event_hub.AddHandlerTrigger("GatherDataFired", "LPS25HB Temp F");
-    infrastructure::event_hub.AddHandlerTrigger("GatherDataFired", "SCD30 CO2 ppm");
-    infrastructure::event_hub.AddHandlerTrigger("GatherDataFired", "AHT20 Relative Humidity %%");
-    infrastructure::event_hub.AddHandlerTrigger("GatherDataFired", "SPS30 Raw");
-    infrastructure::event_hub.AddHandlerTrigger("GatherDataFired", "Absolute Humidity 8.8 g/m^3");
-    infrastructure::event_hub.AddHandlerTrigger("GatherDataFired", "SGP30 tVOC ppb");
-    infrastructure::event_hub.AddHandlerTrigger("GatherDataFired", "SGP30 eCO2 ppm");
-    //infrastructure::event_hub.AddHandler("RenderSerialEvent", UX::RenderSerial, Eventing::TRIGGER_ON_ANY);
-    //infrastructure::event_hub.AddHandlerTrigger("RenderSerialEvent", "GatherDataFired");
-    infrastructure::event_hub.AddHandler("RenderOledEvent", UX::RenderOled, Eventing::TRIGGER_ON_ANY);
-    infrastructure::event_hub.AddHandlerTrigger("RenderOledEvent", "GatherDataFired");
-    infrastructure::event_hub.AddHandlerTrigger("RenderOledEvent", "Joystick Direction Change");
-    infrastructure::event_hub.AddHandler("PaintOled", peripherals::Display::Paint, Eventing::TRIGGER_TEMPORAL, 1200); // long enough for the longest loop to prevent delta clock recursion
-    infrastructure::event_hub.AddHandler("RenderCloud", UX::RenderCloud, Eventing::TRIGGER_TEMPORAL, UX::RenderCloudInterval_ms);
-    //infrastructure::event_hub.AddHandler("DumpOsState", infrastructure::DumpOsState, Eventing::TRIGGER_TEMPORAL, 5000);
-    if (!infrastructure::event_hub.ValidateIsDAG()) {
-        Serial.println("Hub graph is not a DAG!!");
-    }
+    infrastructure::event_hub.add_event("LPS25HB Raw", sensors::ReadLPS25HB, jet::evt::TRIGGER_TEMPORAL, 1000); // pre-decimated output is at 1 Hz
+    infrastructure::event_hub.add_event("SCD30 Raw", sensors::ReadSCD30, jet::evt::TRIGGER_TEMPORAL, sensors::co2SensorInterval*1000);
+    infrastructure::event_hub.add_event("AHT20 Relative Humidity %%", sensors::ReadAHT20, jet::evt::TRIGGER_TEMPORAL, 1000);
+    infrastructure::event_hub.add_event("SPS30 Raw", sensors::ReadSPS30, jet::evt::TRIGGER_TEMPORAL, 1000);
+    infrastructure::event_hub.add_event("SGP30 Raw", sensors::ReadSGP30, jet::evt::TRIGGER_TEMPORAL, sensors::vocReadInterval);
+    infrastructure::event_hub.add_event("SGP30 Save Baselines", sensors::SaveSGP30Baselines, jet::evt::TRIGGER_TEMPORAL, 12*60*60*1000);
+    infrastructure::event_hub.add_event("Absolute Humidity 8.8 g/m^3", sensors::CalculateAbsoluteHumidity_8_8_g_m3, jet::evt::TRIGGER_ON_ALL);
+    infrastructure::event_hub.add_event_trigger("Absolute Humidity 8.8 g/m^3", "LPS25HB Temp C");
+    infrastructure::event_hub.add_event_trigger("Absolute Humidity 8.8 g/m^3", "LPS25HB Pressure hPa");
+    infrastructure::event_hub.add_event_trigger("Absolute Humidity 8.8 g/m^3", "AHT20 Relative Humidity %%");
+    infrastructure::event_hub.add_event("SGP30 Update Absolute Humidity", sensors::SetSGP30AbsoluteHumidity, jet::evt::TRIGGER_ON_ANY);
+    infrastructure::event_hub.add_event_trigger("SGP30 Update Absolute Humidity", "Absolute Humidity 8.8 g/m^3");
+    infrastructure::event_hub.add_event("GatherDataFired", Data::GatherData, jet::evt::TRIGGER_ON_ANY);
+    infrastructure::event_hub.add_event_trigger("GatherDataFired", "LPS25HB Pressure hPa");
+    infrastructure::event_hub.add_event_trigger("GatherDataFired", "LPS25HB Altitude m");
+    infrastructure::event_hub.add_event_trigger("GatherDataFired", "LPS25HB Temp C");
+    infrastructure::event_hub.add_event_trigger("GatherDataFired", "LPS25HB Temp F");
+    infrastructure::event_hub.add_event_trigger("GatherDataFired", "SCD30 CO2 ppm");
+    infrastructure::event_hub.add_event_trigger("GatherDataFired", "AHT20 Relative Humidity %%");
+    infrastructure::event_hub.add_event_trigger("GatherDataFired", "SPS30 Raw");
+    infrastructure::event_hub.add_event_trigger("GatherDataFired", "Absolute Humidity 8.8 g/m^3");
+    infrastructure::event_hub.add_event_trigger("GatherDataFired", "SGP30 tVOC ppb");
+    infrastructure::event_hub.add_event_trigger("GatherDataFired", "SGP30 eCO2 ppm");
+    //infrastructure::event_hub.add_event("RenderSerialEvent", UX::RenderSerial, jet::evt::TRIGGER_ON_ANY);
+    //infrastructure::event_hub.add_event_trigger("RenderSerialEvent", "GatherDataFired");
+    infrastructure::event_hub.add_event("RenderOledEvent", UX::RenderOled, jet::evt::TRIGGER_ON_ANY);
+    infrastructure::event_hub.add_event_trigger("RenderOledEvent", "GatherDataFired");
+    infrastructure::event_hub.add_event_trigger("RenderOledEvent", "Joystick Direction Change");
+    infrastructure::event_hub.add_event("PaintOled", peripherals::Display::Paint, jet::evt::TRIGGER_TEMPORAL, 1200); // long enough for the longest loop to prevent delta clock recursion
+    infrastructure::event_hub.add_event("RenderCloud", UX::RenderCloud, jet::evt::TRIGGER_TEMPORAL, UX::RenderCloudInterval_ms);
+    //infrastructure::event_hub.add_event("DumpOsState", infrastructure::DumpOsState, jet::evt::TRIGGER_TEMPORAL, 5000);
+    //if (!infrastructure::event_hub.is_dag()) {
+    //    Serial.println("Hub graph is not a DAG!!");
+    //}
 }
 
 } // namespace Flow
@@ -1201,7 +1199,7 @@ void setup() {
 void loop() {
     system_tick_t start = millis();
     ApplicationWatchdog::checkin();
-    infrastructure::event_hub.update();
+    infrastructure::event_hub.update(start);
     peripherals::Joystick::EmitChangeEvent();
     system_tick_t end = millis();
     if (end - start > 1000) {
