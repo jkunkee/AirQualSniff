@@ -60,11 +60,11 @@ static Arduino_DebugUtils eventhub_arduino_dbg;
 typedef unsigned long time_t;
 #endif
 
-#include "jet.h"
-
 #ifdef EVENTHUB_TEMPORAL
-#include "DeltaClock.h"
+#define JET_EVT_HUB_TEMPORAL
 #endif
+
+#include "jet.h"
 
 namespace Eventing {
 
@@ -207,6 +207,8 @@ public:
 #endif
 };
 
+using namespace jet::evt;
+
 class Hub {
 private:
 #ifdef EVENTHUB_TEMPORAL
@@ -234,10 +236,10 @@ private:
 public:
 #ifdef EVENTHUB_TEMPORAL
   bool begin() {
-    return clock.begin();
+    return true;
   }
   void update() {
-    clock.update();
+    clock.update(millis());
   }
   // If it's not static, the this pointer means it can't be a DeltaClockAction.
   // If it's static, it can't deliver the result.
@@ -263,15 +265,15 @@ public:
       // double-add
       if (type == TRIGGER_TEMPORAL) {
         dbgprint(DBG_INFO, "Adding Temporal Handler");
-        DeltaClockEntry* clockEntry = (DeltaClockEntry*)malloc(sizeof(DeltaClockEntry));
-        clockEntry->action = (DeltaClockAction)&this->TemporalAction;
+        DeltaClock::Entry* clockEntry = (DeltaClock::Entry*)malloc(sizeof(DeltaClock::Entry));
+        clockEntry->action = (DeltaClock::Action)&this->TemporalAction;
         clockEntry->interval = interval;
         clockEntry->repeating = true;
         TemporalContext* context = new TemporalContext();
         context->handler = eventHandler;
         context->hub = this;
         clockEntry->context = (void*)context;
-        clock.insert(clockEntry);
+        clock.schedule(clockEntry);
       }
 #endif
     } else {
@@ -335,7 +337,7 @@ public:
       }
     }
     outString += "DeltaClock:\n";
-    clock.ToString(outString);
+    clock.debug_string(outString);
   }
   bool ValidateIsDAG() {
     // Topological sort for cycle detection
