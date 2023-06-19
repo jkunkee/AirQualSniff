@@ -884,6 +884,17 @@ public:
       delete(triggers.get(trig_idx));
     }
   }
+  bool change_parameters(HandlerFunc func, TriggerType type) {
+    if (func == nullptr) {
+      return false;
+    }
+    this->action = func;
+    this->type = type;
+    // TODO: allow updating interval (requires DeltaClock integration)
+    //this->interval = interval;
+    reset_triggers();
+    return true;
+  }
   Trigger* find_trigger(EventIndex id) {
     for (int trig_idx = 0; trig_idx < triggers.size(); trig_idx++) {
       Trigger* trigger = triggers.get(trig_idx);
@@ -1009,7 +1020,9 @@ public:
   bool add_event(EventIndex id, HandlerFunc func, TriggerType type, time_t interval = 0) {
     Event* event = find_event(id);
     if (event != nullptr) {
-      return false; // TODO considering overwrite
+      event->change_parameters(func, type);
+      // TODO: apply new interval to DeltaClock entry
+      return false;
     }
     event = new Event(id, func, type, interval);
     m_event_list.append(event);
@@ -1122,6 +1135,9 @@ bool HubTest() {
     jet_assert(tr->event_name.equals("Partisan"));
     tr = ev->find_trigger("Lawrencium");
     jet_assert(tr == nullptr);
+    jet_assert(ev->change_parameters(&TestHandlerProducer, TRIGGER_ON_ALL));
+    jet_assert(ev->action == &TestHandlerProducer);
+    jet_assert(ev->type == TRIGGER_ON_ALL);
     delete(ev);
   }
 
@@ -1233,6 +1249,11 @@ bool HubTest() {
       jet_assert(hub->m_event_list.size() == 1);
       jet_assert(hub->m_event_list.get(0)->event_id == "Event1");
       jet_assert(hub->m_event_list.get(0)->type == TRIGGER_ON_ANY);
+      jet_assert(!hub->add_event("Event1", TestHandlerProducer, TRIGGER_ON_ALL));
+      jet_assert(hub->m_event_list.size() == 1);
+      jet_assert(hub->m_event_list.get(0)->event_id == "Event1");
+      jet_assert(hub->m_event_list.get(0)->action == &TestHandlerProducer);
+      jet_assert(hub->m_event_list.get(0)->type == TRIGGER_ON_ALL);
     }
     if (success) {
       jet_dbgprint("hub: trigger insertion");
