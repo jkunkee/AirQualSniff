@@ -910,6 +910,12 @@ public:
     reset_triggers();
     return true;
   }
+  size_t get_trigger_count() {
+    return triggers.size();
+  }
+  Trigger* get_trigger(int raw_index) {
+    return triggers.get(raw_index);
+  }
   Trigger* find_trigger(EventIndex id) {
     for (unsigned int trig_idx = 0; trig_idx < triggers.size(); trig_idx++) {
       Trigger* trigger = triggers.get(trig_idx);
@@ -1110,7 +1116,44 @@ public:
     }
     return true;
   }
-  bool is_dag();
+  bool is_dag() {
+    // Topological sort for cycle detection
+    // DFS
+    // https://en.wikipedia.org/wiki/Topological_sorting
+    // Handlers are Nodes
+    // Triggers are Edges
+    // My DFS
+    class VisitManager {
+    public:
+      static bool HasCycle(jet::PointerList<Event>& SeenNodes, Hub* hub, Event* CurrentNode) {
+        if (SeenNodes.find_first(CurrentNode) != -1) {
+          return true;
+        }
+        SeenNodes.append(CurrentNode);
+        for (unsigned int trig_idx = 0; trig_idx < CurrentNode->get_trigger_count(); trig_idx++) {
+          Trigger* trigger = CurrentNode->get_trigger((signed)trig_idx);
+          Event* handler = hub->find_event(trigger->event_id);
+          // Since events can be delivered externally, they can be missing from the graph as a node.
+          if (handler != nullptr && HasCycle(SeenNodes, hub, handler)) {
+            return true;
+          }
+        }
+        SeenNodes.remove_first(CurrentNode);
+        return false;
+      }
+    };
+    // For each node, do a full cycle-sensitive depth-first graph traversal
+    // There are faster or more theoretically sound ways to do this, but this
+    // is accurate and simple. It even handles disconnected graphs.
+    for (unsigned int handler_idx = 0; handler_idx < m_event_list.size(); handler_idx++) {
+      jet::PointerList<Event> seen_nodes;
+      Event* handler = m_event_list.get(handler_idx);
+      if (VisitManager::HasCycle(seen_nodes, this, handler)) {
+        return false;
+      }
+    }
+    return true;
+  }
   void debug_string(String& out) {
     out += "jet::evt::Hub(@0x";
     out += String((uintptr_t)this, HEX);
@@ -1120,9 +1163,10 @@ public:
     }
 #ifdef JET_EVT_HUB_TEMPORAL
     clock.debug_string(out);
+    out += "\n";
 #endif
-//    out += (is_dag() ? "Is DAG." : "Is not DAG.");
-//    out += "\n";
+    out += (is_dag() ? "Is DAG." : "Not DAG.");
+    out += "\n";
   }
 #ifdef JET_TEST
   friend bool HubTest();
@@ -1374,6 +1418,12 @@ bool HubTest() {
       // triggers OnAny TestHandlerProducer
       jet_assert(TestHandlerCounter == 8);
     }
+    jet_dbgprint("hub: debug_string");
+    String str;
+    hub->debug_string(str);
+    jet_dbgprint("%s", str.c_str());
+    jet_assert(str.length() != 0);
+    jet_dbgprint("hub: debug_string (end)");
     delete(hub);
   }
 
