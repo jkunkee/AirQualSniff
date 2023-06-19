@@ -1,5 +1,6 @@
 
 #define JET_TEST
+//#define JET_TEST_TRACING
 #define JET_EVT_HUB_TEMPORAL
 
 #include "..\..\src\jet.h"
