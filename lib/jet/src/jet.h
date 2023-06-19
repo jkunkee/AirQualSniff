@@ -49,7 +49,7 @@
 // https://github.com/arduino-libraries/Arduino_DebugUtils/blob/master/src/Arduino_DebugUtils.h
 #include <Arduino_DebugUtils.h>
 Arduino_DebugUtils eventhub_arduino_dbg;
-#define jet_dbgprint(...) eventhub_arduino_dbg.print(0, __VA_ARGS__)
+#define jet_dbgprint(...) eventhub_arduino_dbg.print(DBG_ERROR, __VA_ARGS__)
 #endif
 
 #ifdef JET_TEST_TRACING
@@ -62,7 +62,7 @@ Arduino_DebugUtils eventhub_arduino_dbg;
 #define jet_assert(expr) \
   if (success && !(expr)) { \
     success = false; \
-    jet_dbgprint("Assertion failed: '%s' at line %d", #expr, __LINE__); \
+    jet_dbgprint(F("Assertion failed: '%s' at line %d"), F(#expr), __LINE__); \
   }
 
 #else // JET_TEST
@@ -116,7 +116,7 @@ public:
   {
     jet_traceprint("insert idx:%d item:%p", idx, item);
     if (item == nullptr) {
-      jet_dbgprint("insert null check failed");
+      jet_dbgprint(F("insert null check failed"));
       return false;
     }
     // Insertion can land at the end (-1) or at any existing index
@@ -124,17 +124,17 @@ public:
       idx = m_count;
     }
     if (idx < 0 || (signed)m_count < idx) {
-      jet_dbgprint("insert range check failed");
+      jet_dbgprint(F("insert range check failed"));
       return false;
     }
     // Is there room?
     if (m_count + 1 > m_capacity) {
       if (m_list_is_internally_managed) {
-      jet_dbgprint("insert increase needed");
+      jet_dbgprint(F("insert increase needed"));
         // Allocate a bigger buffer.
         set_capacity(m_capacity + 2);
       } else {
-        jet_dbgprint("insert size check failed");
+        jet_dbgprint(F("insert size check failed"));
         // We don't own the buffer, so fail and let the caller deal with it.
         return false;
       }
@@ -171,7 +171,7 @@ public:
   }
   bool remove(int idx) {
     if (idx < -1 || (signed)m_count <= idx) {
-      jet_dbgprint("remove failed range check %d", idx);
+      jet_dbgprint(F("remove failed range check %d"), idx);
       return false;
     }
     jet_traceprint("remove %d", idx);
@@ -328,9 +328,9 @@ bool PointerListTest() {
   delete(list);
 
   if (success) {
-    jet_dbgprint("Success!");
+    jet_dbgprint(F("Success!"));
   } else {
-    jet_dbgprint("Failure...");
+    jet_dbgprint(F("Failure..."));
   }
 
   return success;
@@ -370,7 +370,7 @@ public:
   void update(time_t now) {
     // Constrain delta to be nonzero
     if (now == m_last_update) {
-      jet_dbgprint("no time has passed (or exactly one max-time_t time interval has passed)");
+      jet_dbgprint(F("no time has passed (or exactly one max-time_t time interval has passed)"));
       return;
     }
     time_t delta = now - m_last_update;
@@ -421,7 +421,7 @@ public:
         new_entry->interval > m_max_interval ||
         new_entry->action == nullptr ||
         new_entry->next != nullptr) {
-      jet_dbgprint("schedule failed with invalid arg");
+      jet_dbgprint(F("schedule failed with invalid arg"));
       return false;
     }
     // Initialize
@@ -506,7 +506,7 @@ static DeltaClock::Entry Entry##id = { \
 static void Action##id(void*) { \
   Counter##id++; \
 }
-//  jet_dbgprint("  "#id":%d", Counter##id);
+//  jet_dbgprint(F("  "#id":%d"), Counter##id);
 //  if (Counter##id > 70) { Entry##id.repeating = false; }
 
 COUNTER_ENTRY(A, 1000, false)
@@ -526,7 +526,7 @@ bool DeltaClockTest() {
   DeltaClock* clock;
 
   if (success) {
-    jet_dbgprint("time type properties");
+    jet_dbgprint(F("time type properties"));
     time_t big_time = -1000;
     time_t small_time = 1000;
     jet_assert(sizeof(time_t) >= 4);
@@ -538,24 +538,24 @@ bool DeltaClockTest() {
 
   clock = new DeltaClock();
   if (success) {
-    jet_dbgprint("constructor");
+    jet_dbgprint(F("constructor"));
     jet_assert(clock->m_head == nullptr);
     jet_assert(clock->m_last_update == 0);
   }
   if (success) {
-    jet_dbgprint("empty list update");
+    jet_dbgprint(F("empty list update"));
     clock->update(5000);
     jet_assert(clock->m_last_update == 5000);
   }
   if (success) {
-    jet_dbgprint("scheduling one event");
+    jet_dbgprint(F("scheduling one event"));
     jet_assert(clock->schedule(&EntryA));
     jet_assert(clock->m_head == &EntryA);
     jet_assert(clock->m_head->remaining == EntryA.interval);
     jet_assert(clock->m_head->next == nullptr);
   }
   if (success) {
-    jet_dbgprint("schedule a second, following event");
+    jet_dbgprint(F("schedule a second, following event"));
     jet_assert(clock->schedule(&EntryB));
     jet_assert(clock->m_head == &EntryA);
     jet_assert(clock->m_head->remaining == EntryA.interval);
@@ -563,14 +563,14 @@ bool DeltaClockTest() {
     jet_assert(clock->m_head->next->remaining == EntryB.interval - EntryA.interval);
   }
   if (success) {
-    jet_dbgprint("clear the list, including next pointers");
+    jet_dbgprint(F("clear the list, including next pointers"));
     clock->clear();
     jet_assert(clock->m_head == nullptr);
     jet_assert(EntryA.next == nullptr);
     jet_assert(EntryB.next == nullptr);
   }
   if (success) {
-    jet_dbgprint("schedule a second, earlier event");
+    jet_dbgprint(F("schedule a second, earlier event"));
     jet_assert(clock->schedule(&EntryB));
     jet_assert(clock->m_head == &EntryB);
     jet_assert(clock->m_head->remaining == EntryB.interval);
@@ -580,14 +580,14 @@ bool DeltaClockTest() {
     jet_assert(clock->m_head->next == &EntryB);
     jet_assert(clock->m_head->next->remaining == EntryB.interval - EntryA.interval);
   }
-  if (success) { jet_dbgprint("destructor"); }
+  if (success) { jet_dbgprint(F("destructor")); }
   delete(clock);
   jet_assert(EntryA.next == nullptr);
   jet_assert(EntryB.next == nullptr);
 
   clock = new DeltaClock();
   if (success) {
-    jet_dbgprint("fire both");
+    jet_dbgprint(F("fire both"));
     jet_assert(clock->schedule(&EntryA));
     jet_assert(clock->schedule(&EntryB));
     CounterA = 0;
@@ -607,7 +607,7 @@ bool DeltaClockTest() {
     jet_assert(EntryB.next == nullptr);
   }
   if (success) {
-    jet_dbgprint("repeater requeue");
+    jet_dbgprint(F("repeater requeue"));
     EntryA.repeating = true;
     EntryB.repeating = true;
     clock->m_last_update = 0;
@@ -629,7 +629,7 @@ bool DeltaClockTest() {
     jet_assert(EntryB.next == nullptr);
   }
   if (success) {
-    jet_dbgprint("repeater repeats");
+    jet_dbgprint(F("repeater repeats"));
     clock->update(15000);
     jet_assert(CounterA == 15);
     jet_assert(CounterB == 7);
@@ -638,7 +638,7 @@ bool DeltaClockTest() {
     jet_assert(EntryB.next == &EntryA);
   }
   if (success) {
-    jet_dbgprint("simultaneous events");
+    jet_dbgprint(F("simultaneous events"));
     clock->clear();
     clock->m_last_update = 0;
     CounterA = 0;
@@ -660,7 +660,7 @@ bool DeltaClockTest() {
     jet_assert(CounterC == 1);
   }
   if (success) {
-    jet_dbgprint("partial repeater costing");
+    jet_dbgprint(F("partial repeater costing"));
     clock->clear();
     clock->m_last_update = 0;
     CounterA = 0;
@@ -681,7 +681,7 @@ bool DeltaClockTest() {
     jet_assert(EntryB.remaining == 0);
   }
   if (success) {
-    jet_dbgprint("timer overflow");
+    jet_dbgprint(F("timer overflow"));
     clock->clear();
     clock->m_last_update = 0;
     CounterA = 0;
@@ -694,7 +694,7 @@ bool DeltaClockTest() {
     jet_assert(EntryA.remaining = 1000);
   }
   if (success) {
-    jet_dbgprint("periodically simultaneous events");
+    jet_dbgprint(F("periodically simultaneous events"));
     clock->clear();
     clock->m_last_update = 0;
     CounterA = 0;
@@ -715,7 +715,7 @@ bool DeltaClockTest() {
     jet_assert(CounterC == 50);
   }
   if (success) {
-    jet_dbgprint("AirQualSniff Scenario");
+    jet_dbgprint(F("AirQualSniff Scenario"));
     clock->clear();
     clock->m_last_update = 0;
     clock->schedule(&Entry1);
@@ -742,26 +742,26 @@ bool DeltaClockTest() {
     jet_assert(Counter6 == (test_duration / Entry6.interval));
     jet_assert(Counter7 == (test_duration / Entry7.interval));
     if (!success) {
-      jet_dbgprint("Counter1: %lu / %lu", Counter1, test_duration / Entry1.interval);
-      jet_dbgprint("Counter2: %lu / %lu", Counter2, test_duration / Entry2.interval);
-      jet_dbgprint("Counter3: %lu / %lu", Counter3, test_duration / Entry3.interval);
-      jet_dbgprint("Counter4: %lu / %lu", Counter4, test_duration / Entry4.interval);
-      jet_dbgprint("Counter5: %lu / %lu", Counter5, test_duration / Entry5.interval);
-      jet_dbgprint("Counter6: %lu / %lu", Counter6, test_duration / Entry6.interval);
-      jet_dbgprint("Counter7: %lu / %lu", Counter7, test_duration / Entry7.interval);
+      jet_dbgprint(F("Counter1: %lu / %lu"), Counter1, test_duration / Entry1.interval);
+      jet_dbgprint(F("Counter2: %lu / %lu"), Counter2, test_duration / Entry2.interval);
+      jet_dbgprint(F("Counter3: %lu / %lu"), Counter3, test_duration / Entry3.interval);
+      jet_dbgprint(F("Counter4: %lu / %lu"), Counter4, test_duration / Entry4.interval);
+      jet_dbgprint(F("Counter5: %lu / %lu"), Counter5, test_duration / Entry5.interval);
+      jet_dbgprint(F("Counter6: %lu / %lu"), Counter6, test_duration / Entry6.interval);
+      jet_dbgprint(F("Counter7: %lu / %lu"), Counter7, test_duration / Entry7.interval);
     }
   }
   if (!success) {
     String str;
     clock->debug_string(str);
-    jet_dbgprint("%s", str.c_str());
+    jet_dbgprint(F("%s"), str.c_str());
   }
   delete(clock);
 
   if (!success) {
-    jet_dbgprint("EntryA: %p", &EntryA);
-    jet_dbgprint("EntryB: %p", &EntryB);
-    jet_dbgprint("EntryC: %p", &EntryC);
+    jet_dbgprint(F("EntryA: %p"), &EntryA);
+    jet_dbgprint(F("EntryB: %p"), &EntryB);
+    jet_dbgprint(F("EntryC: %p"), &EntryC);
   }
   return success;
 }
@@ -1086,7 +1086,7 @@ bool HubTest() {
   jet_assert_var;
 
   if (success) {
-    jet_dbgprint("hub trigger: constructor/destructor");
+    jet_dbgprint(F("hub trigger: constructor/destructor"));
     Trigger* tr = new Trigger("hello");
     jet_assert(tr != nullptr);
     jet_assert(tr->event_id == "hello");
@@ -1097,7 +1097,7 @@ bool HubTest() {
   }
 
   if (success) {
-    jet_dbgprint("hub trigger: deliver/reset");
+    jet_dbgprint(F("hub trigger: deliver/reset"));
     Trigger* tr = new Trigger("TestBareTrigger");
     Datum d = { .in16 = 5 };
     if (success) {
@@ -1112,7 +1112,7 @@ bool HubTest() {
   }
 
   if (success) {
-    jet_dbgprint("hub event: constructor/destructor");
+    jet_dbgprint(F("hub event: constructor/destructor"));
     Event* ev = new Event("Halooo", &TestHandler, TRIGGER_ON_ALL, 1000UL);
     jet_assert(ev->action == &TestHandler);
     jet_assert(ev->event_id == "Halooo");
@@ -1124,7 +1124,7 @@ bool HubTest() {
   }
 
   if (success) {
-    jet_dbgprint("hub event: add/find trigger");
+    jet_dbgprint(F("hub event: add/find trigger"));
     Event* ev = new Event("Halooo", &TestHandler, TRIGGER_ON_ANY);
     jet_assert(ev->add_trigger("Partisan"));
     jet_assert(ev->triggers.size() == 1);
@@ -1143,7 +1143,7 @@ bool HubTest() {
 
   if (success) {
     Event* ev = new Event("Halooo", &TestHandler, TRIGGER_MANUAL);
-    jet_dbgprint("hub event: reset");
+    jet_dbgprint(F("hub event: reset"));
     jet_assert(ev->add_trigger("Partisan"));
     jet_assert(ev->triggers.get(0)->data_ready == false);
     ev->triggers.get(0)->data_ready = true;
@@ -1158,7 +1158,7 @@ bool HubTest() {
     if (success) {
       TestHandlerCounter = 0;
       Datum datum = { 0 };
-      jet_dbgprint("hub event: take_action");
+      jet_dbgprint(F("hub event: take_action"));
       jet_assert(ev->add_trigger("TestEventTrigger"));
       ev->triggers.get(0)->data_ready = true;
       jet_assert(!ev->take_action(datum));
@@ -1169,10 +1169,10 @@ bool HubTest() {
       TestHandlerCounter = 0;
       Datum datum = { 0 };
       ev->reset_triggers();
-      jet_dbgprint("hub event: deliver");
+      jet_dbgprint(F("hub event: deliver"));
       jet_assert(ev->triggers.get(0)->data_ready == false);
       jet_assert(ev->triggers.get(0)->data.uin16 == 0xdead);
-      jet_assert(!ev->deliver_trigger("DoesNotExist", datum, datum));
+      jet_assert(!ev->deliver_trigger(F("DoesNotExist"), datum, datum));
       jet_assert(ev->triggers.get(0)->data_ready == false);
       jet_assert(ev->triggers.get(0)->data.uin16 == 0xdead);
       jet_assert(TestHandlerCounter == 0);
@@ -1186,7 +1186,7 @@ bool HubTest() {
   }
 
   if (success) {
-    jet_dbgprint("hub event: trigger firing and conditions");
+    jet_dbgprint(F("hub event: trigger firing and conditions"));
     Event* ev;
     Datum datum;
 
@@ -1234,7 +1234,7 @@ bool HubTest() {
   }
 
   if (success) {
-    jet_dbgprint("hub: constructor/destructor");
+    jet_dbgprint(F("hub: constructor/destructor"));
     Hub* hub = new Hub();
     jet_assert(hub != nullptr);
     delete(hub);
@@ -1243,7 +1243,7 @@ bool HubTest() {
   if(success) {
     Hub* hub = new Hub();
     if (success) {
-      jet_dbgprint("hub: normal Event insertion");
+      jet_dbgprint(F("hub: normal Event insertion"));
       TestHandlerCounter = 0;
       jet_assert(hub->add_event("Event1", TestHandler, TRIGGER_ON_ANY));
       jet_assert(hub->m_event_list.size() == 1);
@@ -1256,19 +1256,19 @@ bool HubTest() {
       jet_assert(hub->m_event_list.get(0)->type == TRIGGER_ON_ALL);
     }
     if (success) {
-      jet_dbgprint("hub: trigger insertion");
+      jet_dbgprint(F("hub: trigger insertion"));
       jet_assert(hub->add_event_trigger("Event1", "Event1Trigger1"));
       jet_assert(hub->find_event("Event1") != nullptr);
       jet_assert(hub->find_event("Event1")->find_trigger("Event1Trigger1") != nullptr);
     }
     if (success) {
-      jet_dbgprint("hub: temporal insertion");
+      jet_dbgprint(F("hub: temporal insertion"));
       jet_assert(hub->add_event("Event2", TestHandler, TRIGGER_TEMPORAL, 1000UL));
       jet_assert(hub->find_event("Event2") != nullptr);
     }
     if (success) {
       TestHandlerCounter = 0;
-      jet_dbgprint("hub: update");
+      jet_dbgprint(F("hub: update"));
       hub->update(1000);
       jet_assert(TestHandlerCounter == 1);
       hub->update(2000);
@@ -1281,7 +1281,7 @@ bool HubTest() {
     TestHandlerCounter = 0;
     Hub* hub = new Hub();
     Datum datum = { 0 };
-    jet_dbgprint("hub: delivery");
+    jet_dbgprint(F("hub: delivery"));
     jet_assert(hub->add_event("OnAny", &TestHandlerProducer, TRIGGER_ON_ANY));
     jet_assert(hub->add_event_trigger("OnAny", "Trigger1"));
     jet_assert(hub->add_event_trigger("OnAny", "Trigger2"));
@@ -1305,7 +1305,7 @@ bool HubTest() {
     jet_assert(TestHandlerCounter == 4);
     jet_assert(hub->deliver("Trigger4", datum));
     jet_assert(TestHandlerCounter == 6);
-    jet_dbgprint("hub: temporaldelivery");
+    jet_dbgprint(F("hub: temporaldelivery"));
     jet_assert(hub->add_event("Timer1", &TestHandlerProducer, TRIGGER_TEMPORAL, 1000UL));
     jet_assert(hub->add_event_trigger("OnAny", "Timer1"));
     if (success) {
