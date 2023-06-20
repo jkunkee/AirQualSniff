@@ -1202,7 +1202,7 @@ void loop() {
     infrastructure::event_hub.update(start);
     peripherals::Joystick::EmitChangeEvent();
     system_tick_t end = millis();
-    if (end - start > 1000) {
+    if (end - start > 1000ULL) {
         Serial.printlnf("###### Loop End; duration %lu", millis() - start);
     }
 }
