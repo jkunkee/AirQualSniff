@@ -73,8 +73,14 @@ Arduino_DebugUtils eventhub_arduino_dbg;
 #endif // JET_TEST
 
 // https://arduino.stackexchange.com/questions/17639/the-difference-between-time-t-and-datetime#:~:text=A%20DateTime%20is%20a%20full%20class%20with%20lots,of%20the%20time%20stored%20in%20the%20DateTime%20object.
-#if !defined(PARTICLE_WIRING_ARDUINO_COMPATIBILTY) && defined(ARDUINO) && !defined(time_t)
+#if defined(PARTICLE_WIRING_ARDUINO_COMPATIBILTY)
+#define PRIt "llu"
+#elif defined(ARDUINO) && !defined(time_t)
 typedef unsigned long time_t;
+#define PRIt "lu"
+#else
+#warning Print format specifier for time_t uncertain
+#define PRIt "lu"
 #endif
 
 namespace jet {
@@ -204,7 +210,7 @@ public:
     return remove(find_first(item));
   }
   bool swap(int idx1, int idx2) {
-    if (idx1 < 0 || m_count <= idx1 || idx2 < 0 || m_count <= idx2) {
+    if (idx1 < 0 || (signed)m_count <= idx1 || idx2 < 0 || (signed)m_count <= idx2) {
       return false;
     }
     T* temp = m_list[idx1];
@@ -383,14 +389,14 @@ public:
       // type math validated in test suite
       delta = ((unsigned)-(signed)(m_last_update)) + now;
     }
-    jet_traceprint("update from %lu", m_last_update);
-    jet_traceprint("       to %lu", now);
-    jet_traceprint("       delta %lu", delta);
+    jet_traceprint("update from %" PRIt, m_last_update);
+    jet_traceprint("       to %" PRIt, now);
+    jet_traceprint("       delta %" PRIt, delta);
     // Update entries
     while (m_head != NULL) {
-      jet_traceprint("  delta:%lu ---------------", delta);
+      jet_traceprint("  delta:%" PRIt " ---------------", delta);
       jet_traceprint("  processing %p", m_head);
-      jet_traceprint("  remaining:%lu", m_head->remaining);
+      jet_traceprint("  remaining:%" PRIt, m_head->remaining);
       if (m_head->remaining > delta) {
         jet_traceprint("  charge and break");
         m_head->remaining -= delta;
@@ -745,13 +751,13 @@ bool DeltaClockTest() {
     jet_assert(Counter6 == (test_duration / Entry6.interval));
     jet_assert(Counter7 == (test_duration / Entry7.interval));
     if (!success) {
-      jet_dbgprint(F("Counter1: %lu / %lu"), Counter1, test_duration / Entry1.interval);
-      jet_dbgprint(F("Counter2: %lu / %lu"), Counter2, test_duration / Entry2.interval);
-      jet_dbgprint(F("Counter3: %lu / %lu"), Counter3, test_duration / Entry3.interval);
-      jet_dbgprint(F("Counter4: %lu / %lu"), Counter4, test_duration / Entry4.interval);
-      jet_dbgprint(F("Counter5: %lu / %lu"), Counter5, test_duration / Entry5.interval);
-      jet_dbgprint(F("Counter6: %lu / %lu"), Counter6, test_duration / Entry6.interval);
-      jet_dbgprint(F("Counter7: %lu / %lu"), Counter7, test_duration / Entry7.interval);
+      jet_dbgprint(F("Counter1: %" PRIt " / %" PRIt), Counter1, test_duration / Entry1.interval);
+      jet_dbgprint(F("Counter2: %" PRIt " / %" PRIt), Counter2, test_duration / Entry2.interval);
+      jet_dbgprint(F("Counter3: %" PRIt " / %" PRIt), Counter3, test_duration / Entry3.interval);
+      jet_dbgprint(F("Counter4: %" PRIt " / %" PRIt), Counter4, test_duration / Entry4.interval);
+      jet_dbgprint(F("Counter5: %" PRIt " / %" PRIt), Counter5, test_duration / Entry5.interval);
+      jet_dbgprint(F("Counter6: %" PRIt " / %" PRIt), Counter6, test_duration / Entry6.interval);
+      jet_dbgprint(F("Counter7: %" PRIt " / %" PRIt), Counter7, test_duration / Entry7.interval);
     }
   }
   if (!success) {
