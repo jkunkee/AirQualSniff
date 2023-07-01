@@ -408,6 +408,7 @@ public:
     jet_traceprint("update from %" PRIu32, m_last_update);
     jet_traceprint("       to %" PRIu32, now);
     jet_traceprint("       delta %" PRIu32, delta);
+    jet_traceprint("       head %p", m_head);
     // Update entries
     while (m_head != NULL) {
       jet_traceprint("  delta:%" PRIu32 " ---------------", delta);
@@ -441,12 +442,24 @@ public:
   // If two events end up with the same expiration time, the first one inserted will run first.
   bool schedule(Entry* new_entry) {
     // Input validation
-    if (new_entry == nullptr ||
-        new_entry->interval == 0 ||
-        new_entry->interval > m_max_interval ||
-        new_entry->action == nullptr ||
-        new_entry->next != nullptr) {
-      jet_dbgprint(F("schedule failed with invalid arg"));
+    if (new_entry == nullptr) {
+      jet_dbgprint(F("schedule failed with invalid arg: new_entry == nullptr"));
+      return false;
+    }
+    if (new_entry->interval == 0) {
+      jet_dbgprint(F("schedule failed with invalid arg: new_entry->interval == 0"));
+      return false;
+    }
+    if (new_entry->interval > m_max_interval) {
+      jet_dbgprint(F("schedule failed with invalid arg: new_entry->interval==%" PRIu32 " > max_interval==%" PRIu32), new_entry->interval, m_max_interval);
+      return false;
+    }
+    if (new_entry->action == nullptr) {
+      jet_dbgprint(F("schedule failed with invalid arg: new_entry->action == nullptr"));
+      return false;
+    }
+    if (new_entry->next != nullptr) {
+      jet_dbgprint(F("schedule failed with invalid arg: new_entry->next==%p != nullptr"), new_entry->next);
       return false;
     }
     // Initialize
