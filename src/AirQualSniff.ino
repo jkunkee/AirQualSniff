@@ -1199,10 +1199,10 @@ void setup() {
 void loop() {
     system_tick_t start = millis();
     ApplicationWatchdog::checkin();
-    infrastructure::event_hub.update(start);
+    infrastructure::event_hub.update((jet_time_t)start);
     peripherals::Joystick::EmitChangeEvent();
     system_tick_t end = millis();
-    if (end - start > 1000ULL) {
+    if (end - start > (system_tick_t)1000ULL) {
         Serial.printlnf("###### Loop End; duration %lu", millis() - start);
     }
 }
