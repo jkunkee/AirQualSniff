@@ -43,6 +43,10 @@
 
 #ifdef JET_TEST
 
+#ifndef PRIu32
+#error Standard library does not provide modular decimal unsigned integer print format specifier
+#endif
+
 #ifdef PARTICLE_WIRING_ARDUINO_COMPATIBILTY
 #undef F
 #define F(X) (X)
@@ -72,16 +76,28 @@ Arduino_DebugUtils eventhub_arduino_dbg;
 #define jet_traceprint(...)
 #endif // JET_TEST
 
-// https://arduino.stackexchange.com/questions/17639/the-difference-between-time-t-and-datetime#:~:text=A%20DateTime%20is%20a%20full%20class%20with%20lots,of%20the%20time%20stored%20in%20the%20DateTime%20object.
-#if defined(PARTICLE_WIRING_ARDUINO_COMPATIBILTY)
-#define PRIt "llu"
-#elif defined(ARDUINO) && !defined(time_t)
-typedef unsigned long time_t;
-#define PRIt "lu"
-#else
-#warning Print format specifier for time_t uncertain
-#define PRIt "lu"
-#endif
+// time_t type handling is inconsistent across compilers and types.
+// Arduino treated 1000 and 1000UL as so drastically different the code failed to work.
+// Particle somehow passes a computed max integer value as 0.
+//
+// So, we use types that are easy to reason about.
+//
+// uint32_t goes 0 to 4,294,967,295.
+//
+// If we use the top half of the range for rollover detection--that is, we assume that
+// the largest input time delta and largest event interval is UINT32_MAX/2--and then
+// we assume a millisecond time unit, we can represent time spans as large as
+// 4,294,967,295 / 2 => 2147483647 ms
+// 2147483647 / 1000 => 2147483 s
+// 2147483 / 60 => 35791 min
+// 35791 / 60 => 596 h
+// 596 / 24 => 24 d
+//
+// This seems like a good maximum for an embedded timer library. If a design approaches
+// these time scales, it probably also needs wall-clock and calendar synchronization
+// which this library does not have.
+
+typedef uint32_t jet_time_t;
 
 namespace jet {
 
@@ -361,42 +377,42 @@ public:
     // for multiple DeltaClockEntries--say, when an EventHub wraps their creation.
     void* context;
     // Bookkeeping
-    time_t interval;
+    jet_time_t interval;
     boolean repeating;
-    time_t remaining;
+    jet_time_t remaining;
     Entry* next;
   };
 private:
   Entry* m_head;
-  time_t m_last_update;
+  jet_time_t m_last_update;
   // constant for detecting most rollover, overflow, and underflow conditions
   // max type value / 2
-  const time_t m_max_interval = ((time_t)0xffffffffffffffffULL) >> 1;
+  const jet_time_t m_max_interval = ((jet_time_t)0xffffffffffffffffULL) >> 1;
 public:
   DeltaClock() : m_head(nullptr), m_last_update(0) {}
   ~DeltaClock() { clear(); }
   // typically called with millis(), but works with any unsigned monotonic time value
-  void update(time_t now) {
+  void update(jet_time_t now) {
     // Constrain delta to be nonzero
     if (now == m_last_update) {
-      jet_dbgprint(F("no time has passed (or exactly one max-time_t time interval has passed)"));
+      jet_dbgprint(F("no time has passed (or exactly one max-jet_time_t time interval has passed)"));
       return;
     }
-    time_t delta = now - m_last_update;
+    jet_time_t delta = now - m_last_update;
     // monotonic time counter rollover
     if (now < m_last_update) {
       jet_traceprint("DeltaClock monotonic timer wraparound");
       // type math validated in test suite
       delta = ((unsigned)-(signed)(m_last_update)) + now;
     }
-    jet_traceprint("update from %" PRIt, m_last_update);
-    jet_traceprint("       to %" PRIt, now);
-    jet_traceprint("       delta %" PRIt, delta);
+    jet_traceprint("update from %" PRIu32, m_last_update);
+    jet_traceprint("       to %" PRIu32, now);
+    jet_traceprint("       delta %" PRIu32, delta);
     // Update entries
     while (m_head != NULL) {
-      jet_traceprint("  delta:%" PRIt " ---------------", delta);
+      jet_traceprint("  delta:%" PRIu32 " ---------------", delta);
       jet_traceprint("  processing %p", m_head);
-      jet_traceprint("  remaining:%" PRIt, m_head->remaining);
+      jet_traceprint("  remaining:%" PRIu32, m_head->remaining);
       if (m_head->remaining > delta) {
         jet_traceprint("  charge and break");
         m_head->remaining -= delta;
@@ -476,7 +492,7 @@ public:
     return true;
   }
   //bool unschedule(DeltaClockEntry* entry);
-  //time_t get_remaining_time(DeltaClockEntry* entry);
+  //jet_time_t get_remaining_time(DeltaClockEntry* entry);
   void clear() {
     for (Entry* current = m_head; current != nullptr; current = current->next) {
       current->next = nullptr;
@@ -504,7 +520,7 @@ public:
 #ifdef JET_TEST
 
 #define COUNTER_ENTRY(id, ivl, rep) \
-static time_t Counter##id; \
+static jet_time_t Counter##id; \
 static void Action##id(void*); \
 static DeltaClock::Entry Entry##id = { \
   .action = &Action##id, \
@@ -536,13 +552,13 @@ bool DeltaClockTest() {
 
   if (success) {
     jet_dbgprint(F("time type properties"));
-    time_t big_time = -1000;
-    time_t small_time = 1000;
-    jet_assert(sizeof(time_t) >= 4);
+    jet_time_t big_time = -1000;
+    jet_time_t small_time = 1000;
+    jet_assert(sizeof(jet_time_t) >= 4);
     jet_assert(big_time > small_time);
     jet_assert(((unsigned)-(signed)(big_time)) + small_time == 2000);
     // My old method does not work the way it was
-    //jet_assert((time_t)(-1) - big_time + small_time == 2000);
+    //jet_assert((jet_time_t)(-1) - big_time + small_time == 2000);
   }
 
   clock = new DeltaClock();
@@ -741,7 +757,7 @@ bool DeltaClockTest() {
     Counter5 = 0;
     Counter6 = 0;
     Counter7 = 0;
-    time_t test_duration = 36UL*60UL*60UL*1000UL;
+    jet_time_t test_duration = 36UL*60UL*60UL*1000UL;
     clock->update(test_duration);
     jet_assert(Counter1 == (test_duration / Entry1.interval));
     jet_assert(Counter2 == (test_duration / Entry2.interval));
@@ -750,14 +766,14 @@ bool DeltaClockTest() {
     jet_assert(Counter5 == (test_duration / Entry5.interval));
     jet_assert(Counter6 == (test_duration / Entry6.interval));
     jet_assert(Counter7 == (test_duration / Entry7.interval));
-    if (!success) {
-      jet_dbgprint(F("Counter1: %" PRIt " / %" PRIt), Counter1, test_duration / Entry1.interval);
-      jet_dbgprint(F("Counter2: %" PRIt " / %" PRIt), Counter2, test_duration / Entry2.interval);
-      jet_dbgprint(F("Counter3: %" PRIt " / %" PRIt), Counter3, test_duration / Entry3.interval);
-      jet_dbgprint(F("Counter4: %" PRIt " / %" PRIt), Counter4, test_duration / Entry4.interval);
-      jet_dbgprint(F("Counter5: %" PRIt " / %" PRIt), Counter5, test_duration / Entry5.interval);
-      jet_dbgprint(F("Counter6: %" PRIt " / %" PRIt), Counter6, test_duration / Entry6.interval);
-      jet_dbgprint(F("Counter7: %" PRIt " / %" PRIt), Counter7, test_duration / Entry7.interval);
+    if (success) {
+      jet_dbgprint(F("Counter1: %" PRIu32 " / %" PRIu32), Counter1, test_duration / Entry1.interval);
+      jet_dbgprint(F("Counter2: %" PRIu32 " / %" PRIu32), Counter2, test_duration / Entry2.interval);
+      jet_dbgprint(F("Counter3: %" PRIu32 " / %" PRIu32), Counter3, test_duration / Entry3.interval);
+      jet_dbgprint(F("Counter4: %" PRIu32 " / %" PRIu32), Counter4, test_duration / Entry4.interval);
+      jet_dbgprint(F("Counter5: %" PRIu32 " / %" PRIu32), Counter5, test_duration / Entry5.interval);
+      jet_dbgprint(F("Counter6: %" PRIu32 " / %" PRIu32), Counter6, test_duration / Entry6.interval);
+      jet_dbgprint(F("Counter7: %" PRIu32 " / %" PRIu32), Counter7, test_duration / Entry7.interval);
     }
   }
   if (!success) {
@@ -896,9 +912,9 @@ private:
   HandlerFunc action;
   TriggerType type;
   TriggerList triggers;
-  time_t interval;
+  jet_time_t interval;
 public:
-  Event(EventIndex id, HandlerFunc func, TriggerType type_in, time_t interval_in = 0) :
+  Event(EventIndex id, HandlerFunc func, TriggerType type_in, jet_time_t interval_in = 0) :
     event_id(id), event_name(id), action(func), type(type_in), interval(interval_in) {}
   ~Event() {
     for (unsigned int trig_idx = 0; trig_idx < triggers.size(); trig_idx++) {
@@ -1073,11 +1089,11 @@ public:
 #endif
   }
 #ifdef JET_EVT_HUB_TEMPORAL
-  void update(time_t new_now) {
+  void update(jet_time_t new_now) {
     clock.update(new_now);
   }
 #endif
-  bool add_event(EventIndex id, HandlerFunc func, TriggerType type, time_t interval = 0) {
+  bool add_event(EventIndex id, HandlerFunc func, TriggerType type, jet_time_t interval = 0) {
     Event* event = find_event(id);
     if (event != nullptr) {
       event->change_parameters(func, type);
@@ -1419,7 +1435,7 @@ bool HubTest() {
     jet_assert(hub->add_event("Timer1", &TestHandlerProducer, TRIGGER_TEMPORAL, 1000UL));
     jet_assert(hub->add_event_trigger("OnAny", "Timer1"));
     if (success) {
-      hub->update((time_t)1000);
+      hub->update((jet_time_t)1000);
       // Timer1 TestHandlerProducer fires and
       // triggers OnAny TestHandlerProducer
       jet_assert(TestHandlerCounter == 8);
