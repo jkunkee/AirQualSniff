@@ -899,7 +899,7 @@ bool RenderSerial(jet::evt::TriggerList& triggers, jet::evt::Datum& out) {
 
 typedef enum _OledMode {
     HOME,
-    PM_DISPLAY,
+    PM_SUMMARY,
     BLANK,
     DEBUG_RETICLE,
 } OledMode;
@@ -927,7 +927,7 @@ bool RenderOled(jet::evt::TriggerList& triggers, jet::evt::Datum& out) {
                 case peripherals::Joystick::JOYSTICK_DIRECTION::CENTER:
                     break;
                 case peripherals::Joystick::JOYSTICK_DIRECTION::LEFT:
-                    mode = PM_DISPLAY;
+                    mode = PM_SUMMARY;
                     break;
                 case peripherals::Joystick::JOYSTICK_DIRECTION::DOWN:
                     mode = HOME;
@@ -982,7 +982,7 @@ bool RenderOled(jet::evt::TriggerList& triggers, jet::evt::Datum& out) {
             }
         }
         break;
-    case PM_DISPLAY: {
+    case PM_SUMMARY: {
             float totalugm3 = pmInst.pm_1_0_ug_m3 + pmInst.pm_2_5_ug_m3 + pmInst.pm_4_0_ug_m3 + pmInst.pm_10_ug_m3;
             pmMassBox->UpdateValue(totalugm3);
 
