@@ -900,6 +900,7 @@ bool RenderSerial(jet::evt::TriggerList& triggers, jet::evt::Datum& out) {
 typedef enum _OledMode {
     HOME,
     PM_SUMMARY,
+    PM_DETAIL,
     BLANK,
     DEBUG_RETICLE,
 } OledMode;
@@ -915,6 +916,16 @@ Box *pmMassBox;
 Box *pmCountBox;
 Box *pmTypicalBox;
 
+Box *pm1_0MassBox;
+Box *pm2_5MassBox;
+Box *pm4_0MassBox;
+Box *pm10_MassBox;
+Box *pm0_5CountBox;
+Box *pm1_0CountBox;
+Box *pm2_5CountBox;
+Box *pm4_0CountBox;
+Box *pm10_CountBox;
+
 bool RenderOled(jet::evt::TriggerList& triggers, jet::evt::Datum& out) {
     static OledMode mode = HOME;
     for (size_t evt_idx = 0; evt_idx < triggers.size(); evt_idx++) {
@@ -927,7 +938,13 @@ bool RenderOled(jet::evt::TriggerList& triggers, jet::evt::Datum& out) {
                 case peripherals::Joystick::JOYSTICK_DIRECTION::CENTER:
                     break;
                 case peripherals::Joystick::JOYSTICK_DIRECTION::LEFT:
-                    mode = PM_SUMMARY;
+                    if (mode != PM_SUMMARY && mode != PM_DETAIL) {
+                        mode = PM_SUMMARY;
+                    } else if (mode == PM_SUMMARY) {
+                        mode = PM_DETAIL;
+                    } else if (mode == PM_DETAIL) {
+                        mode = PM_SUMMARY;
+                    }
                     break;
                 case peripherals::Joystick::JOYSTICK_DIRECTION::DOWN:
                     mode = HOME;
@@ -981,6 +998,17 @@ bool RenderOled(jet::evt::TriggerList& triggers, jet::evt::Datum& out) {
                 Eco2Box->UpdateValue(9999UL);
             }
         }
+        break;
+    case PM_DETAIL:
+        pm1_0MassBox->UpdateValue(pmInst.pm_1_0_ug_m3);
+        pm2_5MassBox->UpdateValue(pmInst.pm_2_5_ug_m3);
+        pm4_0MassBox->UpdateValue(pmInst.pm_4_0_ug_m3);
+        pm10_MassBox->UpdateValue(pmInst.pm_10_ug_m3);
+        pm0_5CountBox->UpdateValue(pmInst.pm_0_5_n_cm3);
+        pm1_0CountBox->UpdateValue(pmInst.pm_1_0_n_cm3);
+        pm2_5CountBox->UpdateValue(pmInst.pm_2_5_n_cm3);
+        pm4_0CountBox->UpdateValue(pmInst.pm_4_0_n_cm3);
+        pm10_CountBox->UpdateValue(pmInst.pm_10_n_cm3);
         break;
     case PM_SUMMARY: {
             float totalugm3 = pmInst.pm_1_0_ug_m3 + pmInst.pm_2_5_ug_m3 + pmInst.pm_4_0_ug_m3 + pmInst.pm_10_ug_m3;
@@ -1109,6 +1137,17 @@ void init() {
     pmMassBox = new Box(peripherals::Display::u8g2, 0, 1 * 23, 128, 24, u8g2_font_nerhoe_tf, "ug/", "m^3", u8g2_font_osb18_tf, 1);
     pmCountBox = new Box(peripherals::Display::u8g2, 0, 2 * 23, 128, 24, u8g2_font_nerhoe_tf, "part/", "cm^3", u8g2_font_osb18_tf, 1);
     pmTypicalBox = new Box(peripherals::Display::u8g2, 0, 3 * 23, 128, 24, u8g2_font_nerhoe_tf, "um", "typ", u8g2_font_osb18_tf, 1);
+
+    // particle bins w/sparklines
+    pm1_0MassBox = new Box(peripherals::Display::u8g2, 64, 0 * 12, 64, 13, u8g2_font_nerhoe_tf, " ug/m^3", "", u8g2_font_nerhoe_tf, 2);
+    pm2_5MassBox = new Box(peripherals::Display::u8g2, 64, 1 * 12, 64, 13, u8g2_font_nerhoe_tf, " ug/m^3", "", u8g2_font_nerhoe_tf, 2);
+    pm4_0MassBox = new Box(peripherals::Display::u8g2, 64, 2 * 12, 64, 13, u8g2_font_nerhoe_tf, " ug/m^3", "", u8g2_font_nerhoe_tf, 2);
+    pm10_MassBox = new Box(peripherals::Display::u8g2, 64, 3 * 12, 64, 13, u8g2_font_nerhoe_tf, " ug/m^3", "", u8g2_font_nerhoe_tf, 2);
+    pm0_5CountBox = new Box(peripherals::Display::u8g2, 64, 4 * 12, 64, 13, u8g2_font_nerhoe_tf, " n/cm^3", "", u8g2_font_nerhoe_tf, 2);
+    pm1_0CountBox = new Box(peripherals::Display::u8g2, 64, 5 * 12, 64, 13, u8g2_font_nerhoe_tf, " n/cm^3", "", u8g2_font_nerhoe_tf, 2);
+    pm2_5CountBox = new Box(peripherals::Display::u8g2, 64, 6 * 12, 64, 13, u8g2_font_nerhoe_tf, " n/cm^3", "", u8g2_font_nerhoe_tf, 2);
+    pm4_0CountBox = new Box(peripherals::Display::u8g2, 64, 7 * 12, 64, 13, u8g2_font_nerhoe_tf, " n/cm^3", "", u8g2_font_nerhoe_tf, 2);
+    pm10_CountBox = new Box(peripherals::Display::u8g2, 64, 8 * 12, 64, 13, u8g2_font_nerhoe_tf, " n/cm^3", "", u8g2_font_nerhoe_tf, 2);
 
     // Apparently .connect() will call .on() for me, but if I want to call .scan() first
     // then I need to call it myself.
