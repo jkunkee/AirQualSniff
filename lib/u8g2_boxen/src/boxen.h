@@ -25,7 +25,7 @@ private:
     } m_value;
     void Render(BoxValueType boxType);
 public:
-    // x,y is the top left corner of the Box, width and height count down and do the right.
+    // x,y is the top left corner of the Box, height and width count down and do the right.
     Box(u8g2_t *u8g2, u8g2_int_t x, u8g2_int_t y, u8g2_int_t width, u8g2_int_t height, const uint8_t *labelFont, const char *labelTop, const char *labelBottom, const uint8_t *valueFont, uint8_t digits);
 
     void UpdateValue(int32_t val);
