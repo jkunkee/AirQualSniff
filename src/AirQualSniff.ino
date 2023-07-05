@@ -1125,6 +1125,49 @@ int Report(String s) {
     return 0;
 }
 
+int Framebuffer(String s) {
+    char *buf;
+    constexpr size_t bufLen = 622; // limit on Particle Photon running OS 2.3.0
+    buf = (char*)malloc(bufLen);
+
+    // I'm not using the u8g2 dynamic buffer feature, so GetBufferSize is not defined
+    uint16_t framebufferSize = 8 * peripherals::Display::u8g2->u8x8.display_info->tile_width * peripherals::Display::u8g2->tile_buf_height;
+    //uint8_t *framebuffer = peripherals::Display::u8g2->tile_buf_ptr;
+    uint8_t page_cnt;
+    uint8_t *framebuffer = u8g2_m_16_16_f(&page_cnt);
+    // The screen is 128x128
+    // SSD1327 is 4bpp, u8g2 uses 1bpp
+    // u8g2 also tiles the bytes vertically: each byte is a column of 8 bits next to the previous column of 8 (I think)
+    constexpr int rowLen = 128 / 8;
+    constexpr int rows = 128;
+    // Naive rendering makes this too big to report out via the Particle event hub all at once.
+    constexpr int rowChunkLen = 4;
+
+    //for (int chunk = 0; chunk < 128/4; chunk++) {
+    for (int row = 0; row < 128; row++) {
+        //memset(buf, 0, bufLen);
+        //JSONBufferWriter writer(buf, bufLen-1);
+        //writer.beginArray();
+        for (int elem = 0; elem < rowLen; elem++) {
+            //writer.value(frameBuffer[elem]);
+            for (int bit = 0; bit < 8; bit++) {
+                Serial.print(((framebuffer[elem] >> bit) & 1) == 1 ? "*" : " ");
+            }
+        }
+        Serial.print("\n");
+        //writer.endArray();
+        //Particle.publish("framebuffer1", buf);
+        framebuffer += 128/8;
+    }
+    Serial.print((uintptr_t)framebuffer, 16);
+    Serial.print(" ");
+    Serial.println(framebufferSize);
+
+    free(buf);
+
+    return (uintptr_t)framebuffer;
+}
+
 int RemoteJoystick(String s) {
     jet::evt::Datum joystickData;
     joystickData.uin16 = s.toInt();
@@ -1167,6 +1210,7 @@ void init() {
     if (peripherals::IsKnownNetworkPresent()) {
         Particle.function("ManualSerial", ManualSerial);
         Particle.function("Report", Report);
+        Particle.function("Framebuffer", Framebuffer);
         Particle.function("RemoteJoystick", RemoteJoystick);
         Particle.connect();
         Particle.publishVitals(30min);
