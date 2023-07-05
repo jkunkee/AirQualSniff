@@ -1125,6 +1125,16 @@ int Report(String s) {
     return 0;
 }
 
+int RemoteJoystick(String s) {
+    jet::evt::Datum joystickData;
+    joystickData.uin16 = s.toInt();
+    if (joystickData.uin16 > peripherals::Joystick::JOYSTICK_DIRECTION::CENTER) {
+        return -1;
+    }
+    infrastructure::event_hub.deliver("Joystick Direction Change", joystickData);
+    return 0;
+}
+
 void init() {
     //FontData *candidates[] = {u8g2_font_6x10_tf, u8g2_font_profont11_tf, u8g2_font_simple1_tf, u8g2_font_NokiaSmallPlain_tf };
     PressureBox = new Box(peripherals::Display::u8g2, 32, 0 * 23, 128-32, 24, u8g2_font_bitcasual_tf, "hPa", "", u8g2_font_osb18_tf, 0);
@@ -1157,6 +1167,7 @@ void init() {
     if (peripherals::IsKnownNetworkPresent()) {
         Particle.function("ManualSerial", ManualSerial);
         Particle.function("Report", Report);
+        Particle.function("RemoteJoystick", RemoteJoystick);
         Particle.connect();
         Particle.publishVitals(30min);
     } else {
