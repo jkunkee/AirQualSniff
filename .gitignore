@@ -6,6 +6,7 @@ AirQualSniff.cpp
 # local build folder
 target
 # Workbench requires libraries to be installed locally for autocompletion and local build
+Base64RK
 SparkFun_SCD30_Arduino_Library
 SparkFun_LPS25HB_Arduino_Library
 SparkFun_I2C_Mux_Arduino_Library
