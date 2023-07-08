@@ -1125,43 +1125,57 @@ int Report(String s) {
     return 0;
 }
 
+// Something weird means that the u8g2 fields and methods
+// that this should use don't get filled in.
+bool ReadPixel(uint8_t *buf, uint16_t bufLen, int x, int y) {
+    // The screen is 128x128
+    // SSD1327 is 4bpp, u8g2 uses 1bpp (see u8g2_m_16_16_f)
+    // u8g2 also tiles the bytes vertically: each byte is a column of 8 bits next to the previous column of 8 (I think)
+    int index = x + (y/8)*128;
+    int shift = y % 8;
+    if (index < bufLen) {
+        return ((buf[index] >> shift) & 1) == 1;
+    } else {
+        return false;
+    }
+}
+
 int Framebuffer(String s) {
     char *buf;
     constexpr size_t bufLen = 622; // limit on Particle Photon running OS 2.3.0
     buf = (char*)malloc(bufLen);
 
-    // I'm not using the u8g2 dynamic buffer feature, so GetBufferSize is not defined
-    uint16_t framebufferSize = 8 * peripherals::Display::u8g2->u8x8.display_info->tile_width * peripherals::Display::u8g2->tile_buf_height;
-    //uint8_t *framebuffer = peripherals::Display::u8g2->tile_buf_ptr;
+    // See u8g2_m_16_16_f for buffer info. Called from u8g2 constructor.
     uint8_t page_cnt;
     uint8_t *framebuffer = u8g2_m_16_16_f(&page_cnt);
-    // The screen is 128x128
-    // SSD1327 is 4bpp, u8g2 uses 1bpp
-    // u8g2 also tiles the bytes vertically: each byte is a column of 8 bits next to the previous column of 8 (I think)
-    constexpr int rowLen = 128 / 8;
-    constexpr int rows = 128;
-    // Naive rendering makes this too big to report out via the Particle event hub all at once.
-    constexpr int rowChunkLen = 4;
+    constexpr uint16_t framebufferSize = 2048;
+    constexpr size_t WIDTH = peripherals::Display::WIDTH;
+    constexpr size_t HEIGHT = peripherals::Display::HEIGHT;
 
-    //for (int chunk = 0; chunk < 128/4; chunk++) {
-    for (int row = 0; row < 128; row++) {
-        //memset(buf, 0, bufLen);
-        //JSONBufferWriter writer(buf, bufLen-1);
-        //writer.beginArray();
-        for (int elem = 0; elem < rowLen; elem++) {
-            //writer.value(frameBuffer[elem]);
-            for (int bit = 0; bit < 8; bit++) {
-                Serial.print(((framebuffer[elem] >> bit) & 1) == 1 ? "*" : " ");
+    constexpr size_t txBytesPerRow = WIDTH + 2 /*quotes*/ + 1 /*comma*/;
+    constexpr size_t txIntroOutroBytesPerTx = 2 /*square brackets*/ - 1 /*no final comma*/;
+    constexpr size_t txRowsPerTx = (bufLen - 1 /*null terminator*/ - txIntroOutroBytesPerTx) / txBytesPerRow;
+    constexpr size_t txCount = framebufferSize / txRowsPerTx; // TODO: needs rounding trick
+
+    for (uint16_t txIdx = 0; txIdx < txCount; txIdx++) {
+        memset(buf, 0, bufLen);
+        JSONBufferWriter writer(buf, bufLen-1);
+        writer.beginArray();
+        //Serial.printlnf("begin tx %d", txIdx);
+        // prevent going out of bounds, but index by txIdx-based chunks
+        for (uint16_t row = txIdx * txRowsPerTx; row < HEIGHT && row < (txIdx + 1) * txRowsPerTx; row++) {
+            String str;
+            for (uint16_t col = 0; col < WIDTH; col++) {
+                bool pxVal = ReadPixel(framebuffer, framebufferSize, col, row);
+                Serial.print(pxVal ? "*" : " ");
+                str += pxVal ? "*" : " ";
             }
+            Serial.println();
+            writer.value(str);
         }
-        Serial.print("\n");
-        //writer.endArray();
-        //Particle.publish("framebuffer1", buf);
-        framebuffer += 128/8;
+        writer.endArray();
+        //Particle.publish("framebuffer", buf); // Currently fails after three
     }
-    Serial.print((uintptr_t)framebuffer, 16);
-    Serial.print(" ");
-    Serial.println(framebufferSize);
 
     free(buf);
 
