@@ -12,6 +12,7 @@
 #include "boxen.h"
 
 // Particle-style dependencies
+#include <Base64RK.h>
 #include <photon-vbat.h>
 #include <SparkFun_SCD30_Arduino_Library.h>
 #include <SparkFun_LPS25HB_Arduino_Library.h>
@@ -1125,61 +1126,60 @@ int Report(String s) {
     return 0;
 }
 
-// Something weird means that the u8g2 fields and methods
-// that this should use don't get filled in.
-bool ReadPixel(uint8_t *buf, uint16_t bufLen, int x, int y) {
-    // The screen is 128x128
-    // SSD1327 is 4bpp, u8g2 uses 1bpp (see u8g2_m_16_16_f)
-    // u8g2 also tiles the bytes vertically: each byte is a column of 8 bits next to the previous column of 8 (I think)
-    int index = x + (y/8)*128;
-    int shift = y % 8;
-    if (index < bufLen) {
-        return ((buf[index] >> shift) & 1) == 1;
-    } else {
-        return false;
-    }
-}
-
 int Framebuffer(String s) {
-    char *buf;
-    constexpr size_t bufLen = 622; // limit on Particle Photon running OS 2.3.0
-    buf = (char*)malloc(bufLen);
-
+    constexpr size_t bufLen = 622; // max message length for OS 2.3.x
     // See u8g2_m_16_16_f for buffer info. Called from u8g2 constructor.
     uint8_t page_cnt;
     uint8_t *framebuffer = u8g2_m_16_16_f(&page_cnt);
     constexpr uint16_t framebufferSize = 2048;
+
+    // Dump to the event hub in a compact manner
+    uint16_t encodedTotal = Base64::getEncodedSize(framebufferSize, false);
+    uint16_t encodedChunkCount = encodedTotal / (bufLen - 1);
+    String encoded = Base64::encodeToString(framebuffer, framebufferSize);
+    for (uint16_t chunkIdx = 0; chunkIdx < encodedChunkCount; chunkIdx++) {
+        String chunk = encoded.substring(chunkIdx * (bufLen-1), (chunkIdx+1) * (bufLen-1));
+        String chunkName = "fb_";
+        chunkName += chunkIdx;
+        if (chunkIdx != 0) { delay(500); } // avoid throttling
+        Particle.publish(chunkName, chunk);
+    }
+
+    // Dump to serial in a less-compact manner
     constexpr size_t WIDTH = peripherals::Display::WIDTH;
     constexpr size_t HEIGHT = peripherals::Display::HEIGHT;
 
-    constexpr size_t txBytesPerRow = WIDTH + 2 /*quotes*/ + 1 /*comma*/;
-    constexpr size_t txIntroOutroBytesPerTx = 2 /*square brackets*/ - 1 /*no final comma*/;
-    constexpr size_t txRowsPerTx = (bufLen - 1 /*null terminator*/ - txIntroOutroBytesPerTx) / txBytesPerRow;
-    constexpr size_t txCount = framebufferSize / txRowsPerTx; // TODO: needs rounding trick
-
-    for (uint16_t txIdx = 0; txIdx < txCount; txIdx++) {
-        memset(buf, 0, bufLen);
-        JSONBufferWriter writer(buf, bufLen-1);
-        writer.beginArray();
-        //Serial.printlnf("begin tx %d", txIdx);
-        // prevent going out of bounds, but index by txIdx-based chunks
-        for (uint16_t row = txIdx * txRowsPerTx; row < HEIGHT && row < (txIdx + 1) * txRowsPerTx; row++) {
-            String str;
-            for (uint16_t col = 0; col < WIDTH; col++) {
-                bool pxVal = ReadPixel(framebuffer, framebufferSize, col, row);
-                Serial.print(pxVal ? "*" : " ");
-                str += pxVal ? "*" : " ";
+    for (uint16_t row = 0; row < HEIGHT; row += 2) {
+        for (uint16_t col = 0; col < WIDTH; col++) {
+            // The screen is 128x128
+            // SSD1327 is 4bpp, u8g2 uses 1bpp (see u8g2_m_16_16_f)
+            // u8g2 also tiles the bytes vertically: each byte is a column of 8 bits next to the previous column of 8 (I think)
+            int byteIndex = col + (row / 8) * WIDTH;
+            int shift = row % 8;
+            int val = (framebuffer[byteIndex] >> shift) & 0x3;
+            const char *glyph;
+            switch (val) {
+                case 0:
+                    glyph = " ";
+                    break;
+                case 1:
+                    glyph = "'";
+                    break;
+                case 2:
+                    glyph = ",";
+                    break;
+                case 3:
+                    glyph = "8";
+                    break;
+                default:
+                    glyph = "?";
             }
-            Serial.println();
-            writer.value(str);
+            Serial.print(glyph);
         }
-        writer.endArray();
-        //Particle.publish("framebuffer", buf); // Currently fails after three
+        Serial.println();
     }
 
-    free(buf);
-
-    return (uintptr_t)framebuffer;
+    return framebufferSize;
 }
 
 int RemoteJoystick(String s) {
