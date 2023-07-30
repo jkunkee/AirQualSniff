@@ -385,14 +385,22 @@ public:
 private:
   Entry* m_head;
   jet_time_t m_last_update;
+  bool m_first_update = true;
   // constant for detecting most rollover, overflow, and underflow conditions
   // max type value / 2
   const jet_time_t m_max_interval = ((jet_time_t)0xffffffffffffffffULL) >> 1;
 public:
   DeltaClock() : m_head(nullptr), m_last_update(0) {}
   ~DeltaClock() { clear(); }
+  void first_update(jet_time_t first_now) {
+  }
   // typically called with millis(), but works with any unsigned monotonic time value
   void update(jet_time_t now) {
+    if (m_first_update) {
+      m_last_update = now;
+      m_first_update = false;
+      return;
+    }
     // Constrain delta to be nonzero
     if (now == m_last_update) {
       jet_dbgprint(F("no time has passed (or exactly one max-jet_time_t time interval has passed)"));
@@ -579,6 +587,7 @@ bool DeltaClockTest() {
     jet_dbgprint(F("constructor"));
     jet_assert(clock->m_head == nullptr);
     jet_assert(clock->m_last_update == 0);
+    jet_assert(clock->m_first_update == true);
   }
   if (success) {
     jet_dbgprint(F("empty list update"));
@@ -628,6 +637,7 @@ bool DeltaClockTest() {
     jet_dbgprint(F("fire both"));
     jet_assert(clock->schedule(&EntryA));
     jet_assert(clock->schedule(&EntryB));
+    clock->update(0);
     CounterA = 0;
     CounterB = 0;
     clock->update(100);
