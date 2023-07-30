@@ -154,7 +154,7 @@ public:
     // Is there room?
     if (m_count + 1 > m_capacity) {
       if (m_list_is_internally_managed) {
-      jet_dbgprint(F("insert increase needed"));
+        jet_dbgprint(F("insert increase needed"));
         // Allocate a bigger buffer.
         set_capacity(m_capacity + 2);
       } else {
