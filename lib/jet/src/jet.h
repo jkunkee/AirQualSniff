@@ -401,9 +401,9 @@ public:
     jet_time_t delta = now - m_last_update;
     // monotonic time counter rollover
     if (now < m_last_update) {
-      jet_traceprint("DeltaClock monotonic timer wraparound");
       // type math validated in test suite
       delta = ((unsigned)-(signed)(m_last_update)) + now;
+      jet_dbgprint(F("DeltaClock monotonic timer wraparound %" PRIu32 " to %" PRIu32 " is %" PRIu32), m_last_update, now, delta);
     }
     jet_traceprint("update from %" PRIu32, m_last_update);
     jet_traceprint("       to %" PRIu32, now);
