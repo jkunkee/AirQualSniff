@@ -1284,6 +1284,8 @@ void init() {
     if (!infrastructure::event_hub.is_dag()) {
         Serial.println("Hub graph is not a DAG!!");
     }
+    // first call to update() sets baseline time
+    infrastructure::event_hub.update(millis());
 }
 
 } // namespace Flow
