@@ -98,6 +98,7 @@ Arduino_DebugUtils eventhub_arduino_dbg;
 // which this library does not have.
 
 typedef uint32_t jet_time_t;
+#define JET_TIME_T_MAX UINT32_MAX
 
 namespace jet {
 
@@ -409,9 +410,11 @@ public:
     jet_time_t delta = now - m_last_update;
     // monotonic time counter rollover
     if (now < m_last_update) {
-      // type math validated in test suite
-      delta = ((unsigned)-(signed)(m_last_update)) + now;
+      delta = JET_TIME_T_MAX - m_last_update + now + 1 /* correction for JET_TIME_T_MAX == 2^bits - 1 */;
       jet_dbgprint(F("DeltaClock monotonic timer wraparound %" PRIu32 " to %" PRIu32 " is %" PRIu32), m_last_update, now, delta);
+    }
+    if (delta > 30*1000) {
+      jet_dbgprint("DeltaClock big delta: %" PRIu32, delta);
     }
     jet_traceprint("update from %" PRIu32, m_last_update);
     jet_traceprint("       to %" PRIu32, now);
