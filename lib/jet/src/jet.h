@@ -363,6 +363,490 @@ bool PointerListTest() {
 
 #endif // JET_TEST
 
+// UInt32 class
+// Provides a two's compliment 32-bit unsigned integer type with predictable rollover
+// and useful operation flags.
+// Since 8-bit microcontrollers have to use combinations of instructions to do larger
+// type arithmetic, they don't always have predictable overflow and type conversion
+// characteristics.
+
+class UInt32 {
+private:
+  uint8_t m_bytes[4];
+  bool m_overflow;
+  bool m_underflow;
+  void clear_flags() {
+    m_overflow = false;
+    m_underflow = false;
+  }
+  uint32_t to_uint32() const {
+    uint32_t result = 0;
+    result += m_bytes[3] << 24;
+    result += m_bytes[2] << 16;
+    result += m_bytes[1] << 8;
+    result += m_bytes[0] << 0;
+    return result;
+  }
+  void from_uint32(uint32_t in) {
+    m_bytes[3] = (in >> 24) & 0xFF;
+    m_bytes[2] = (in >> 16) & 0xFF;
+    m_bytes[1] = (in >> 8) & 0xFF;
+    m_bytes[0] = (in >> 0) & 0xFF;
+  }
+public:
+  UInt32() : m_bytes({0, 0, 0, 0}) {
+    clear_flags();
+  }
+  UInt32(const UInt32 &in) {
+    clear_flags();
+    m_bytes[0] = in.m_bytes[0];
+    m_bytes[1] = in.m_bytes[1];
+    m_bytes[2] = in.m_bytes[2];
+    m_bytes[3] = in.m_bytes[3];
+  }
+
+  UInt32(uint32_t in) { this->operator=(in); }
+  UInt32(uint16_t in) { this->operator=(in); }
+  UInt32(uint8_t in) { this->operator=(in); }
+  UInt32(int32_t in) { this->operator=(in); }
+  UInt32(int16_t in) { this->operator=(in); }
+  UInt32(int8_t in) { this->operator=(in); }
+
+  // Reference: https://en.wikipedia.org/wiki/Operators_in_C_and_C%2B%2B
+
+  UInt32 & operator = (uint32_t in) {
+    clear_flags();
+    this->from_uint32(in);
+  }
+  UInt32 & operator = (uint16_t in) { this->operator=((uint32_t)in); }
+  UInt32 & operator = (uint8_t in) { this->operator=((uint32_t)in); }
+  UInt32 & operator = (int32_t in) {
+    clear_flags();
+    if (in >= 0) {
+      this->from_uint32((uint32_t)in);
+    } else {
+      jet_traceprint(F("jet::UInt32 assignment flushing %d to 0"), in);
+      this->from_uint32(0);
+      this->m_underflow = true;
+    }
+  }
+  UInt32 & operator = (int16_t in) { this->operator=((int32_t)in); }
+  UInt32 & operator = (int8_t in) { this->operator=((int32_t)in); }
+
+  // Addition
+  friend UInt32 operator + (const UInt32 &lhs, const UInt32 &rhs);
+  UInt32 & operator += (const UInt32 &in) { this->operator=(*this + in); }
+
+  // Subtraction
+  friend UInt32 operator - (const UInt32 &lhs, const UInt32 &rhs);
+  // Multiplication
+  // Division
+  // Modulo?
+  // Comparison
+  // all other variants call operator > and so don't need friendship
+  friend bool operator > (const UInt32 &lhs, const UInt32 &rhs);
+  friend bool operator == (const UInt32 &lhs, const UInt32 &rhs);
+
+  friend bool UInt32Test();
+
+  void debug_string(String& out) const {
+    out += "UInt32:";
+    out += String(m_bytes[3], 16);
+    out += ",";
+    out += String(m_bytes[2], 16);
+    out += ",";
+    out += String(m_bytes[1], 16);
+    out += ",";
+    out += String(m_bytes[0], 16);
+  }
+};
+
+// Left-hand operand type coersion is only possible in non-member functions; see Arduino's String.h and
+// https://stackoverflow.com/questions/4652932/why-define-operator-or-outside-a-class-and-how-to-do-it-properly
+// Also, member binary operators confuse me about which operand is where.
+
+inline UInt32 operator + (const UInt32 &lhs, const UInt32 &rhs) {
+  uint16_t z, l, r;
+  bool carry;
+  UInt32 out;
+
+  out.clear_flags();
+
+  l = (uint16_t)lhs.m_bytes[0];
+  r = (uint16_t)rhs.m_bytes[0];
+  z = l + r;
+  out.m_bytes[0] = (uint8_t)z;
+  carry = z > (uint16_t)UINT8_MAX;
+
+  l = (uint16_t)lhs.m_bytes[1];
+  r = (uint16_t)rhs.m_bytes[1];
+  z = l + r;
+  if (carry) { z += 1; }
+  out.m_bytes[1] = (uint8_t)z;
+  carry = z > (uint16_t)UINT8_MAX;
+
+  l = (uint16_t)lhs.m_bytes[2];
+  r = (uint16_t)rhs.m_bytes[2];
+  z = l + r;
+  if (carry) { z += 1; }
+  out.m_bytes[2] = (uint8_t)z;
+  carry = z > (uint16_t)UINT8_MAX;
+
+  l = (uint16_t)lhs.m_bytes[3];
+  r = (uint16_t)rhs.m_bytes[3];
+  z = l + r;
+  if (carry) { z += 1; }
+  out.m_bytes[3] = (uint8_t)z;
+  carry = z > (uint16_t)UINT8_MAX;
+
+  out.m_overflow = carry;
+
+  jet_traceprint("%" PRIx32 " + %" PRIx32 " => %" PRIx32, lhs.to_uint32(), rhs.to_uint32(), out.to_uint32());
+
+  return out;
+}
+
+inline bool operator > (const UInt32 &lhs, const UInt32 &rhs) {
+  // Yes, this can be simplified. A lot. But it works, and it's done.
+  if (lhs.m_bytes[3] > rhs.m_bytes[3]) {
+    return true;
+  } else if (lhs.m_bytes[3] == rhs.m_bytes[3] && lhs.m_bytes[2] > rhs.m_bytes[2]) {
+    return true;
+  } else if (lhs.m_bytes[3] == rhs.m_bytes[3] && lhs.m_bytes[2] == rhs.m_bytes[2] && lhs.m_bytes[1] > rhs.m_bytes[1]) {
+    return true;
+  } else if (lhs.m_bytes[3] == rhs.m_bytes[3] && lhs.m_bytes[2] == rhs.m_bytes[2] && lhs.m_bytes[1] == rhs.m_bytes[1] && lhs.m_bytes[0] > rhs.m_bytes[0]) {
+    return true;
+  } else {
+    return false;
+  }
+}
+inline bool operator >= (const UInt32 &lhs, const UInt32 &rhs) { return !(rhs > lhs); }
+inline bool operator < (const UInt32 &lhs, const UInt32 &rhs) { return (rhs > lhs); }
+inline bool operator <= (const UInt32 &lhs, const UInt32 &rhs) { return !(lhs > rhs); }
+inline bool operator == (const UInt32 &lhs, const UInt32 &rhs) {
+  return lhs.m_bytes[3] == rhs.m_bytes[3] &&
+         lhs.m_bytes[2] == rhs.m_bytes[2] &&
+         lhs.m_bytes[1] == rhs.m_bytes[1] &&
+         lhs.m_bytes[0] == rhs.m_bytes[0];
+}
+
+inline UInt32 operator - (const UInt32 &lhs, const UInt32 &rhs) {
+  UInt32 inv;
+  // Two's complement
+  inv.m_bytes[0] = ~rhs.m_bytes[0];
+  inv.m_bytes[1] = ~rhs.m_bytes[1];
+  inv.m_bytes[2] = ~rhs.m_bytes[2];
+  inv.m_bytes[3] = ~rhs.m_bytes[3];
+  inv += 1;
+  // Outsource math to addition operator
+  UInt32 out = lhs + inv;
+  out.m_overflow = false;
+  if (lhs < rhs) {
+    out.m_underflow = true;
+  }
+  return out;
+}
+
+bool UInt32Test() {
+  jet_assert_var(success);
+
+  if (success) {
+    jet_dbgprint(F("basic constructor and uint assignment"));
+    UInt32 obj;
+
+    jet_assert(obj.m_bytes[0] == 0);
+    jet_assert(obj.m_bytes[1] == 0);
+    jet_assert(obj.m_bytes[2] == 0);
+    jet_assert(obj.m_bytes[3] == 0);
+    jet_assert(obj.m_overflow == false);
+    jet_assert(obj.m_underflow == false);
+
+    obj = (uint32_t)1;
+
+    jet_assert(obj.m_bytes[0] == 1);
+    jet_assert(obj.m_bytes[1] == 0);
+    jet_assert(obj.m_bytes[2] == 0);
+    jet_assert(obj.m_bytes[3] == 0);
+
+    obj = (uint16_t)1;
+
+    jet_assert(obj.m_bytes[0] == 1);
+    jet_assert(obj.m_bytes[1] == 0);
+    jet_assert(obj.m_bytes[2] == 0);
+    jet_assert(obj.m_bytes[3] == 0);
+
+    obj = (uint8_t)1;
+
+    jet_assert(obj.m_bytes[0] == 1);
+    jet_assert(obj.m_bytes[1] == 0);
+    jet_assert(obj.m_bytes[2] == 0);
+    jet_assert(obj.m_bytes[3] == 0);
+
+    if (!success) {
+      String out;
+      obj.debug_string(out);
+      jet_dbgprint(out.c_str());
+    }
+  }
+
+  if (success) {
+    jet_dbgprint(F("signed assignment"));
+    UInt32 obj;
+
+    obj = (int32_t)1;
+
+    jet_assert(obj.m_bytes[0] == 1);
+    jet_assert(obj.m_bytes[1] == 0);
+    jet_assert(obj.m_bytes[2] == 0);
+    jet_assert(obj.m_bytes[3] == 0);
+    jet_assert(obj.m_overflow == false);
+    jet_assert(obj.m_underflow == false);
+
+    obj = (int32_t)INT32_MAX;
+
+    jet_assert(obj.m_bytes[0] == ((INT32_MAX >> 0) & 0xFF));
+    jet_assert(obj.m_bytes[1] == ((INT32_MAX >> 8) & 0xFF));
+    jet_assert(obj.m_bytes[2] == ((INT32_MAX >> 16) & 0xFF));
+    jet_assert(obj.m_bytes[3] == ((INT32_MAX >> 24) & 0xFF));
+    jet_assert(obj.m_overflow == false);
+    jet_assert(obj.m_underflow == false);
+
+    obj = (int32_t)INT32_MIN;
+
+    jet_assert(obj.m_bytes[0] == 0);
+    jet_assert(obj.m_bytes[1] == 0);
+    jet_assert(obj.m_bytes[2] == 0);
+    jet_assert(obj.m_bytes[3] == 0);
+    jet_assert(obj.m_overflow == false);
+    jet_assert(obj.m_underflow == true);
+
+    // reset so changes are visible
+    obj = (uint32_t)0;
+
+    obj = (int16_t)1;
+
+    jet_assert(obj.m_bytes[0] == 1);
+    jet_assert(obj.m_bytes[1] == 0);
+    jet_assert(obj.m_bytes[2] == 0);
+    jet_assert(obj.m_bytes[3] == 0);
+    jet_assert(obj.m_overflow == false);
+    jet_assert(obj.m_underflow == false);
+
+    obj = (int16_t)INT16_MIN;
+
+    jet_assert(obj.m_bytes[0] == 0);
+    jet_assert(obj.m_bytes[1] == 0);
+    jet_assert(obj.m_bytes[2] == 0);
+    jet_assert(obj.m_bytes[3] == 0);
+    jet_assert(obj.m_overflow == false);
+    jet_assert(obj.m_underflow == true);
+
+    // reset so changes are visible
+    obj = (uint32_t)0;
+
+    obj = (int8_t)1;
+
+    jet_assert(obj.m_bytes[0] == 1);
+    jet_assert(obj.m_bytes[1] == 0);
+    jet_assert(obj.m_bytes[2] == 0);
+    jet_assert(obj.m_bytes[3] == 0);
+    jet_assert(obj.m_overflow == false);
+    jet_assert(obj.m_underflow == false);
+
+    obj = (int8_t)INT8_MIN;
+
+    jet_assert(obj.m_bytes[0] == 0);
+    jet_assert(obj.m_bytes[1] == 0);
+    jet_assert(obj.m_bytes[2] == 0);
+    jet_assert(obj.m_bytes[3] == 0);
+    jet_assert(obj.m_overflow == false);
+    jet_assert(obj.m_underflow == true);
+
+    if (!success) {
+      String out;
+      obj.debug_string(out);
+      jet_dbgprint(out.c_str());
+    }
+  }
+
+  if (success) {
+    jet_dbgprint(F("operator +"));
+    UInt32 obj, a, b;
+
+    obj = 0;
+    a = 1;
+    b = 0;
+
+    obj = a + b;
+
+    jet_assert(obj.m_bytes[0] == 1);
+    jet_assert(obj.m_bytes[1] == 0);
+    jet_assert(obj.m_bytes[2] == 0);
+    jet_assert(obj.m_bytes[3] == 0);
+    jet_assert(obj.m_overflow == false);
+    jet_assert(obj.m_underflow == false);
+
+    obj = 0;
+    a = (uint32_t)0xaaaaaaaa;
+    b = (uint32_t)0x55555555;
+
+    obj = a + b;
+
+    jet_assert(obj.m_bytes[0] == 0xFF);
+    jet_assert(obj.m_bytes[1] == 0xFF);
+    jet_assert(obj.m_bytes[2] == 0xFF);
+    jet_assert(obj.m_bytes[3] == 0xFF);
+    jet_assert(obj.m_overflow == false);
+    jet_assert(obj.m_underflow == false);
+
+    obj = 0;
+    a = (uint32_t)257;
+    b = (uint32_t)UINT32_MAX;
+
+    obj = a + b;
+
+    jet_assert(obj.m_bytes[0] == 0);
+    jet_assert(obj.m_bytes[1] == 1);
+    jet_assert(obj.m_bytes[2] == 0);
+    jet_assert(obj.m_bytes[3] == 0);
+    jet_assert(obj.m_overflow == true);
+    jet_assert(obj.m_underflow == false);
+
+    obj = 0;
+    a = (int32_t)-16; // flushes to zero
+    b = (uint32_t)32;
+
+    obj = a + b;
+
+    jet_assert(obj.m_bytes[0] == 32);
+    jet_assert(obj.m_bytes[1] == 0);
+    jet_assert(obj.m_bytes[2] == 0);
+    jet_assert(obj.m_bytes[3] == 0);
+    jet_assert(obj.m_overflow == false);
+    jet_assert(obj.m_underflow == false);
+
+    obj = 0;
+    a = 1;
+
+    obj = a + 2;
+
+    jet_assert(obj.m_bytes[0] == 3);
+    jet_assert(obj.m_bytes[1] == 0);
+    jet_assert(obj.m_bytes[2] == 0);
+    jet_assert(obj.m_bytes[3] == 0);
+    jet_assert(obj.m_overflow == false);
+    jet_assert(obj.m_underflow == false);
+
+    obj = 0;
+    a = 1;
+
+    obj = 2 + a;
+
+    jet_assert(obj.m_bytes[0] == 3);
+    jet_assert(obj.m_bytes[1] == 0);
+    jet_assert(obj.m_bytes[2] == 0);
+    jet_assert(obj.m_bytes[3] == 0);
+    jet_assert(obj.m_overflow == false);
+    jet_assert(obj.m_underflow == false);
+
+    if (!success) {
+      String out;
+      obj.debug_string(out);
+      jet_dbgprint(out.c_str());
+    }
+  }
+
+  if (success) {
+    jet_dbgprint(F("operator +="));
+    UInt32 obj, a;
+
+    obj = 0;
+    a = 1;
+
+    obj += a;
+
+    jet_assert(obj.m_bytes[0] == 1);
+    jet_assert(obj.m_bytes[1] == 0);
+    jet_assert(obj.m_bytes[2] == 0);
+    jet_assert(obj.m_bytes[3] == 0);
+    jet_assert(obj.m_overflow == false);
+    jet_assert(obj.m_underflow == false);
+
+    obj = 0;
+
+    obj += (uint32_t)1;
+
+    jet_assert(obj.m_bytes[0] == 1);
+    jet_assert(obj.m_bytes[1] == 0);
+    jet_assert(obj.m_bytes[2] == 0);
+    jet_assert(obj.m_bytes[3] == 0);
+    jet_assert(obj.m_overflow == false);
+    jet_assert(obj.m_underflow == false);
+
+    obj = 14;
+
+    obj += (int16_t)1;
+
+    jet_assert(obj.m_bytes[0] == 15);
+    jet_assert(obj.m_bytes[1] == 0);
+    jet_assert(obj.m_bytes[2] == 0);
+    jet_assert(obj.m_bytes[3] == 0);
+    jet_assert(obj.m_overflow == false);
+    jet_assert(obj.m_underflow == false);
+
+    if (!success) {
+      String out;
+      obj.debug_string(out);
+      jet_dbgprint(out.c_str());
+    }
+  }
+
+  if (success) {
+    jet_dbgprint(F("operators < > <= >= =="));
+    UInt32 a, b;
+
+    a = 1;
+    b = 2;
+
+    jet_assert(b > a == true);
+    jet_assert(a > b == false)
+    jet_assert(a < b == true);
+    jet_assert(b < a == false);
+    jet_assert(b <= b == true);
+    jet_assert(a <= b == true);
+    jet_assert(b <= a == false);
+    jet_assert(a >= a == true);
+    jet_assert(b >= a == true);
+    jet_assert(a >= b == false);
+  }
+
+  if (success) {
+    jet_dbgprint(F("operator -"));
+    UInt32 obj, a, b;
+
+    obj = 0;
+    a = 2;
+    b = 1;
+
+    obj = a - b;
+
+    jet_assert(obj.m_bytes[0] == 1);
+    jet_assert(obj.m_bytes[1] == 0);
+    jet_assert(obj.m_bytes[2] == 0);
+    jet_assert(obj.m_bytes[3] == 0);
+    jet_assert(obj.m_overflow == false);
+    jet_assert(obj.m_underflow == false);
+
+    if (!success) {
+      String out;
+      obj.debug_string(out);
+      jet_dbgprint(out.c_str());
+    }
+  }
+
+  return success;
+}
+
 
 namespace evt {
 

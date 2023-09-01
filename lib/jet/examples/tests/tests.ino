@@ -18,6 +18,7 @@ void loop() {
     Serial.println(String("PointerListTest returned ")+jet::PointerListTest());
     Serial.println(String("evt::DeltaClockTest returned ")+jet::evt::DeltaClockTest());
     Serial.println(String("evt::HubTest returned ")+jet::evt::HubTest());
+    Serial.println(String("UInt32Test returned ")+jet::UInt32Test());
     tests_have_run = true;
   }
 }
