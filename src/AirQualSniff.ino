@@ -6,6 +6,7 @@
 #include "sps30.h"
 #define JET_EVT_HUB_TEMPORAL
 #include "jet.h"
+using jet::evt::jet_time_t;
 // checked-in 3p dependencies
 #include "SparkFun_SGP30_Arduino_Library.h"
 #include "U8g2lib.h"
@@ -1058,7 +1059,7 @@ int ManualSerial(String s) {
 // Each RenderCloud is one Data Operation.
 // Current free tier is 100,000 Data Operations per month.
 // Render every 10 minutes for ~4320/mo
-constexpr time_t RenderCloudInterval_ms = 10 * 60 * 1000;
+jet_time_t RenderCloudInterval_ms((uint32_t)10 * 60 * 1000);
 
 bool RenderCloud(jet::evt::TriggerList& triggers, jet::evt::Datum& out) {
     if (!Particle.connected()) {
@@ -1135,7 +1136,7 @@ int Framebuffer(String s) {
 
     // Dump to the event hub in a compact manner
     uint16_t encodedTotal = Base64::getEncodedSize(framebufferSize, false);
-    uint16_t encodedChunkCount = encodedTotal / (bufLen - 1);
+    uint16_t encodedChunkCount = (encodedTotal / (bufLen - 1))+1; // TODO: round up correctly
     String encoded = Base64::encodeToString(framebuffer, framebufferSize);
     for (uint16_t chunkIdx = 0; chunkIdx < encodedChunkCount; chunkIdx++) {
         String chunk = encoded.substring(chunkIdx * (bufLen-1), (chunkIdx+1) * (bufLen-1));
@@ -1250,12 +1251,12 @@ namespace flow {
 
 // One Init To Rule Them All, And In The Setup, Bind Them
 void init() {
-    infrastructure::event_hub.add_event("LPS25HB Raw", sensors::ReadLPS25HB, jet::evt::TRIGGER_TEMPORAL, 1000); // pre-decimated output is at 1 Hz
-    infrastructure::event_hub.add_event("SCD30 Raw", sensors::ReadSCD30, jet::evt::TRIGGER_TEMPORAL, sensors::co2SensorInterval*1000);
-    infrastructure::event_hub.add_event("AHT20 Relative Humidity %%", sensors::ReadAHT20, jet::evt::TRIGGER_TEMPORAL, 1000);
-    infrastructure::event_hub.add_event("SPS30 Raw", sensors::ReadSPS30, jet::evt::TRIGGER_TEMPORAL, 1000);
+    infrastructure::event_hub.add_event("LPS25HB Raw", sensors::ReadLPS25HB, jet::evt::TRIGGER_TEMPORAL, (uint32_t)1000); // pre-decimated output is at 1 Hz
+    infrastructure::event_hub.add_event("SCD30 Raw", sensors::ReadSCD30, jet::evt::TRIGGER_TEMPORAL, sensors::co2SensorInterval*(uint32_t)1000);
+    infrastructure::event_hub.add_event("AHT20 Relative Humidity %%", sensors::ReadAHT20, jet::evt::TRIGGER_TEMPORAL, (uint32_t)1000);
+    infrastructure::event_hub.add_event("SPS30 Raw", sensors::ReadSPS30, jet::evt::TRIGGER_TEMPORAL, (uint32_t)1000);
     infrastructure::event_hub.add_event("SGP30 Raw", sensors::ReadSGP30, jet::evt::TRIGGER_TEMPORAL, sensors::vocReadInterval);
-    infrastructure::event_hub.add_event("SGP30 Save Baselines", sensors::SaveSGP30Baselines, jet::evt::TRIGGER_TEMPORAL, 12*60*60*1000);
+    infrastructure::event_hub.add_event("SGP30 Save Baselines", sensors::SaveSGP30Baselines, jet::evt::TRIGGER_TEMPORAL, (uint32_t)12*60*60*1000);
     infrastructure::event_hub.add_event("Absolute Humidity 8.8 g/m^3", sensors::CalculateAbsoluteHumidity_8_8_g_m3, jet::evt::TRIGGER_ON_ALL);
     infrastructure::event_hub.add_event_trigger("Absolute Humidity 8.8 g/m^3", "LPS25HB Temp C");
     infrastructure::event_hub.add_event_trigger("Absolute Humidity 8.8 g/m^3", "LPS25HB Pressure hPa");
@@ -1278,7 +1279,7 @@ void init() {
     infrastructure::event_hub.add_event("RenderOledEvent", UX::RenderOled, jet::evt::TRIGGER_ON_ANY);
     infrastructure::event_hub.add_event_trigger("RenderOledEvent", "GatherDataFired");
     infrastructure::event_hub.add_event_trigger("RenderOledEvent", "Joystick Direction Change");
-    infrastructure::event_hub.add_event("PaintOled", peripherals::Display::Paint, jet::evt::TRIGGER_TEMPORAL, 1200); // long enough for the longest loop to prevent delta clock recursion
+    infrastructure::event_hub.add_event("PaintOled", peripherals::Display::Paint, jet::evt::TRIGGER_TEMPORAL, (uint32_t)1200); // long enough for the longest loop to prevent delta clock recursion
     infrastructure::event_hub.add_event("RenderCloud", UX::RenderCloud, jet::evt::TRIGGER_TEMPORAL, UX::RenderCloudInterval_ms);
     //infrastructure::event_hub.add_event("DumpOsState", infrastructure::DumpOsState, jet::evt::TRIGGER_TEMPORAL, 5000);
     if (!infrastructure::event_hub.is_dag()) {
