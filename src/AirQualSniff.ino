@@ -62,6 +62,7 @@ static constexpr int LED = D7;
 namespace infrastructure {
 
     static jet::evt::Hub event_hub;
+    static jet_time_t hub_time_offset((uint32_t)0);
 
     static ApplicationWatchdog *wd = NULL;
     static int wd_count = 0;
@@ -85,7 +86,8 @@ namespace infrastructure {
 
     static void init();
     static void init() {
-        event_hub.update(millis());
+        // first call to update() sets baseline time
+        event_hub.update(hub_time_offset + millis());
         wd = new ApplicationWatchdog(30000U, &watchdogHandler, 1536);
     }
 
@@ -1285,8 +1287,6 @@ void init() {
     if (!infrastructure::event_hub.is_dag()) {
         Serial.println("Hub graph is not a DAG!!");
     }
-    // first call to update() sets baseline time
-    infrastructure::event_hub.update(millis());
 }
 
 } // namespace Flow
@@ -1308,13 +1308,13 @@ void setup() {
 }
 
 void loop() {
-    system_tick_t start = millis();
+    system_tick_t start = millis() + infrastructure::hub_time_offset.to_uint32_t();
     ApplicationWatchdog::checkin();
     infrastructure::event_hub.update((jet_time_t)start);
     peripherals::Joystick::EmitChangeEvent();
-    system_tick_t end = millis();
+    system_tick_t end = millis() + infrastructure::hub_time_offset.to_uint32_t();
     if (end - start > (system_tick_t)1000ULL) {
-        Serial.printlnf("###### Loop End; duration %lu", millis() - start);
+        Serial.printlnf("###### Loop End; duration %lu-%lu=%lu", end, start, end - start);
     }
 }
 
