@@ -76,30 +76,6 @@ Arduino_DebugUtils eventhub_arduino_dbg;
 #define jet_traceprint(...)
 #endif // JET_TEST
 
-// time_t type handling is inconsistent across compilers and types.
-// Arduino treated 1000 and 1000UL as so drastically different the code failed to work.
-// Particle somehow passes a computed max integer value as 0.
-//
-// So, we use types that are easy to reason about.
-//
-// uint32_t goes 0 to 4,294,967,295.
-//
-// If we use the top half of the range for rollover detection--that is, we assume that
-// the largest input time delta and largest event interval is UINT32_MAX/2--and then
-// we assume a millisecond time unit, we can represent time spans as large as
-// 4,294,967,295 / 2 => 2147483647 ms
-// 2147483647 / 1000 => 2147483 s
-// 2147483 / 60 => 35791 min
-// 35791 / 60 => 596 h
-// 596 / 24 => 24 d
-//
-// This seems like a good maximum for an embedded timer library. If a design approaches
-// these time scales, it probably also needs wall-clock and calendar synchronization
-// which this library does not have.
-
-typedef uint32_t jet_time_t;
-#define JET_TIME_T_MAX UINT32_MAX
-
 namespace jet {
 
 // Pointer List
@@ -394,7 +370,12 @@ private:
     m_bytes[0] = (in >> 0) & 0xFF;
   }
 public:
-  UInt32() : m_bytes({0, 0, 0, 0}) {
+  static constexpr uint32_t MAX = UINT32_MAX;
+  UInt32() {
+    m_bytes[0] = 0;
+    m_bytes[1] = 0;
+    m_bytes[2] = 0;
+    m_bytes[3] = 0;
     clear_flags();
   }
   UInt32(const UInt32 &in) {
@@ -411,53 +392,69 @@ public:
   UInt32(int32_t in) { this->operator=(in); }
   UInt32(int16_t in) { this->operator=(in); }
   UInt32(int8_t in) { this->operator=(in); }
+  //UInt32(int in) { this->operator=((int32_t)in); }
 
   // Reference: https://en.wikipedia.org/wiki/Operators_in_C_and_C%2B%2B
 
   UInt32 & operator = (uint32_t in) {
     clear_flags();
-    this->from_uint32(in);
+    from_uint32(in);
+    return *this;
   }
-  UInt32 & operator = (uint16_t in) { this->operator=((uint32_t)in); }
-  UInt32 & operator = (uint8_t in) { this->operator=((uint32_t)in); }
+  UInt32 & operator = (uint16_t in) { this->operator=((uint32_t)in); return *this; }
+  UInt32 & operator = (uint8_t in) { this->operator=((uint32_t)in); return *this; }
   UInt32 & operator = (int32_t in) {
     clear_flags();
     if (in >= 0) {
-      this->from_uint32((uint32_t)in);
+      from_uint32((uint32_t)in);
     } else {
       jet_traceprint(F("jet::UInt32 assignment flushing %d to 0"), in);
-      this->from_uint32(0);
-      this->m_underflow = true;
+      from_uint32(0);
+      m_underflow = true;
     }
+    return *this;
   }
-  UInt32 & operator = (int16_t in) { this->operator=((int32_t)in); }
-  UInt32 & operator = (int8_t in) { this->operator=((int32_t)in); }
+  UInt32 & operator = (int16_t in) { this->operator=((int32_t)in); return *this; }
+  UInt32 & operator = (int8_t in) { this->operator=((int32_t)in); return *this; }
 
   // Addition
   friend UInt32 operator + (const UInt32 &lhs, const UInt32 &rhs);
-  UInt32 & operator += (const UInt32 &in) { this->operator=(*this + in); }
+  UInt32 & operator += (const UInt32 &in) { this->operator=(*this + in); return *this; }
+  UInt32 & operator ++ () { this->operator=(*this + (uint32_t)1); return *this; }
 
   // Subtraction
   friend UInt32 operator - (const UInt32 &lhs, const UInt32 &rhs);
+  UInt32 & operator -= (const UInt32 &in) { this->operator=(*this - in); return *this; }
+  UInt32 & operator -- () { this->operator=(*this - (uint32_t)1); return *this; }
   // Multiplication
+  friend UInt32 operator * (const UInt32 &lhs, const UInt32 &rhs);
   // Division
+  friend UInt32 operator / (const UInt32 &lhs, const UInt32 &rhs);
   // Modulo?
-  // Comparison
+  // Comparisons
   // all other variants call operator > and so don't need friendship
   friend bool operator > (const UInt32 &lhs, const UInt32 &rhs);
   friend bool operator == (const UInt32 &lhs, const UInt32 &rhs);
+  // Typecast
+  //operator uint32_t() { return this->to_uint32(); } // this makes 2 + a ambiguous because it can be coerced back
+  uint32_t to_uint32_t() { return this->to_uint32(); }
+  operator String() {
+    String out;
+    debug_string(out);
+    return out;
+  }
 
   friend bool UInt32Test();
 
   void debug_string(String& out) const {
     out += "UInt32:";
-    out += String(m_bytes[3], 16);
+    out += String(m_bytes[3], (uint8_t)16);
     out += ",";
-    out += String(m_bytes[2], 16);
+    out += String(m_bytes[2], (uint8_t)16);
     out += ",";
-    out += String(m_bytes[1], 16);
+    out += String(m_bytes[1], (uint8_t)16);
     out += ",";
-    out += String(m_bytes[0], 16);
+    out += String(m_bytes[0], (uint8_t)16);
   }
 };
 
@@ -537,7 +534,7 @@ inline UInt32 operator - (const UInt32 &lhs, const UInt32 &rhs) {
   inv.m_bytes[1] = ~rhs.m_bytes[1];
   inv.m_bytes[2] = ~rhs.m_bytes[2];
   inv.m_bytes[3] = ~rhs.m_bytes[3];
-  inv += 1;
+  inv += (uint32_t)1;
   // Outsource math to addition operator
   UInt32 out = lhs + inv;
   out.m_overflow = false;
@@ -546,6 +543,49 @@ inline UInt32 operator - (const UInt32 &lhs, const UInt32 &rhs) {
   }
   return out;
 }
+
+UInt32 operator * (const UInt32 &lhs, const UInt32 &rhs) {
+  // cascading multiply
+//  uint8_t out[9] = { 0 };
+//
+//  for (int lcol = 0; lcol < 4; lcol++) {
+//    for (int rcol = 0; rcol < 4; rcol++) {
+//      uint16_t l = (uint16_t)lhs.m_bytes[lcol];
+//      uint16_t r = (uint16_t)rhs.m_bytes[rcol];
+//      uint16_t z = l * r;
+//      uint16_t lowsum = (uint16_t)out[lcol + rcol] + (z & 0xFF);
+//      out[lcol + rcol] = (uint8_t)lowsum;
+//      uint16_t highsum = (uint16_t)out[lcol + rcol + 1] + ((z >> 8) & 0xFF) + (lowsum >> 8);
+//      out[lcol + rcol + 1] += (uint8_t)highsum;
+//      out[lcol + rcol + 2] += 0; // CASCADE INCOMPLETE
+//    }
+//  }
+//
+  UInt32 result;
+  // operate on bigger type, then downcast
+//  result.m_bytes[0] = out[0];
+//  result.m_bytes[1] = out[1];
+//  result.m_bytes[2] = out[2];
+//  result.m_bytes[3] = out[3];
+//  result.m_overflow = out[4] != 0 ||
+//                      out[5] != 0 ||
+//                      out[6] != 0 ||
+//                      out[7] != 0;
+//  uint64_t lbig = lhs.to_uint32();
+//  uint64_t rbig = rhs.to_uint32();
+//  uint64_t out = lbig * rbig;
+//  result.from_uint32((uint32_t)out);
+//  result.m_overflow = (out >> 32) != 0;
+  // TODO
+  result = lhs.to_uint32() * rhs.to_uint32(); // is my to_uint32 broken?
+  return result;
+}
+UInt32 operator / (const UInt32 &lhs, const UInt32 &rhs) {
+  // TODO
+  return lhs.to_uint32() / rhs.to_uint32();
+}
+
+#ifdef JET_TEST
 
 bool UInt32Test() {
   jet_assert_var(success);
@@ -844,11 +884,73 @@ bool UInt32Test() {
     }
   }
 
+  if (success) {
+    jet_dbgprint(F("operator *"));
+    UInt32 obj, a, b;
+
+    obj = 0;
+    a = 3;
+    b = 5;
+
+    obj = a * b;
+
+    jet_assert(obj.m_bytes[0] == 15);
+    jet_assert(obj.m_bytes[1] == 0);
+    jet_assert(obj.m_bytes[2] == 0);
+    jet_assert(obj.m_bytes[3] == 0);
+    jet_assert(obj.m_overflow == false);
+    jet_assert(obj.m_underflow == false);
+
+    obj = 0;
+    a = 65535;
+    b = 999;
+
+    obj = a * b;
+
+    jet_assert(obj.m_bytes[0] == 0x19);
+    jet_assert(obj.m_bytes[1] == 0xfc);
+    jet_assert(obj.m_bytes[2] == 0xe6);
+    jet_assert(obj.m_bytes[3] == 0x3);
+    jet_assert(obj.m_overflow == false);
+    jet_assert(obj.m_underflow == false);
+
+    if (!success) {
+      String out;
+      obj.debug_string(out);
+      jet_dbgprint(out.c_str());
+    }
+  }
+
   return success;
 }
 
+#endif // JET_TEST
+
 
 namespace evt {
+
+// time_t type handling is inconsistent across compilers and types.
+// Arduino treated 1000 and 1000UL as so drastically different the code failed to work.
+// Particle somehow passes a computed max integer value as 0.
+//
+// So, we use types that are easy to reason about.
+//
+// uint32_t goes 0 to 4,294,967,295.
+//
+// If we use the top half of the range for rollover detection--that is, we assume that
+// the largest input time delta and largest event interval is UINT32_MAX/2--and then
+// we assume a millisecond time unit, we can represent time spans as large as
+// 4,294,967,295 / 2 => 2147483647 ms
+// 2147483647 / 1000 => 2147483 s
+// 2147483 / 60 => 35791 min
+// 35791 / 60 => 596 h
+// 596 / 24 => 24 d
+//
+// This seems like a good maximum for an embedded timer library. If a design approaches
+// these time scales, it probably also needs wall-clock and calendar synchronization
+// which this library does not have.
+
+typedef UInt32 jet_time_t;
 
 class DeltaClock {
 public:
@@ -873,9 +975,10 @@ private:
   bool m_first_update = true;
   // constant for detecting most rollover, overflow, and underflow conditions
   // max type value / 2
-  const jet_time_t m_max_interval = ((jet_time_t)0xffffffffffffffffULL) >> 1;
+  //const jet_time_t m_max_interval = ((jet_time_t)0xffffffffffffffffULL) >> 1;
+  const jet_time_t m_max_interval = UInt32::MAX / 2;
 public:
-  DeltaClock() : m_head(nullptr), m_last_update(0) {}
+  DeltaClock() : m_head(nullptr), m_last_update((uint32_t)0) {}
   ~DeltaClock() { clear(); }
   void first_update(jet_time_t first_now) {
   }
@@ -894,10 +997,10 @@ public:
     jet_time_t delta = now - m_last_update;
     // monotonic time counter rollover
     if (now < m_last_update) {
-      delta = JET_TIME_T_MAX - m_last_update + now + 1 /* correction for JET_TIME_T_MAX == 2^bits - 1 */;
+      delta = UInt32::MAX - m_last_update + now + (uint32_t)1 /* correction for JET_TIME_T_MAX == 2^bits - 1 */;
       jet_dbgprint(F("DeltaClock monotonic timer wraparound %" PRIu32 " to %" PRIu32 " is %" PRIu32), m_last_update, now, delta);
     }
-    if (delta > 30*1000) {
+    if (delta > (uint32_t)30*(uint32_t)1000) {
       jet_dbgprint("DeltaClock big delta: %" PRIu32, delta);
     }
     jet_traceprint("update from %" PRIu32, m_last_update);
@@ -919,7 +1022,7 @@ public:
         Entry* entry = m_head;
         // Charge it against the delta.
         delta -= entry->remaining;
-        entry->remaining = 0;
+        entry->remaining = (uint32_t)0;
         // Dequeue it.
         m_head = entry->next;
         entry->next = nullptr;
@@ -941,7 +1044,7 @@ public:
       jet_dbgprint(F("schedule failed with invalid arg: new_entry == nullptr"));
       return false;
     }
-    if (new_entry->interval == 0) {
+    if (new_entry->interval == (uint32_t)0) {
       jet_dbgprint(F("schedule failed with invalid arg: new_entry->interval == 0"));
       return false;
     }
@@ -1013,7 +1116,7 @@ public:
       out += "  ";
       out += String((uintptr_t)entry, HEX);
       out += " rem: ";
-      out += String((uint32_t)entry->remaining);
+      out += String(entry->remaining);
       out += " next: ";
       out += String((uintptr_t)entry->next, HEX);
       out += "\n";
@@ -1060,11 +1163,12 @@ bool DeltaClockTest() {
 
   if (success) {
     jet_dbgprint(F("time type properties"));
-    jet_time_t big_time = -1000;
+    jet_time_t big_time;
+    big_time -= 1000;
     jet_time_t small_time = 1000;
     jet_assert(sizeof(jet_time_t) >= 4);
     jet_assert(big_time > small_time);
-    jet_assert(((unsigned)-(signed)(big_time)) + small_time == 2000);
+    jet_assert(((unsigned)-(signed)(big_time.to_uint32_t())) + small_time == 2000); // TODO rework with new class
     // My old method does not work the way it was
     //jet_assert((jet_time_t)(-1) - big_time + small_time == 2000);
   }
@@ -1226,7 +1330,7 @@ bool DeltaClockTest() {
     jet_assert(clock->schedule(&EntryA));
     clock->update(500-1);
     jet_assert(CounterA == 1);
-    jet_assert(EntryA.remaining = 1000);
+    jet_assert(EntryA.remaining == 1000);
   }
   if (success) {
     jet_dbgprint(F("periodically simultaneous events"));
@@ -1276,7 +1380,7 @@ bool DeltaClockTest() {
     jet_assert(Counter5 == (test_duration / Entry5.interval));
     jet_assert(Counter6 == (test_duration / Entry6.interval));
     jet_assert(Counter7 == (test_duration / Entry7.interval));
-    if (success) {
+    if (!success) {
       jet_dbgprint(F("Counter1: %" PRIu32 " / %" PRIu32), Counter1, test_duration / Entry1.interval);
       jet_dbgprint(F("Counter2: %" PRIu32 " / %" PRIu32), Counter2, test_duration / Entry2.interval);
       jet_dbgprint(F("Counter3: %" PRIu32 " / %" PRIu32), Counter3, test_duration / Entry3.interval);
@@ -1286,6 +1390,31 @@ bool DeltaClockTest() {
       jet_dbgprint(F("Counter7: %" PRIu32 " / %" PRIu32), Counter7, test_duration / Entry7.interval);
     }
   }
+  if (success) {
+    jet_dbgprint(F("Sus high-value issues"));
+    clock->clear();
+    jet_time_t base_time = 0x40000000;
+    clock->update(base_time);
+    CounterA = 0;
+    EntryA.interval = 0x01000000;
+    EntryA.repeating = true;
+    jet_assert(clock->schedule(&EntryA));
+    clock->update(base_time + EntryA.interval);
+    jet_assert(CounterA == 1);
+    clock->update(base_time + EntryA.interval*16);
+    jet_assert(CounterA == 16);
+    clock->update(base_time + EntryA.interval*32);
+    jet_assert(CounterA == 32);
+    clock->update(base_time + EntryA.interval*128);
+    jet_assert(CounterA == 128);
+    // Integer overflow is Undefined Behavior in C, and the Arduino and Particle compiler behavior
+    // turns out to not actually be plain base-2 rollover. Arduino simply drops the high bits, probably
+    // as an artifact of the cascaded-register multi-byte add algorithm.
+    clock->update(base_time + EntryA.interval*256);
+    jet_assert(CounterA == 256);
+    clock->update(0);
+    jet_assert(CounterA == 0xc0000000/*amt to trigger rollover*/ / 0x01000000/*interval*/);
+  }
   if (!success) {
     String str;
     clock->debug_string(str);
@@ -1294,9 +1423,9 @@ bool DeltaClockTest() {
   delete(clock);
 
   if (!success) {
-    jet_dbgprint(F("EntryA: %p"), &EntryA);
-    jet_dbgprint(F("EntryB: %p"), &EntryB);
-    jet_dbgprint(F("EntryC: %p"), &EntryC);
+    jet_dbgprint(F("EntryA: @%p CounterA:%d"), &EntryA, CounterA);
+    jet_dbgprint(F("EntryB: @%p CounterB:%d"), &EntryB, CounterB);
+    jet_dbgprint(F("EntryC: @%p CounterC:%d"), &EntryC, CounterC);
   }
   return success;
 }
@@ -1424,7 +1553,7 @@ private:
   TriggerList triggers;
   jet_time_t interval;
 public:
-  Event(EventIndex id, HandlerFunc func, TriggerType type_in, jet_time_t interval_in = 0) :
+  Event(EventIndex id, HandlerFunc func, TriggerType type_in, jet_time_t interval_in = (uint32_t)0) :
     event_id(id), event_name(id), action(func), type(type_in), interval(interval_in) {}
   ~Event() {
     for (unsigned int trig_idx = 0; trig_idx < triggers.size(); trig_idx++) {
@@ -1539,7 +1668,7 @@ public:
 #ifdef JET_EVT_HUB_TEMPORAL
     if (type == TRIGGER_TEMPORAL) {
       out += " interval:";
-      out += String((uint32_t)this->interval);
+      out += String(this->interval.to_uint32_t());
     }
 #endif
     out += "\n";
@@ -1603,7 +1732,7 @@ public:
     clock.update(new_now);
   }
 #endif
-  bool add_event(EventIndex id, HandlerFunc func, TriggerType type, jet_time_t interval = 0) {
+  bool add_event(EventIndex id, HandlerFunc func, TriggerType type, jet_time_t interval = (uint32_t)0) {
     Event* event = find_event(id);
     if (event != nullptr) {
       event->change_parameters(func, type);
@@ -1905,10 +2034,17 @@ bool HubTest() {
     if (success) {
       TestHandlerCounter = 0;
       jet_dbgprint(F("hub: update"));
+      hub->update(0);
       hub->update(1000);
       jet_assert(TestHandlerCounter == 1);
       hub->update(2000);
       jet_assert(TestHandlerCounter == 2);
+    }
+    if (!success) {
+      String str;
+      jet_dbgprint(F("TestHandlerCounter: %d"), TestHandlerCounter);
+      hub->debug_string(str);
+      jet_dbgprint(F("%s"), str.c_str());
     }
     delete(hub);
   }
@@ -1917,6 +2053,7 @@ bool HubTest() {
     TestHandlerCounter = 0;
     Hub* hub = new Hub();
     Datum datum = { 0 };
+    hub->update(0);
     jet_dbgprint(F("hub: delivery"));
     jet_assert(hub->add_event("OnAny", &TestHandlerProducer, TRIGGER_ON_ANY));
     jet_assert(hub->add_event_trigger("OnAny", "Trigger1"));
