@@ -931,8 +931,8 @@ Box *pm2_5CountBox;
 Box *pm4_0CountBox;
 Box *pm10_CountBox;
 
-jet_time_t hub_simulated_delta;
-Box *hub_simulated_delta_box;
+jet_time_t hub_old;
+jet_time_t hub_new;
 
 bool RenderOled(jet::evt::TriggerList& triggers, jet::evt::Datum& out) {
     static OledMode mode = HOME;
@@ -1000,12 +1000,13 @@ bool RenderOled(jet::evt::TriggerList& triggers, jet::evt::Datum& out) {
             }
             if (sensors::vocSensorPresent) {
                 //Eco2Box->UpdateValue((uint32_t)eco2Inst);
-                TvocBox->UpdateValue((uint32_t)tvocInst);
+                //TvocBox->UpdateValue((uint32_t)tvocInst);
+                Eco2Box->UpdateValue((float)hub_old.to_uint32_t());
+                TvocBox->UpdateValue((float)hub_new.to_uint32_t());
             } else {
-                //Eco2Box->UpdateValue(9999UL);
+                Eco2Box->UpdateValue(9999UL);
                 TvocBox->UpdateValue(9999UL);
             }
-            hub_simulated_delta_box->UpdateValue((float)hub_simulated_delta.to_uint32_t());
         }
         break;
     case PM_DETAIL:
@@ -1149,8 +1150,8 @@ int Framebuffer(String s) {
         String chunk = encoded.substring(chunkIdx * (bufLen-1), (chunkIdx+1) * (bufLen-1));
         String chunkName = "fb_";
         chunkName += chunkIdx;
-        //if (chunkIdx != 0) { delay(500); } // avoid throttling
-        //Particle.publish(chunkName, chunk);
+        if (chunkIdx != 0) { delay(500); } // avoid throttling
+        Particle.publish(chunkName, chunk);
     }
 
     // Dump to serial in a less-compact manner
@@ -1210,9 +1211,11 @@ void init() {
     TempBox = new Box(peripherals::Display::u8g2, 32, 1 * 23, 128-32, 24, u8g2_font_bitcasual_tf, /*"\u00b0" actual degree symbol */"deg", "F", u8g2_font_osb18_tf, 1);
     Co2Box = new Box(peripherals::Display::u8g2, 32, 2 * 23, 128-32, 24, u8g2_font_bitcasual_tf, "ppm", "CO2", u8g2_font_osb18_tf, 0);
     RhBox = new Box(peripherals::Display::u8g2, 32, 3 * 23, 128-32, 24, u8g2_font_bitcasual_tf, "%", "rh", u8g2_font_osb18_tf, 1);
-    Eco2Box = new Box(peripherals::Display::u8g2, 64, 4 * 23, 64, 12, u8g2_font_nerhoe_tf, "ppm eCO2", "", u8g2_font_nerhoe_tf, 1);
-    TvocBox = new Box(peripherals::Display::u8g2, 64, 4 * 23 + 11, 64, 12, u8g2_font_nerhoe_tf, "ppb tVOC", "", u8g2_font_nerhoe_tf, 1);
-    hub_simulated_delta_box = new Box(peripherals::Display::u8g2, 32, 4*23, 64, 12, u8g2_font_nerhoe_tf, "ms", "", u8g2_font_nerhoe_tf, 0);
+    // Stealing these two screen slots for temporary debugging
+    //Eco2Box = new Box(peripherals::Display::u8g2, 64, 4 * 23, 64, 12, u8g2_font_nerhoe_tf, "ppm eCO2", "", u8g2_font_nerhoe_tf, 1);
+    //TvocBox = new Box(peripherals::Display::u8g2, 64, 4 * 23 + 11, 64, 12, u8g2_font_nerhoe_tf, "ppb tVOC", "", u8g2_font_nerhoe_tf, 1);
+    Eco2Box = new Box(peripherals::Display::u8g2, 0, 4 * 23, 128, 12, u8g2_font_nerhoe_tf, "ol", "", u8g2_font_nerhoe_tf, 1);
+    TvocBox = new Box(peripherals::Display::u8g2, 0, 4 * 23 + 11, 128, 12, u8g2_font_nerhoe_tf, "nu", "", u8g2_font_nerhoe_tf, 1);
 
     pmMassBox = new Box(peripherals::Display::u8g2, 0, 1 * 23, 128, 24, u8g2_font_nerhoe_tf, "ug/", "m^3", u8g2_font_osb18_tf, 1);
     pmCountBox = new Box(peripherals::Display::u8g2, 0, 2 * 23, 128, 24, u8g2_font_nerhoe_tf, "part/", "cm^3", u8g2_font_osb18_tf, 1);
@@ -1324,7 +1327,8 @@ void loop() {
         // pretend to be the hub. track and calculate the time delta
         static jet_time_t previous_start;
         if (start - previous_start > (uint32_t)0) {
-            UX::hub_simulated_delta = start - previous_start;
+            UX::hub_old = previous_start;
+            UX::hub_new = start;
         }
         previous_start = start;
     }
