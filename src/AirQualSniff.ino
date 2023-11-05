@@ -6,6 +6,8 @@
 #include "sps30.h"
 //#define JET_TEST
 #define JET_EVT_HUB_TEMPORAL
+uint32_t jet_evt_measure_timing_func() { return (uint32_t)millis(); }
+#define JET_EVT_MEASURE_TIMING_FUNC jet_evt_measure_timing_func
 #include "jet.h"
 using jet::evt::jet_time_t;
 // checked-in 3p dependencies
@@ -63,7 +65,7 @@ static constexpr int LED = D7;
 namespace infrastructure {
 
     static jet::evt::Hub event_hub;
-    static jet_time_t hub_time_offset((uint32_t)0x20000000);
+    static jet_time_t hub_time_offset((uint32_t)0x00000000);
 
     static ApplicationWatchdog *wd = NULL;
     static int wd_count = 0;

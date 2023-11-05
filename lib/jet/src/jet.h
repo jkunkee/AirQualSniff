@@ -76,6 +76,8 @@ Arduino_DebugUtils eventhub_arduino_dbg;
 #define jet_traceprint(...)
 #endif // JET_TEST
 
+// JET_EVT_MEASURE_TIMING_FUNC: uint32_t get_time()
+
 namespace jet {
 
 // Pointer List
@@ -439,6 +441,7 @@ public:
   //operator uint32_t() { return this->to_uint32(); } // this makes 2 + a ambiguous because it can be coerced back
   uint32_t to_uint32_t() { return this->to_uint32(); }
   operator String() {
+    return String(to_uint32_t());
     String out;
     debug_string(out);
     return out;
@@ -1553,6 +1556,12 @@ private:
   TriggerList triggers;
   jet_time_t interval;
 public:
+#ifdef JET_EVT_MEASURE_TIMING_FUNC
+  jet_time_t start;
+  jet_time_t end;
+  jet_time_t delta;
+  jet_time_t peak_delta;
+#endif
   Event(EventIndex id, HandlerFunc func, TriggerType type_in, jet_time_t interval_in = (uint32_t)0) :
     event_id(id), event_name(id), action(func), type(type_in), interval(interval_in) {}
   ~Event() {
@@ -1627,8 +1636,12 @@ public:
     return false;
   }
   bool take_action(Datum& result) {
+    start = JET_EVT_MEASURE_TIMING_FUNC();
     bool data_generated = action(triggers, result);
+    end = JET_EVT_MEASURE_TIMING_FUNC();
     reset_triggers();
+    delta = end - start;
+    if (delta > peak_delta) { peak_delta = delta; }
     return data_generated;
   }
   bool deliver_trigger(EventIndex id, Datum input, Datum& result) {
@@ -1643,6 +1656,19 @@ public:
     return false;
   }
   void debug_string(String& out) {
+    out += F("  ");
+    Event *ev = this;
+    out += ev->event_id;
+    out += ",";
+    out += String(ev->start);
+    out += ",";
+    out += String(ev->end);
+    out += ",";
+    out += String(ev->delta);
+    out += ",";
+    out += String(ev->peak_delta);
+    out += "\n";
+    return;
     out += F("  ");
     out += this->event_name;
     out += ", type:";
@@ -1822,11 +1848,11 @@ public:
     for (unsigned int idx = 0; idx < m_event_list.size(); idx++) {
       m_event_list.get(idx)->debug_string(out);
     }
-#ifdef JET_EVT_HUB_TEMPORAL
-    clock.debug_string(out);
-    out += "\n";
-#endif
-    out += (is_dag() ? "Is DAG." : "Not DAG.");
+//#ifdef JET_EVT_HUB_TEMPORAL
+//    clock.debug_string(out);
+//    out += "\n";
+//#endif
+//    out += (is_dag() ? "Is DAG." : "Not DAG.");
     out += "\n";
   }
 #ifdef JET_TEST
