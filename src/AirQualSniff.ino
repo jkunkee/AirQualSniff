@@ -20,6 +20,8 @@ using jet::evt::jet_time_t;
 #include <SparkFun_I2C_Mux_Arduino_Library.h>
 #include <SparkFun_Qwiic_Humidity_AHT20.h>
 #include <SparkFun_Qwiic_Joystick_Arduino_Library.h>
+#include <MQTT5.h>
+#include <mDNSResolver.h>
 
 /*****************************************************************************\
  * Particle system configuration and board facts
@@ -1195,6 +1197,136 @@ int RemoteJoystick(String s) {
     return 0;
 }
 
+namespace networking {
+    bool IsNetworkConnected() {
+        return Particle.connected();
+    }
+
+    // mDNS facilities
+    UDP udp;
+    mDNSResolver::Resolver resolver(udp);
+    bool LookUpMdnsName(String name, IPAddress &address); // because Wiring preprocessing
+    bool LookUpMdnsName(String name, IPAddress &address) {
+        address = resolver.search(name.c_str());
+        return !address.toString().equalsIgnoreCase(INADDR_NONE.toString());
+    }
+    //int MdnsLookupFunction(String name) {
+    //    IPAddress addr = resolver.search(name.c_str());
+    //    return addr.raw().ipv4;
+    //}
+
+    namespace mqtt {
+        IPAddress mqttServerAddress = INADDR_NONE;
+        MQTT5 client(512);
+        bool Connect() {
+            // mDNS from the MQTT server is flaky, so be a little resilient.
+            // do a fresh lookup
+            IPAddress newAddress;
+            bool resolveSucceeded = LookUpMdnsName("pi.local", newAddress);
+            if (resolveSucceeded) {
+                // if that worked, keep it
+                mqttServerAddress = newAddress;
+            }
+            // if that failed, use the cached value
+            if (mqttServerAddress == INADDR_NONE) {
+                Serial.println("MQTT Connect did not find an address");
+                return false;
+            }
+
+            // Fill out connection options
+            MQTT5ConnectOptions mqttOpts;
+            mqttOpts = MQTT5_DEFAULT_CONNECT_OPTIONS;
+            mqttOpts.username = "AirQualSniff";
+            String password = System.deviceID(); // remember, System.deviceID().c_str() destroys the c_str before it's used
+            mqttOpts.password = password.c_str(); // secure as tissue paper, just like the non-TLS connection
+
+            // marshall the stashed address to pass through the MQTT5 API
+            uint8_t addrAsBytes[4];
+            // This array gets handed to IPAddress(uint8_t*), and this is the correct order.
+            addrAsBytes[0] = (mqttServerAddress.raw().ipv4 >> 3*8) & 0xFF;
+            addrAsBytes[1] = (mqttServerAddress.raw().ipv4 >> 2*8) & 0xFF;
+            addrAsBytes[2] = (mqttServerAddress.raw().ipv4 >> 1*8) & 0xFF;
+            addrAsBytes[3] = (mqttServerAddress.raw().ipv4 >> 0*8) & 0xFF;
+
+            // Initiate the connection; this is only the start of the connection
+            if (!client.connect(&addrAsBytes[0], 1883, nullptr, mqttOpts)) {
+                Serial.println("MQTT5 socket setup failed (getting a reason is like pulling teeth)");
+                return false;
+            }
+            return true;
+        }
+        bool Publish(String subtopic, String data) {
+            // If there's no connection yet, start one.
+            if (!client.connected() && !client.connecting()) {
+                // Bail out if setup failed (like if the server isn't present)
+                if (!Connect()) {
+                    return false;
+                }
+                // if packets have already arrived, process them.
+                client.loop();
+            }
+            // If the connection is still in progress, wait a moment for it to complete.
+            if (client.connecting()) {
+                delay(300);
+                // process packets again
+                client.loop();
+                // If it is *still* connecting, bail out.
+                if (client.connecting()) {
+                    Serial.println("MQTT5 connection still pending");
+                    return false;
+                }
+            }
+            if (!client.connected()) {
+                Serial.println("MQTT5 connection failed");
+                return false;
+            }
+            return client.publish(subtopic.c_str(), data.c_str());
+        }
+        //int PublishFunction(String data) {
+        //    return Publish("manual", "{\"hi\":1}");
+        //}
+        void FailureCallback(MQTT5_REASON_CODE Code);
+        void FailureCallback(MQTT5_REASON_CODE Code) {
+            Serial.printlnf("MQTT5 failure w/code %d", (int)Code);
+        }
+        void init() {
+            client.onConnectFailed(FailureCallback);
+        }
+    }
+    bool TryConnect() {
+        if (IsNetworkConnected()) {
+            return true;
+        }
+        // Apparently .connect() will call .on() for me, but if I want to call .scan() first
+        // then I need to call it myself.
+        WiFi.on();
+        delay(1000); // allow the module to finish its initial scan
+        // This can be anywhere as long as we're not in AUTOMATIC mode since the OS is >= 1.5.0.
+        if (peripherals::IsKnownNetworkPresent()) {
+            Particle.connect();
+            mqtt::Connect();
+        } else {
+            WiFi.off();
+        }
+        return IsNetworkConnected();
+    }
+    void init() {
+        Particle.function("ManualSerial", ManualSerial);
+        Particle.function("Report", Report);
+        Particle.function("Framebuffer", Framebuffer);
+        Particle.function("RemoteJoystick", RemoteJoystick);
+        //Particle.function("MdnsLookup", MdnsLookupFunction);
+        //Particle.function("MqttPublish", mqtt::PublishFunction);
+        Particle.publishVitals(30min);
+        mqtt::init();
+        TryConnect();
+    }
+    void update() {
+        resolver.loop();
+        mqtt::client.loop();
+    }
+} // namespace UX::networking
+
 void init() {
     //FontData *candidates[] = {u8g2_font_6x10_tf, u8g2_font_profont11_tf, u8g2_font_simple1_tf, u8g2_font_NokiaSmallPlain_tf };
     PressureBox = new Box(peripherals::Display::u8g2, 32, 0 * 23, 128-32, 24, u8g2_font_bitcasual_tf, "hPa", "", u8g2_font_osb18_tf, 0);
@@ -1219,21 +1351,7 @@ void init() {
     pm4_0CountBox = new Box(peripherals::Display::u8g2, 64, 7 * 12, 64, 13, u8g2_font_nerhoe_tf, " n/cm^3", "", u8g2_font_nerhoe_tf, 2);
     pm10_CountBox = new Box(peripherals::Display::u8g2, 64, 8 * 12, 64, 13, u8g2_font_nerhoe_tf, " n/cm^3", "", u8g2_font_nerhoe_tf, 2);
 
-    // Apparently .connect() will call .on() for me, but if I want to call .scan() first
-    // then I need to call it myself.
-    WiFi.on();
-    delay(1000); // allow the module to finish its initial scan
-    // This can be anywhere as long as we're not in AUTOMATIC mode since the OS is >= 1.5.0.
-    if (peripherals::IsKnownNetworkPresent()) {
-        Particle.function("ManualSerial", ManualSerial);
-        Particle.function("Report", Report);
-        Particle.function("Framebuffer", Framebuffer);
-        Particle.function("RemoteJoystick", RemoteJoystick);
-        Particle.connect();
-        Particle.publishVitals(30min);
-    } else {
-        WiFi.off();
-    }
+    networking::init();
 }
 
 } // namespace UX
@@ -1312,6 +1430,7 @@ void loop() {
     ApplicationWatchdog::checkin();
     infrastructure::event_hub.update((jet_time_t)start);
     peripherals::Joystick::EmitChangeEvent();
+    UX::networking::update();
     system_tick_t end = millis() + infrastructure::hub_time_offset.to_uint32_t();
     if (end - start > (system_tick_t)1000ULL) {
         Serial.printlnf("###### Loop End; duration %lu-%lu=%lu", end, start, end - start);
