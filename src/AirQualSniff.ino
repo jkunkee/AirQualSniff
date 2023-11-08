@@ -1093,6 +1093,8 @@ bool RenderCloud(jet::evt::TriggerList& triggers, jet::evt::Datum& out) {
     return false;
 }
 
+bool RenderMqtt(jet::evt::TriggerList& triggers, jet::evt::Datum& out);
+
 int Report(String s) {
     char *buf;
     constexpr size_t bufLen = 622; // limit on Particle Photon running OS 2.3.0
@@ -1127,6 +1129,7 @@ int Report(String s) {
         jet::evt::TriggerList triggers;
         jet::evt::Datum out;
         RenderCloud(triggers, out);
+        RenderMqtt(triggers, out);
     }
     return 0;
 }
@@ -1282,9 +1285,6 @@ namespace networking {
             }
             return client.publish(subtopic.c_str(), data.c_str());
         }
-        //int PublishFunction(String data) {
-        //    return Publish("manual", "{\"hi\":1}");
-        //}
         void FailureCallback(MQTT5_REASON_CODE Code);
         void FailureCallback(MQTT5_REASON_CODE Code) {
             Serial.printlnf("MQTT5 failure w/code %d", (int)Code);
@@ -1326,6 +1326,29 @@ namespace networking {
         mqtt::client.loop();
     }
 } // namespace UX::networking
+
+bool RenderMqtt(jet::evt::TriggerList& triggers, jet::evt::Datum& out) {
+    if (!networking::IsNetworkConnected() || !networking::mqtt::client.connected()) {
+        // nothing to do, alas
+        // TODO: trigger connection attempt?
+        return false;
+    }
+    constexpr size_t bufLen = 5*1024;
+    char *buf = (char*)malloc(bufLen);
+    memset(buf, 0, bufLen);
+    JSONBufferWriter writer(buf, bufLen-1); // always null-terminated
+    writer.beginObject();
+        writer.name("ver").value(1);
+        writer.name("inst").beginObject();
+            writer.name("temp_F").value(Data::tempFInst);
+            writer.name("temp_C").value(Data::tempCInst);
+            writer.name("rh_%").value(Data::rhInst);
+        writer.endObject();
+    writer.endObject();
+    networking::mqtt::Publish("AirQualSniff/data/10min", buf);
+    free(buf);
+    return false;
+}
 
 void init() {
     //FontData *candidates[] = {u8g2_font_6x10_tf, u8g2_font_profont11_tf, u8g2_font_simple1_tf, u8g2_font_NokiaSmallPlain_tf };
@@ -1401,6 +1424,7 @@ void init() {
     infrastructure::event_hub.add_event_trigger("RenderOledEvent", "Joystick Direction Change");
     infrastructure::event_hub.add_event("PaintOled", peripherals::Display::Paint, jet::evt::TRIGGER_TEMPORAL, (uint32_t)1200); // long enough for the longest loop to prevent delta clock recursion
     infrastructure::event_hub.add_event("RenderCloud", UX::RenderCloud, jet::evt::TRIGGER_TEMPORAL, UX::RenderCloudInterval_ms);
+    infrastructure::event_hub.add_event("RenderMqtt", UX::RenderMqtt, jet::evt::TRIGGER_TEMPORAL, UX::RenderCloudInterval_ms);
     //infrastructure::event_hub.add_event("DumpOsState", infrastructure::DumpOsState, jet::evt::TRIGGER_TEMPORAL, 5000);
     if (!infrastructure::event_hub.is_dag()) {
         Serial.println("Hub graph is not a DAG!!");
