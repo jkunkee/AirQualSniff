@@ -1328,11 +1328,6 @@ namespace networking {
 } // namespace UX::networking
 
 bool RenderMqtt(jet::evt::TriggerList& triggers, jet::evt::Datum& out) {
-    if (!networking::IsNetworkConnected() || !networking::mqtt::client.connected()) {
-        // nothing to do, alas
-        // TODO: trigger connection attempt?
-        return false;
-    }
     constexpr size_t bufLen = 5*1024;
     char *buf = (char*)malloc(bufLen);
     memset(buf, 0, bufLen);
@@ -1342,7 +1337,7 @@ bool RenderMqtt(jet::evt::TriggerList& triggers, jet::evt::Datum& out) {
         writer.name("inst").beginObject();
             writer.name("temp_F").value(Data::tempFInst);
             writer.name("temp_C").value(Data::tempCInst);
-            writer.name("rh_%").value(Data::rhInst);
+            writer.name("rh_percent").value(Data::rhInst);
         writer.endObject();
     writer.endObject();
     networking::mqtt::Publish("AirQualSniff/data/10min", buf);
