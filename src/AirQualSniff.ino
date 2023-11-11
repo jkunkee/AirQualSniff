@@ -645,7 +645,7 @@ static SPS30 pmSensor;
 static bool pmSensorPresent = false;
 static constexpr uint32_t cleanIntervalGoal = 60 /* sec/min */ * 60 /* min/hr */ * 24 /* hr/day */ * 7 /* day/wk */ * 1;
 static uint8_t pmTickCounter = 0;
-static constexpr uint8_t pmMeasurementInterval = 60; // seconds
+static constexpr uint8_t pmMeasurementInterval = 60; // seconds between on/measure/off cycles; ReadSPS30 is called at 1Hz flat
 
 static SPS30_DATA_FLOAT sps30_global_datum_struct;
 bool ReadSPS30(jet::evt::TriggerList& triggers, jet::evt::Datum& out) {
