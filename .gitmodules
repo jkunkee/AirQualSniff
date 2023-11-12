@@ -1,3 +1,6 @@
 [submodule "lib/Particle_mDNSResolver"]
 	path = lib/Particle_mDNSResolver
 	url = https://github.com/jkunkee/Particle_mDNSResolver.git
+[submodule "lib/MQTT5"]
+	path = lib/MQTT5
+	url = https://github.com/jkunkee/MQTT5.git
