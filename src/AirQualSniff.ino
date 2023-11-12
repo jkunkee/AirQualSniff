@@ -919,6 +919,8 @@ Box *Co2Box;
 Box *RhBox;
 Box *TvocBox;
 Box *Eco2Box;
+Box *DebugBoxA;
+Box *DebugBoxB;
 
 Box *pmMassBox;
 Box *pmCountBox;
@@ -1005,6 +1007,8 @@ bool RenderOled(jet::evt::TriggerList& triggers, jet::evt::Datum& out) {
                 TvocBox->UpdateValue(9999UL);
                 Eco2Box->UpdateValue(9999UL);
             }
+            DebugBoxA->UpdateValue(0.0f);
+            DebugBoxB->UpdateValue(0.0f);
         }
         break;
     case PM_DETAIL:
@@ -1377,6 +1381,8 @@ void init() {
     RhBox = new Box(peripherals::Display::u8g2, 32, 3 * 23, 128-32, 24, u8g2_font_bitcasual_tf, "%", "rh", u8g2_font_osb18_tf, 1);
     TvocBox = new Box(peripherals::Display::u8g2, 64, 4 * 23 + 11, 64, 12, u8g2_font_nerhoe_tf, "ppb tVOC", "", u8g2_font_nerhoe_tf, 1);
     Eco2Box = new Box(peripherals::Display::u8g2, 64, 4 * 23, 64, 12, u8g2_font_nerhoe_tf, "ppm eCO2", "", u8g2_font_nerhoe_tf, 1);
+    DebugBoxA = new Box(peripherals::Display::u8g2, 0, 5 * 23 + 11, 128, 12, u8g2_font_nerhoe_tf, "A", "", u8g2_font_nerhoe_tf, 0);
+    DebugBoxB = new Box(peripherals::Display::u8g2, 0, 5 * 23, 128, 12, u8g2_font_nerhoe_tf, "B", "", u8g2_font_nerhoe_tf, 0);
 
     pmMassBox = new Box(peripherals::Display::u8g2, 0, 1 * 23, 128, 24, u8g2_font_nerhoe_tf, "ug/", "m^3", u8g2_font_osb18_tf, 1);
     pmCountBox = new Box(peripherals::Display::u8g2, 0, 2 * 23, 128, 24, u8g2_font_nerhoe_tf, "part/", "cm^3", u8g2_font_osb18_tf, 1);
