@@ -5,6 +5,8 @@
 #include "Atmospherics.h"
 #include "sps30.h"
 #define JET_EVT_HUB_TEMPORAL
+uint32_t jet_evt_measure_timing_func() { return (uint32_t)millis(); }
+#define JET_EVT_MEASURE_TIMING_FUNC jet_evt_measure_timing_func
 #include "jet.h"
 using jet::evt::jet_time_t;
 // checked-in 3p dependencies

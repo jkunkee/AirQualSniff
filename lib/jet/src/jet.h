@@ -76,6 +76,15 @@ Arduino_DebugUtils eventhub_arduino_dbg;
 #define jet_traceprint(...)
 #endif // JET_TEST
 
+// JET's temporal code was designed to be told when it is and not have to ask.
+// While this is perfectly functional, it makes certain kinds of debugging
+// impossible. If you #define JET_EVT_MEASURE_TIMING_FUNC to be a function that
+// takes no arguments and returns a uint32_t -- think Arduino's millis() --
+// then various kinds of temporal debugging information will be tracked and can
+// be printed with debug_string functions.
+//
+// JET_EVT_MEASURE_TIMING_FUNC: uint32_t get_time(void)
+
 namespace jet {
 
 // Pointer List
@@ -1553,6 +1562,12 @@ private:
   TriggerList triggers;
   jet_time_t interval;
 public:
+#ifdef JET_EVT_MEASURE_TIMING_FUNC
+  jet_time_t start;
+  jet_time_t end;
+  jet_time_t delta;
+  jet_time_t peak_delta;
+#endif
   Event(EventIndex id, HandlerFunc func, TriggerType type_in, jet_time_t interval_in = (uint32_t)0) :
     event_id(id), event_name(id), action(func), type(type_in), interval(interval_in) {}
   ~Event() {
@@ -1627,8 +1642,18 @@ public:
     return false;
   }
   bool take_action(Datum& result) {
+#ifdef JET_EVT_MEASURE_TIMING_FUNC
+    start = JET_EVT_MEASURE_TIMING_FUNC();
+#endif
     bool data_generated = action(triggers, result);
+#ifdef JET_EVT_MEASURE_TIMING_FUNC
+    end = JET_EVT_MEASURE_TIMING_FUNC();
+#endif
     reset_triggers();
+#ifdef JET_EVT_MEASURE_TIMING_FUNC
+    delta = end - start;
+    if (delta > peak_delta) { peak_delta = delta; }
+#endif
     return data_generated;
   }
   bool deliver_trigger(EventIndex id, Datum input, Datum& result) {
@@ -1670,6 +1695,16 @@ public:
       out += " interval:";
       out += String(this->interval.to_uint32_t());
     }
+#ifdef JET_EVT_MEASURE_TIMING_FUNC
+    out += " timing stats:start=";
+    out += String(this->start);
+    out += ",end=";
+    out += String(this->end);
+    out += ",delta=";
+    out += String(this->delta);
+    out += ",peak_delta=";
+    out += String(this->peak_delta);
+#endif
 #endif
     out += "\n";
     for (unsigned int idx = 0; idx < this->triggers.size(); idx++) {
