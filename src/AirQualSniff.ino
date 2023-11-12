@@ -1219,8 +1219,9 @@ namespace networking {
     //}
 
     namespace mqtt {
+        constexpr size_t BUFFER_LENGTH = 3*1024;
         IPAddress mqttServerAddress = INADDR_NONE;
-        MQTT5 client(512);
+        MQTT5 client(BUFFER_LENGTH + 64); // allow for MQTT packet header and topic data
         bool Connect() {
             // mDNS from the MQTT server is flaky, so be a little resilient.
             // do a fresh lookup
@@ -1328,7 +1329,7 @@ namespace networking {
 } // namespace UX::networking
 
 bool RenderMqtt(jet::evt::TriggerList& triggers, jet::evt::Datum& out) {
-    constexpr size_t bufLen = 5*1024;
+    constexpr size_t bufLen = networking::mqtt::BUFFER_LENGTH;
     char *buf = (char*)malloc(bufLen);
     memset(buf, 0, bufLen);
     JSONBufferWriter writer(buf, bufLen-1); // always null-terminated
@@ -1338,9 +1339,30 @@ bool RenderMqtt(jet::evt::TriggerList& triggers, jet::evt::Datum& out) {
             writer.name("temp_F").value(Data::tempFInst);
             writer.name("temp_C").value(Data::tempCInst);
             writer.name("rh_percent").value(Data::rhInst);
+            writer.name("co2_ppm").value(Data::co2ppmInst);
+            writer.name("pm").beginObject();
+                writer.name("typical_size_um").value(Data::pmInst.typical_size_um);
+                writer.name("0_5_n_cm3").value(Data::pmInst.pm_0_5_n_cm3);
+                writer.name("1_0_n_cm3").value(Data::pmInst.pm_1_0_n_cm3);
+                writer.name("2_5_n_cm3").value(Data::pmInst.pm_2_5_n_cm3);
+                writer.name("4_0_n_cm3").value(Data::pmInst.pm_4_0_n_cm3);
+                writer.name("10_n_cm3").value(Data::pmInst.pm_10_n_cm3);
+                writer.name("1_0_ug_m3").value(Data::pmInst.pm_1_0_ug_m3);
+                writer.name("2_5_ug_m3").value(Data::pmInst.pm_2_5_ug_m3);
+                writer.name("4_0_ug_m3").value(Data::pmInst.pm_4_0_ug_m3);
+                writer.name("10_ug_m3").value(Data::pmInst.pm_10_ug_m3);
+            writer.endObject();
+            writer.name("pressure_hPa").value(Data::pressureInst);
+            writer.name("tvoc_ppb").value(Data::tvocInst);
+            writer.name("eco2_ppm").value(Data::eco2Inst);
         writer.endObject();
     writer.endObject();
-    networking::mqtt::Publish("AirQualSniff/data/10min", buf);
+    if (writer.dataSize() >= writer.bufferSize()) {
+        networking::mqtt::Publish("AirQualSniff/status/error", "JSON too big for buffer");
+    }
+    if (!networking::mqtt::Publish("AirQualSniff/data/10min", buf)) {
+        Serial.println("RenderMqtt failed to publish");
+    }
     free(buf);
     return false;
 }
