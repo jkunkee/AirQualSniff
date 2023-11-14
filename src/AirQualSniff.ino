@@ -793,6 +793,8 @@ uint16_t eco2Inst = -1;
 //Decimator eco2Decimator(12, 60, 24); // every 5s
 uint16_t tvocInst = -1;
 //Decimator tvocDecimator(12, 60, 24); // every 5s
+uint16_t h2Rel = -1;
+uint16_t ethanolRel = -1;
 uint16_t abshumInst = -1;
 //Decimator abshumDecimator(12, 60, 24); // every 5s
 
@@ -805,6 +807,8 @@ bool GatherData(jet::evt::TriggerList& triggers, jet::evt::Datum& out) {
             if (trigger->event_id.equalsIgnoreCase(String("LPS25HB Pressure hPa"))) {
                 pressureInst = trigger->data.fl;
                 pressureDecimator.push(pressureInst);
+                // Each of these is delivered singly from ReadLPS25HB, so only generate
+                // a big update when the last one lands.
                 return false;
             } else if (trigger->event_id.equalsIgnoreCase(String("LPS25HB Altitude m"))) {
                 altitudeInst = trigger->data.fl;
@@ -826,8 +830,15 @@ bool GatherData(jet::evt::TriggerList& triggers, jet::evt::Datum& out) {
                 pmInst = *((SPS30_DATA_FLOAT*)trigger->data.ptr);
             } else if (trigger->event_id.equalsIgnoreCase(String("SGP30 tVOC ppb"))) {
                 tvocInst = trigger->data.uin16;
+                return false;
             } else if (trigger->event_id.equalsIgnoreCase(String("SGP30 eCO2 ppm"))) {
                 eco2Inst = trigger->data.uin16;
+                return false;
+            } else if (trigger->event_id.equalsIgnoreCase(String("SGP30 H2"))) {
+                h2Rel = trigger->data.uin16;
+                return false;
+            } else if (trigger->event_id.equalsIgnoreCase(String("SGP30 ethanol"))) {
+                ethanolRel = trigger->data.uin16;
             } else if (trigger->event_id.equalsIgnoreCase(String("Absolute Humidity 8.8 g/m^3"))) {
                 abshumInst = trigger->data.uin16;
             } else {
@@ -1348,6 +1359,8 @@ bool RenderMqtt(jet::evt::TriggerList& triggers, jet::evt::Datum& out) {
             writer.name("temp_C").value(Data::tempCInst);
             writer.name("rh_percent").value(Data::rhInst);
             writer.name("co2_ppm").value(Data::co2ppmInst);
+            writer.name("pm").beginObject();
+                writer.name("typical_size_um").value(Data::pmInst.typical_size_um);
             if (Data::pmInst.pm_0_5_n_cm3 != 0.0f ||
                 Data::pmInst.pm_1_0_n_cm3 != 0.0f ||
                 Data::pmInst.pm_2_5_n_cm3 != 0.0f ||
@@ -1358,8 +1371,6 @@ bool RenderMqtt(jet::evt::TriggerList& triggers, jet::evt::Datum& out) {
                 Data::pmInst.pm_4_0_ug_m3 != 0.0f ||
                 Data::pmInst.pm_10_ug_m3 != 0.0f)
             {
-            writer.name("pm").beginObject();
-                writer.name("typical_size_um").value(Data::pmInst.typical_size_um);
                 writer.name("0_5_n_cm3").value(Data::pmInst.pm_0_5_n_cm3);
                 writer.name("1_0_n_cm3").value(Data::pmInst.pm_1_0_n_cm3);
                 writer.name("2_5_n_cm3").value(Data::pmInst.pm_2_5_n_cm3);
@@ -1369,11 +1380,13 @@ bool RenderMqtt(jet::evt::TriggerList& triggers, jet::evt::Datum& out) {
                 writer.name("2_5_ug_m3").value(Data::pmInst.pm_2_5_ug_m3);
                 writer.name("4_0_ug_m3").value(Data::pmInst.pm_4_0_ug_m3);
                 writer.name("10_ug_m3").value(Data::pmInst.pm_10_ug_m3);
-            writer.endObject();
             }
+            writer.endObject();
             writer.name("pressure_hPa").value(Data::pressureInst);
             writer.name("tvoc_ppb").value(Data::tvocInst);
             writer.name("eco2_ppm").value(Data::eco2Inst);
+            writer.name("h2_rel").value(Data::h2Rel);
+            writer.name("ethanol_rel").value(Data::ethanolRel);
         writer.endObject();
     writer.endObject();
     if (writer.dataSize() >= writer.bufferSize()) {
