@@ -611,15 +611,16 @@ static bool ReadSGP30(jet::evt::TriggerList& triggers, jet::evt::Datum& out) {
             // Sensor is still initializing (first 15s after init)
             return false;
         }
+        if (vocSensor.measureRawSignals() ==  SGP30_SUCCESS) {
+            datum.uin16 = vocSensor.H2;
+            infrastructure::event_hub.deliver(String("SGP30 H2"), datum);
+            datum.uin16 = vocSensor.ethanol;
+            infrastructure::event_hub.deliver(String("SGP30 ethanol"), datum);
+        }
         datum.uin16 = vocSensor.TVOC;
         infrastructure::event_hub.deliver(String("SGP30 tVOC ppb"), datum);
         datum.uin16 = vocSensor.CO2;
         infrastructure::event_hub.deliver(String("SGP30 eCO2 ppm"), datum);
-        vocSensor.measureRawSignals();
-        datum.uin16 = vocSensor.H2;
-        infrastructure::event_hub.deliver(String("SGP30 H2"), datum);
-        datum.uin16 = vocSensor.ethanol;
-        infrastructure::event_hub.deliver(String("SGP30 ethanol"), datum);
     }
     return false;
 }
@@ -828,17 +829,17 @@ bool GatherData(jet::evt::TriggerList& triggers, jet::evt::Datum& out) {
                 rhDecimator.push(rhInst);
             } else if (trigger->event_id.equalsIgnoreCase(String("SPS30 Raw"))) {
                 pmInst = *((SPS30_DATA_FLOAT*)trigger->data.ptr);
-            } else if (trigger->event_id.equalsIgnoreCase(String("SGP30 tVOC ppb"))) {
-                tvocInst = trigger->data.uin16;
-                return false;
-            } else if (trigger->event_id.equalsIgnoreCase(String("SGP30 eCO2 ppm"))) {
-                eco2Inst = trigger->data.uin16;
-                return false;
             } else if (trigger->event_id.equalsIgnoreCase(String("SGP30 H2"))) {
                 h2Rel = trigger->data.uin16;
                 return false;
             } else if (trigger->event_id.equalsIgnoreCase(String("SGP30 ethanol"))) {
                 ethanolRel = trigger->data.uin16;
+                return false;
+            } else if (trigger->event_id.equalsIgnoreCase(String("SGP30 tVOC ppb"))) {
+                tvocInst = trigger->data.uin16;
+                return false;
+            } else if (trigger->event_id.equalsIgnoreCase(String("SGP30 eCO2 ppm"))) {
+                eco2Inst = trigger->data.uin16;
             } else if (trigger->event_id.equalsIgnoreCase(String("Absolute Humidity 8.8 g/m^3"))) {
                 abshumInst = trigger->data.uin16;
             } else {
@@ -1385,8 +1386,11 @@ bool RenderMqtt(jet::evt::TriggerList& triggers, jet::evt::Datum& out) {
             writer.name("pressure_hPa").value(Data::pressureInst);
             writer.name("tvoc_ppb").value(Data::tvocInst);
             writer.name("eco2_ppm").value(Data::eco2Inst);
+            // Another driver that sometimes doesn't work right
+            if (Data::h2Rel == 0xffff || Data::ethanolRel == 0xffff) {
             writer.name("h2_rel").value(Data::h2Rel);
             writer.name("ethanol_rel").value(Data::ethanolRel);
+            }
         writer.endObject();
     writer.endObject();
     if (writer.dataSize() >= writer.bufferSize()) {
