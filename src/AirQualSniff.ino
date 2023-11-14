@@ -671,6 +671,7 @@ bool ReadSPS30(jet::evt::TriggerList& triggers, jet::evt::Datum& out) {
             peripherals::SlowDownI2c();
             readyErr = pmSensor.is_data_ready();
             // verbose for easy addition of debug statements
+            // Something goes wrong often and this returns zero'd-out data.
             dataIsReady = readyErr == SPS30_OK;
             retrieveErr = pmSensor.read_data_no_wait_float(&sps30_global_datum_struct);
             dataRetrieved = retrieveErr == SPS30_OK;
@@ -689,6 +690,7 @@ bool ReadSPS30(jet::evt::TriggerList& triggers, jet::evt::Datum& out) {
         pmTickCounter = (pmTickCounter + 1) % pmMeasurementInterval;
         return sendData;
     }
+    // sensor not present
     return false;
 }
 
@@ -1346,6 +1348,16 @@ bool RenderMqtt(jet::evt::TriggerList& triggers, jet::evt::Datum& out) {
             writer.name("temp_C").value(Data::tempCInst);
             writer.name("rh_percent").value(Data::rhInst);
             writer.name("co2_ppm").value(Data::co2ppmInst);
+            if (Data::pmInst.pm_0_5_n_cm3 != 0.0f ||
+                Data::pmInst.pm_1_0_n_cm3 != 0.0f ||
+                Data::pmInst.pm_2_5_n_cm3 != 0.0f ||
+                Data::pmInst.pm_4_0_n_cm3 != 0.0f ||
+                Data::pmInst.pm_10_n_cm3 != 0.0f ||
+                Data::pmInst.pm_1_0_ug_m3 != 0.0f ||
+                Data::pmInst.pm_2_5_ug_m3 != 0.0f ||
+                Data::pmInst.pm_4_0_ug_m3 != 0.0f ||
+                Data::pmInst.pm_10_ug_m3 != 0.0f)
+            {
             writer.name("pm").beginObject();
                 writer.name("typical_size_um").value(Data::pmInst.typical_size_um);
                 writer.name("0_5_n_cm3").value(Data::pmInst.pm_0_5_n_cm3);
@@ -1358,6 +1370,7 @@ bool RenderMqtt(jet::evt::TriggerList& triggers, jet::evt::Datum& out) {
                 writer.name("4_0_ug_m3").value(Data::pmInst.pm_4_0_ug_m3);
                 writer.name("10_ug_m3").value(Data::pmInst.pm_10_ug_m3);
             writer.endObject();
+            }
             writer.name("pressure_hPa").value(Data::pressureInst);
             writer.name("tvoc_ppb").value(Data::tvocInst);
             writer.name("eco2_ppm").value(Data::eco2Inst);
