@@ -611,11 +611,15 @@ static bool ReadSGP30(jet::evt::TriggerList& triggers, jet::evt::Datum& out) {
             // Sensor is still initializing (first 15s after init)
             return false;
         }
-        if (vocSensor.measureRawSignals() ==  SGP30_SUCCESS) {
+        // Silicon may be new enough that this is disabled
+        SGP30ERR rawReadStatus = vocSensor.measureRawSignals();
+        if (rawReadStatus ==  SGP30_SUCCESS) {
             datum.uin16 = vocSensor.H2;
             infrastructure::event_hub.deliver(String("SGP30 H2"), datum);
             datum.uin16 = vocSensor.ethanol;
             infrastructure::event_hub.deliver(String("SGP30 ethanol"), datum);
+        } else {
+            Serial.printlnf("SGP30 raw read failed with %d", rawReadStatus);
         }
         datum.uin16 = vocSensor.TVOC;
         infrastructure::event_hub.deliver(String("SGP30 tVOC ppb"), datum);
@@ -1387,7 +1391,7 @@ bool RenderMqtt(jet::evt::TriggerList& triggers, jet::evt::Datum& out) {
             writer.name("tvoc_ppb").value(Data::tvocInst);
             writer.name("eco2_ppm").value(Data::eco2Inst);
             // Another driver that sometimes doesn't work right
-            if (Data::h2Rel == 0xffff || Data::ethanolRel == 0xffff) {
+            if (Data::h2Rel != 0xffff || Data::ethanolRel != 0xffff) {
             writer.name("h2_rel").value(Data::h2Rel);
             writer.name("ethanol_rel").value(Data::ethanolRel);
             }
