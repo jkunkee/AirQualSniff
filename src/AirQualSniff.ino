@@ -1557,8 +1557,10 @@ void loop() {
     peripherals::Joystick::EmitChangeEvent();
     UX::networking::update();
     system_tick_t end = millis() + infrastructure::hub_time_offset.to_uint32_t();
-    if (end - start > (system_tick_t)1000ULL) {
+    if (end - start > (system_tick_t)10000ULL) {
         Serial.printlnf("###### Loop End; duration %lu-%lu=%lu", end, start, end - start);
+        String mqttMsg = String::format("long loop, duration %lu-%lu=%lu", end, start, end - start);
+        UX::networking::mqtt::Publish("AirQualSniff/status/error", mqttMsg);
     }
 }
 
