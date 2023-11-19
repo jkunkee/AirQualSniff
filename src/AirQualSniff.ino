@@ -1443,7 +1443,7 @@ bool RenderMqtt(jet::evt::TriggerList& triggers, jet::evt::Datum& out) {
     String eventState;
     infrastructure::event_hub.debug_string(eventState);
     memcpy(buf, eventState.c_str(), min(bufLen-1, eventState.length()));
-    networking::mqtt::Publish("AirQualSniff/status/HubState", buf);
+    networking::mqtt::Publish("AirQualSniff/status/error", buf);
 
     free(buf);
     return false;
