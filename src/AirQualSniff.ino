@@ -115,8 +115,14 @@ namespace peripherals {
 
 static constexpr uint32_t I2C_DEFAULT_SPEED = CLOCK_SPEED_400KHZ;
 static constexpr uint32_t I2C_SAFE_SPEED    = CLOCK_SPEED_100KHZ;
-static constexpr uint8_t PM_MUX_PORT = 4;
+static constexpr uint8_t AHT20_MUX_PORT = 0;
+static constexpr uint8_t SCREEN_MUX_PORT = 1;
+static constexpr uint8_t LPS25HB_MUX_PORT = 2;
 static constexpr uint8_t CO2_MUX_PORT = 3;
+static constexpr uint8_t PM_MUX_PORT = 4;
+static constexpr uint8_t UNUSED1_MUX_PORT = 5;
+static constexpr uint8_t SGP30_MUX_PORT = 6;
+static constexpr uint8_t UNUSED2_MUX_PORT = 7;
 
 static QWIICMUX i2cMux;
 static bool i2cMuxPresent = false;
@@ -172,9 +178,11 @@ namespace Display {
 
     void u8g2_ssd1327_lock() {
         u8g2_SendF(peripherals::Display::u8g2, "ca", 0xFD, 0x12 | (1<<2));
+        i2cMux.disablePort(SCREEN_MUX_PORT);
     }
 
     void u8g2_ssd1327_unlock() {
+        i2cMux.enablePort(SCREEN_MUX_PORT);
         u8g2_SendF(peripherals::Display::u8g2, "ca", 0xFD, 0x12 | (0<<2));
     }
 
@@ -284,6 +292,7 @@ namespace Display {
         // I thought something about u8x8_gpio_and_delay_arduino caused lockups too;
         // replacing it with a do-nothing 'return 0;' worked when I encountered that.
 
+        i2cMux.enablePort(SCREEN_MUX_PORT);
         u8g2_Setup_ssd1327_i2c_midas_128x128_f(u8g2, U8G2_R3, u8x8_byte_arduino_hw_i2c, u8x8_gpio_and_delay_arduino);
         //u8g2_oo = new U8G2_SSD1327_MIDAS_128X128_F_HW_I2C(U8G2_R1);
         //u8g2_oo->beginSimple();
@@ -295,6 +304,7 @@ namespace Display {
         //u8g2_SetDrawColor(u8g2, 1); // GetDrawColor returns 0 anyways
         u8g2_ClearBuffer(u8g2);
         u8g2_SendBuffer(u8g2);
+        u8g2_ssd1327_lock();
     }
 } // namespace Display
 
@@ -321,8 +331,10 @@ namespace Joystick {
 
     static JOYSTICK_DIRECTION ReadJoystick();
     static JOYSTICK_DIRECTION ReadJoystick() {
+        i2cMux.enablePort(SCREEN_MUX_PORT); // Rewiring this one to its own port was just too much effort for me.
         uint16_t horiz = joystick.getHorizontal();
         uint16_t vert = joystick.getVertical();
+        i2cMux.disablePort(SCREEN_MUX_PORT);
 
         JOYSTICK_DIRECTION joyDir;
         if (vert > DOWN_THRESHOLD && horiz > RIGHT_THRESHOLD) {
@@ -424,23 +436,16 @@ void init() {
 
     i2cMuxPresent = i2cMux.begin();
     if (i2cMuxPresent) {
-        i2cMux.setPortState(0
-            //|0x1 // nc
-            //|0x2 // nc
-            //|0x4 // nc
-            | (1 << CO2_MUX_PORT) // CO2
-            //|0x10 // nc
-            //|0x20 // nc
-            //|0x40 // nc
-            //|0x80 // SCD30/PM
-            );
+        i2cMux.setPortState(0);
     }
 
     // The PM sensor has been muxed off, so speed up
     SpeedUpI2c();
     Display::init();
 
+    i2cMux.enablePort(SCREEN_MUX_PORT);
     Joystick::joystickPresent = Joystick::joystick.begin();
+    i2cMux.disablePort(SCREEN_MUX_PORT);
 }
 
 } // namespace peripherals
@@ -467,7 +472,9 @@ static bool LPS25HB_data_is_ready();
 static bool LPS25HB_data_is_ready() {
     constexpr uint8_t STATUS_REG_P_DA = 0x2;
     constexpr uint8_t STATUS_REG_T_DA = 0x1;
+    peripherals::i2cMux.enablePort(peripherals::LPS25HB_MUX_PORT);
     uint8_t status = pressureSensor.getStatus();
+    peripherals::i2cMux.disablePort(peripherals::LPS25HB_MUX_PORT);
     return lps25hb_pressure_sensor_present &&
             (status & STATUS_REG_T_DA) &&
             (status & STATUS_REG_P_DA);
@@ -481,9 +488,11 @@ static bool ReadLPS25HB(jet::evt::TriggerList& triggers, jet::evt::Datum& out) {
         jet::evt::Datum pressurehPa;
         jet::evt::Datum altitudem;
 
+        peripherals::i2cMux.enablePort(peripherals::LPS25HB_MUX_PORT);
         tempC.fl = pressureSensor.getTemperature_degC() + pressureSensorTempFOffset * 5 / 9;
-        tempF.fl = C_TO_F(tempC.fl);
         pressurehPa.fl = pressureSensor.getPressure_hPa();
+        peripherals::i2cMux.disablePort(peripherals::LPS25HB_MUX_PORT);
+        tempF.fl = C_TO_F(tempC.fl);
         altitudem.fl = atmospherics::pressure_to_est_altitude(pressurehPa.fl);
 
         infrastructure::event_hub.deliver(String("LPS25HB Pressure hPa"), pressurehPa);
@@ -519,6 +528,7 @@ static constexpr float co2SensorTempFOffset = 80.1 - 79.0;
 
 static bool ReadSCD30(jet::evt::TriggerList& triggers, jet::evt::Datum& out);
 static bool ReadSCD30(jet::evt::TriggerList& triggers, jet::evt::Datum& out) {
+    peripherals::i2cMux.enablePort(peripherals::CO2_MUX_PORT);
     if (co2SensorPresent && co2Sensor.dataAvailable()) {
         jet::evt::Datum rh;
         jet::evt::Datum tempC;
@@ -532,6 +542,7 @@ static bool ReadSCD30(jet::evt::TriggerList& triggers, jet::evt::Datum& out) {
         infrastructure::event_hub.deliver(String("SCD30 temp C"), tempC);
         infrastructure::event_hub.deliver(String("SCD30 rh %"), rh);
     }
+    peripherals::i2cMux.disablePort(peripherals::CO2_MUX_PORT);
     // Data is delivered with Deliver, so out param is unused.
     return false;
 }
@@ -542,11 +553,14 @@ static constexpr float humiditySensorTempOffset = 0.0;
 
 static bool ReadAHT20(jet::evt::TriggerList& triggers, jet::evt::Datum& out);
 static bool ReadAHT20(jet::evt::TriggerList& triggers, jet::evt::Datum& out) {
+    peripherals::i2cMux.enablePort(peripherals::AHT20_MUX_PORT);
     if (humiditySensorPresent && humiditySensor.isCalibrated()) {
         humiditySensor.triggerMeasurement();
         out.fl = humiditySensor.getHumidity();
+        peripherals::i2cMux.disablePort(peripherals::AHT20_MUX_PORT);
         return true;
     }
+    peripherals::i2cMux.disablePort(peripherals::AHT20_MUX_PORT);
     return false;
 }
 
@@ -606,13 +620,17 @@ static bool ReadSGP30(jet::evt::TriggerList& triggers, jet::evt::Datum& out);
 static bool ReadSGP30(jet::evt::TriggerList& triggers, jet::evt::Datum& out) {
     if (vocSensorPresent) {
         jet::evt::Datum datum;
+        peripherals::i2cMux.enablePort(peripherals::SGP30_MUX_PORT);
         vocSensor.measureAirQuality();
+        peripherals::i2cMux.disablePort(peripherals::SGP30_MUX_PORT);
         if (vocSensor.CO2 == 400 && vocSensor.TVOC == 0) {
             // Sensor is still initializing (first 15s after init)
             return false;
         }
         // Silicon may be new enough that this is disabled
+        peripherals::i2cMux.enablePort(peripherals::SGP30_MUX_PORT);
         SGP30ERR rawReadStatus = vocSensor.measureRawSignals();
+        peripherals::i2cMux.disablePort(peripherals::SGP30_MUX_PORT);
         if (rawReadStatus ==  SGP30_SUCCESS) {
             datum.uin16 = vocSensor.H2;
             infrastructure::event_hub.deliver(String("SGP30 H2"), datum);
@@ -632,7 +650,9 @@ static bool ReadSGP30(jet::evt::TriggerList& triggers, jet::evt::Datum& out) {
 static bool SaveSGP30Baselines(jet::evt::TriggerList& triggers, jet::evt::Datum& out);
 static bool SaveSGP30Baselines(jet::evt::TriggerList& triggers, jet::evt::Datum& out) {
     if (vocSensorPresent) {
+        peripherals::i2cMux.enablePort(peripherals::SGP30_MUX_PORT);
         vocSensor.getBaseline();
+        peripherals::i2cMux.disablePort(peripherals::SGP30_MUX_PORT);
         peripherals::NvStorage::NvSettings.vocBaselineCo2 = vocSensor.baselineCO2;
         peripherals::NvStorage::NvSettings.vocBaselineTvoc = vocSensor.baselineTVOC;
         peripherals::NvStorage::commit();
@@ -643,7 +663,9 @@ static bool SaveSGP30Baselines(jet::evt::TriggerList& triggers, jet::evt::Datum&
 static bool SetSGP30AbsoluteHumidity(jet::evt::TriggerList& triggers, jet::evt::Datum& out);
 static bool SetSGP30AbsoluteHumidity(jet::evt::TriggerList& triggers, jet::evt::Datum& out) {
     if (vocSensorPresent && triggers.size() >= 1 && triggers.get(0)->data_ready) {
+        peripherals::i2cMux.enablePort(peripherals::SGP30_MUX_PORT);
         vocSensor.setHumidity(triggers.get(0)->data.uin16);
+        peripherals::i2cMux.disablePort(peripherals::SGP30_MUX_PORT);
     }
     return false;
 }
@@ -700,6 +722,7 @@ bool ReadSPS30(jet::evt::TriggerList& triggers, jet::evt::Datum& out) {
 }
 
 void init() {
+    peripherals::i2cMux.enablePort(peripherals::LPS25HB_MUX_PORT);
     lps25hb_pressure_sensor_present = pressureSensor.begin();
     if (lps25hb_pressure_sensor_present) {
         // Application Note AN4672 provides guidelines for balancing power
@@ -717,12 +740,21 @@ void init() {
         pressureSensor.setTemperatureAverages(LPS25HB_RES_CONF_T_64);
         pressureSensor.setPressureAverages(LPS25HB_RES_CONF_P_512);
     }
+    peripherals::i2cMux.disablePort(peripherals::LPS25HB_MUX_PORT);
+
+    peripherals::i2cMux.enablePort(peripherals::CO2_MUX_PORT);
     co2SensorPresent = co2Sensor.begin();
     if (co2SensorPresent != false) {
         co2Sensor.setAutoSelfCalibration(true);
         co2Sensor.setMeasurementInterval(co2SensorInterval);
     }
+    peripherals::i2cMux.disablePort(peripherals::CO2_MUX_PORT);
+
+    peripherals::i2cMux.enablePort(peripherals::AHT20_MUX_PORT);
     humiditySensorPresent = humiditySensor.begin();
+    peripherals::i2cMux.disablePort(peripherals::AHT20_MUX_PORT);
+
+    peripherals::i2cMux.enablePort(peripherals::SGP30_MUX_PORT);
     vocSensorPresent = vocSensor.begin();
     if (vocSensorPresent) {
         vocSensor.initAirQuality();
@@ -733,6 +765,8 @@ void init() {
                                   peripherals::NvStorage::NvSettings.vocBaselineTvoc);
         }
     }
+    peripherals::i2cMux.disablePort(peripherals::SGP30_MUX_PORT);
+
     peripherals::SlowDownI2c();
     pmSensorPresent = pmSensor.begin();
     if (pmSensorPresent) {
