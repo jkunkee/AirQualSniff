@@ -989,7 +989,7 @@ Box *pm4_0CountBox;
 Box *pm10_CountBox;
 
 bool RenderOled(jet::evt::TriggerList& triggers, jet::evt::Datum& out) {
-    static OledMode mode = HOME;
+    static OledMode mode = BLANK;
     for (size_t evt_idx = 0; evt_idx < triggers.size(); evt_idx++) {
         jet::evt::Trigger* trigger = triggers.get(evt_idx);
         if (trigger->data_ready) {
