@@ -456,13 +456,14 @@ public:
   friend bool UInt32Test();
 
   void debug_string(String& out) const {
-    out += "UInt32:";
+    out += "s0x";
+    if (m_bytes[3] < 128) { out += "0"; }
     out += String(m_bytes[3], (uint8_t)16);
-    out += ",";
+    if (m_bytes[2] < 128) { out += "0"; }
     out += String(m_bytes[2], (uint8_t)16);
-    out += ",";
+    if (m_bytes[1] < 128) { out += "0"; }
     out += String(m_bytes[1], (uint8_t)16);
-    out += ",";
+    if (m_bytes[0] < 128) { out += "0"; }
     out += String(m_bytes[0], (uint8_t)16);
   }
 };
