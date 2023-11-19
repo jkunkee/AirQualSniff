@@ -1437,6 +1437,14 @@ bool RenderMqtt(jet::evt::TriggerList& triggers, jet::evt::Datum& out) {
     if (!networking::mqtt::Publish("AirQualSniff/data/10min", buf)) {
         Serial.println("RenderMqtt failed to publish");
     }
+
+    // Also dump HubState to try and find the cause(s) for the data gaps/device hangs
+    memset(buf, 0, bufLen);
+    String eventState;
+    infrastructure::event_hub.debug_string(eventState);
+    memcpy(buf, eventState.c_str(), min(bufLen-1, eventState.length()));
+    networking::mqtt::Publish("AirQualSniff/status/HubState", buf);
+
     free(buf);
     return false;
 }
