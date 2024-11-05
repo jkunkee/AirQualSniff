@@ -4,3 +4,9 @@
 [submodule "lib/MQTT5"]
 	path = lib/MQTT5
 	url = https://github.com/jkunkee/MQTT5.git
+[submodule "lib/SparkFun_BMA400_Arduino_Library"]
+	path = lib/SparkFun_BMA400_Arduino_Library
+	url = https://github.com/sparkfun/SparkFun_BMA400_Arduino_Library.git
+[submodule "lib/SparkFun_External_EEPROM_Arduino_Library"]
+	path = lib/SparkFun_External_EEPROM_Arduino_Library
+	url = https://github.com/sparkfun/SparkFun_External_EEPROM_Arduino_Library.git
