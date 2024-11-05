@@ -24,6 +24,7 @@ using jet::evt::jet_time_t;
 #include <SparkFun_Qwiic_Joystick_Arduino_Library.h>
 #include <SparkFunMicroOLED.h>
 #include <SparkFunMAX17043.h>
+#include <SparkFun_BMA400_Arduino_Library.h>
 #include <MQTT5.h>
 #include <mDNSResolver.h>
 
@@ -123,8 +124,10 @@ static constexpr uint8_t LPS25HB_MUX_PORT = 2;
 static constexpr uint8_t CO2_MUX_PORT = 3;
 static constexpr uint8_t PM_MUX_PORT = 4;
 static constexpr uint8_t UNUSED1_MUX_PORT = 5;
-static constexpr uint8_t SGP30_MUX_PORT = 6;
+static constexpr uint8_t BMA400_MUX_PORT = 6;
 static constexpr uint8_t UNUSED2_MUX_PORT = 7;
+
+static constexpr uint8_t SGP30_MUX_PORT = UNUSED1_MUX_PORT;
 
 static QWIICMUX i2cMux;
 static bool i2cMuxPresent = false;
@@ -433,6 +436,10 @@ namespace NvStorage {
 } // namespace NvStorage
 
 MAX17043 & lipo = lipo;
+bool lipoShieldPresent = false;
+
+BMA400 accel;
+bool accelPresent = false;
 
 void init() {
     Serial.begin(115200);
@@ -461,8 +468,17 @@ void init() {
     i2cMux.disablePort(SCREEN_MUX_PORT);
 
     // Since it's a Particle shield, the library even declares the object.
-    lipo.begin();
-    lipo.quickStart();
+    if (lipo.getVersion() == 3) {
+        lipoShieldPresent = true;
+        lipo.begin();
+        lipo.quickStart();
+    }
+
+    i2cMux.enablePort(BMA400_MUX_PORT);
+    if (accel.beginI2C() == BMA400_OK) {
+        accelPresent = true;
+    }
+    i2cMux.disablePort(BMA400_MUX_PORT);
 }
 
 } // namespace peripherals
@@ -927,7 +943,15 @@ using namespace Data;
 
 bool RenderTestToSerial(jet::evt::TriggerList& triggers, jet::evt::Datum& out) {
     Serial.printlnf("Hello World");
-    Serial.printlnf("lipo: %f%% %fV", peripherals::lipo.getSOC(), peripherals::lipo.getVoltage());
+    Serial.printlnf("lipo: %d %f%% %fV", peripherals::lipoShieldPresent, peripherals::lipo.getSOC(), peripherals::lipo.getVoltage());
+    peripherals::i2cMux.enablePort(peripherals::BMA400_MUX_PORT);
+    peripherals::accel.getSensorData();
+    peripherals::i2cMux.disablePort(peripherals::BMA400_MUX_PORT);
+    Serial.printlnf("accel: %d x:%f y:%f z:%f",
+        peripherals::accelPresent,
+        peripherals::accel.data.accelX,
+        peripherals::accel.data.accelY,
+        peripherals::accel.data.accelZ);
     return false;
 }
 
