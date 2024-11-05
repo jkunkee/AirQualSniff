@@ -22,6 +22,7 @@ using jet::evt::jet_time_t;
 #include <SparkFun_I2C_Mux_Arduino_Library.h>
 #include <SparkFun_Qwiic_Humidity_AHT20.h>
 #include <SparkFun_Qwiic_Joystick_Arduino_Library.h>
+#include <SparkFunMicroOLED.h>
 #include <MQTT5.h>
 #include <mDNSResolver.h>
 
@@ -284,6 +285,8 @@ namespace Display {
         return false;
     }
 
+    MicroOLED uoled;
+
     void init() {
         // FUll U8G2, SSD1327 controller, Midas 128x128 display, full framebuffer, First Arduino Hardware I2C, rotated so USB is on left
         // Docs say U8G2_SSD1327_EA_W128128_F_HW_I2C, but it chops off the top and bottom 16 rows.
@@ -305,6 +308,13 @@ namespace Display {
         u8g2_ClearBuffer(u8g2);
         u8g2_SendBuffer(u8g2);
         u8g2_ssd1327_lock();
+
+        // shield defaults to SPI config
+        uoled.begin();
+        uoled.clear(ALL);
+        uoled.display();
+        delay(100);
+        uoled.clear(PAGE);
     }
 } // namespace Display
 
