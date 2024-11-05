@@ -25,6 +25,7 @@ using jet::evt::jet_time_t;
 #include <SparkFunMicroOLED.h>
 #include <SparkFunMAX17043.h>
 #include <SparkFun_BMA400_Arduino_Library.h>
+#include <SparkFun_External_EEPROM.h>
 #include <MQTT5.h>
 #include <mDNSResolver.h>
 
@@ -410,6 +411,9 @@ namespace NvStorage {
     static_assert(currentVersion != 0x00, "The version must be distinguishable from the new-firmware value 0x00.");
     static_assert(currentVersion != 0xFF, "The version must be distinguishable from the erased-flash value 0xFF.");
 
+    ExternalEEPROM externalEeprom;
+    bool externalEepromPresent = false;
+
     void begin() {
         // The Photon has 2047 bytes of emulated (flash-backed, page-erase-worn) EEPROM
         // It appears that when the firmware is updated, the EEPROM area is zero'd out,
@@ -424,6 +428,9 @@ namespace NvStorage {
             NvSettings.vocBaselineTvoc = 41427; // tvoc 41061,41336,41427
             EEPROM.put(NvSettingsAddress, NvSettings);
         }
+
+        externalEeprom.setMemoryType(512); // CAT24C512
+        //externalEepromPresent = externalEeprom.begin(); // causes SOS
     }
 
     void commit() {
@@ -942,12 +949,13 @@ namespace UX {
 using namespace Data;
 
 bool RenderTestToSerial(jet::evt::TriggerList& triggers, jet::evt::Datum& out) {
-    Serial.printlnf("Hello World");
+    Serial.printlnf("Hello World - eeprom %d", peripherals::NvStorage::externalEepromPresent);
+    peripherals::lipo.quickStart();
     Serial.printlnf("lipo: %d %f%% %fV", peripherals::lipoShieldPresent, peripherals::lipo.getSOC(), peripherals::lipo.getVoltage());
     peripherals::i2cMux.enablePort(peripherals::BMA400_MUX_PORT);
     peripherals::accel.getSensorData();
     peripherals::i2cMux.disablePort(peripherals::BMA400_MUX_PORT);
-    Serial.printlnf("accel: %d x:%f y:%f z:%f",
+    Serial.printlnf("accel: %d x:%fg y:%fg z:%fg",
         peripherals::accelPresent,
         peripherals::accel.data.accelX,
         peripherals::accel.data.accelY,
