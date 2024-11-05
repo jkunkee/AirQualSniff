@@ -23,6 +23,7 @@ using jet::evt::jet_time_t;
 #include <SparkFun_Qwiic_Humidity_AHT20.h>
 #include <SparkFun_Qwiic_Joystick_Arduino_Library.h>
 #include <SparkFunMicroOLED.h>
+#include <SparkFunMAX17043.h>
 #include <MQTT5.h>
 #include <mDNSResolver.h>
 
@@ -431,6 +432,8 @@ namespace NvStorage {
     }
 } // namespace NvStorage
 
+MAX17043 & lipo = lipo;
+
 void init() {
     Serial.begin(115200);
 
@@ -456,6 +459,10 @@ void init() {
     i2cMux.enablePort(SCREEN_MUX_PORT);
     Joystick::joystickPresent = Joystick::joystick.begin();
     i2cMux.disablePort(SCREEN_MUX_PORT);
+
+    // Since it's a Particle shield, the library even declares the object.
+    lipo.begin();
+    lipo.quickStart();
 }
 
 } // namespace peripherals
@@ -917,6 +924,12 @@ bool GatherData(jet::evt::TriggerList& triggers, jet::evt::Datum& out) {
 namespace UX {
 
 using namespace Data;
+
+bool RenderTestToSerial(jet::evt::TriggerList& triggers, jet::evt::Datum& out) {
+    Serial.printlnf("Hello World");
+    Serial.printlnf("lipo: %f%% %fV", peripherals::lipo.getSOC(), peripherals::lipo.getVoltage());
+    return false;
+}
 
 bool RenderSerial(jet::evt::TriggerList& triggers, jet::evt::Datum& out) {
     static system_tick_t lastFire = 0;
@@ -1528,6 +1541,7 @@ void init() {
     infrastructure::event_hub.add_event_trigger("GatherDataFired", "Absolute Humidity 8.8 g/m^3");
     infrastructure::event_hub.add_event_trigger("GatherDataFired", "SGP30 tVOC ppb");
     infrastructure::event_hub.add_event_trigger("GatherDataFired", "SGP30 eCO2 ppm");
+    infrastructure::event_hub.add_event("RenderTestToSerial", UX::RenderTestToSerial, jet::evt::TRIGGER_TEMPORAL, (uint32_t)3000);
     //infrastructure::event_hub.add_event("RenderSerialEvent", UX::RenderSerial, jet::evt::TRIGGER_ON_ANY);
     //infrastructure::event_hub.add_event_trigger("RenderSerialEvent", "GatherDataFired");
     infrastructure::event_hub.add_event("RenderOledEvent", UX::RenderOled, jet::evt::TRIGGER_ON_ANY);
