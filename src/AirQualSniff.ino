@@ -450,9 +450,6 @@ namespace NvStorage {
 MAX17043 & lipo = lipo;
 bool lipoShieldPresent = false;
 
-BMA400 accel;
-bool accelPresent = false;
-
 void init() {
     Serial.begin(115200);
 
@@ -485,12 +482,6 @@ void init() {
         lipo.begin();
         lipo.quickStart();
     }
-
-    i2cMux.enablePort(BMA400_MUX_PORT);
-    if (accel.beginI2C() == BMA400_OK) {
-        accelPresent = true;
-    }
-    i2cMux.disablePort(BMA400_MUX_PORT);
 }
 
 } // namespace peripherals
@@ -505,6 +496,80 @@ void init() {
 \*****************************************************************************/
 
 namespace sensors {
+
+BMA400 accel;
+bool accelPresent = false;
+BMA400_SensorData accelDatum = { 0 };
+const uint32_t accelReadInterval = 300;
+
+static bool ReadBMA400(jet::evt::TriggerList& triggers, jet::evt::Datum& out);
+static bool ReadBMA400(jet::evt::TriggerList& triggers, jet::evt::Datum& out) {
+    if (accelPresent != false) {
+        peripherals::i2cMux.enablePort(peripherals::BMA400_MUX_PORT);
+        accel.getSensorData();
+        peripherals::i2cMux.disablePort(peripherals::BMA400_MUX_PORT);
+        accelDatum = accel.data;
+        out.ptr = &accelDatum;
+        return true;
+    }
+    return false;
+}
+
+enum Orientation {
+    FACE_UP,
+    ON_LEFT_SIDE,
+    ON_RIGHT_SIDE,
+    ON_TOP,
+    ON_BOTTOM,
+    FACE_DOWN,
+};
+
+static bool ReduceBMA400ToOrientation(jet::evt::TriggerList& triggers, jet::evt::Datum& out);
+static bool ReduceBMA400ToOrientation(jet::evt::TriggerList& triggers, jet::evt::Datum& out) {
+    static Orientation currentOrientation = ON_BOTTOM;
+    Orientation newOrientation = currentOrientation;
+    bool hasChanged = false;
+    if (triggers.size() == 1) {
+        jet::evt::Trigger* trigger = triggers.get(0);
+        BMA400_SensorData datum = *(BMA400_SensorData*)trigger->data.ptr;
+        // decide the new orientation
+        // the "bottom" is "down" is with the joystick on the left and the screen on the right, sitting flat on a desk facing the user
+        // +X is towards left side
+        // -X is towards right side
+        // +Y is towards bottom
+        // -Y is towards top
+        // +Z is towards face
+        // -Z is towards back
+        // Sure, I could do dot products or Euler angles
+        // but what will work NOW?
+        // magnitudes!
+        if (abs(datum.accelX) > abs(datum.accelY) && abs(datum.accelX) > abs(datum.accelZ)) {
+            if (datum.accelX > 0.0f) {
+                newOrientation = ON_RIGHT_SIDE;
+            } else {
+                newOrientation = ON_LEFT_SIDE;
+            }
+        } else if (abs(datum.accelY) > abs(datum.accelX) && abs(datum.accelY) > abs(datum.accelZ)) {
+            if (datum.accelY > 0.0f) {
+                newOrientation = ON_TOP;
+            } else {
+                newOrientation = ON_BOTTOM;
+            }
+        } else if (abs(datum.accelZ) > abs(datum.accelX) && abs(datum.accelZ) > abs(datum.accelY)) {
+            if (datum.accelZ > 0.0f) {
+                newOrientation = FACE_UP;
+            } else {
+                newOrientation = FACE_DOWN;
+            }
+        } else {
+            newOrientation = FACE_UP;
+        }
+    }
+    hasChanged = newOrientation != currentOrientation;
+    currentOrientation = newOrientation;
+    out.uin16 = currentOrientation;
+    return hasChanged;
+}
 
 static LPS25HB pressureSensor;
 static bool lps25hb_pressure_sensor_present = false;
@@ -767,6 +832,14 @@ bool ReadSPS30(jet::evt::TriggerList& triggers, jet::evt::Datum& out) {
 }
 
 void init() {
+    peripherals::i2cMux.enablePort(peripherals::BMA400_MUX_PORT);
+    if (accel.beginI2C() == BMA400_OK) {
+        accelPresent = true;
+        accel.setODR(BMA400_ODR_12_5HZ);
+        accel.setOSR(BMA400_ACCEL_OSR_SETTING_1); // just because I like oversampling
+    }
+    peripherals::i2cMux.disablePort(peripherals::BMA400_MUX_PORT);
+
     peripherals::i2cMux.enablePort(peripherals::LPS25HB_MUX_PORT);
     lps25hb_pressure_sensor_present = pressureSensor.begin();
     if (lps25hb_pressure_sensor_present) {
@@ -852,6 +925,7 @@ void init() {
 namespace Data {
 
 // TODO: statically allocated buffers
+BMA400_SensorData accelDatum = { 0 };
 // fine: every 10 seconds
 float pressureInst = -NAN;
 // Instead of doing the EPA careful route right now, go for pretty/useful displays.
@@ -888,7 +962,9 @@ bool GatherData(jet::evt::TriggerList& triggers, jet::evt::Datum& out) {
     for (size_t evt_idx = 0; evt_idx < triggers.size(); evt_idx++) {
         jet::evt::Trigger* trigger = triggers.get(evt_idx);
         if (trigger->data_ready) {
-            if (trigger->event_id.equalsIgnoreCase(String("LPS25HB Pressure hPa"))) {
+            if (trigger->event_id.equalsIgnoreCase(String("BMA400 Raw"))) {
+                accelDatum = *(BMA400_SensorData*)trigger->data.ptr;
+            } else if (trigger->event_id.equalsIgnoreCase(String("LPS25HB Pressure hPa"))) {
                 pressureInst = trigger->data.fl;
                 pressureDecimator.push(pressureInst);
                 // Each of these is delivered singly from ReadLPS25HB, so only generate
@@ -956,21 +1032,10 @@ using namespace Data;
 bool RenderTestToSerial(jet::evt::TriggerList& triggers, jet::evt::Datum& out) {
     Serial.printlnf("Hello World - eeprom %d", peripherals::NvStorage::externalEepromPresent);
     peripherals::lipo.quickStart();
-    Serial.printlnf("lipo: %d %f%% %fV", peripherals::lipoShieldPresent, peripherals::lipo.getSOC(), peripherals::lipo.getVoltage());
-    peripherals::i2cMux.enablePort(peripherals::BMA400_MUX_PORT);
-    peripherals::accel.getSensorData();
-    peripherals::i2cMux.disablePort(peripherals::BMA400_MUX_PORT);
-    Serial.printlnf("accel: %d x:%fg y:%fg z:%fg",
-        peripherals::accelPresent,
-        peripherals::accel.data.accelX,
-        peripherals::accel.data.accelY,
-        peripherals::accel.data.accelZ);
-    peripherals::Display::uoled.setColor(BLACK);
-    peripherals::Display::uoled.circle(16, 16, 8);
-    peripherals::Display::uoled.circle(32, 32, 8);
-    peripherals::Display::uoled.setColor(WHITE);
+    float lipoSoc = peripherals::lipo.getSOC();
+    Serial.printlnf("lipo: %d %f%% %fV", peripherals::lipoShieldPresent, lipoSoc, peripherals::lipo.getVoltage());
     peripherals::Display::uoled.setCursor(0, 0);
-    peripherals::Display::uoled.printlnf("EHLOL %f", peripherals::accel.data.accelX);
+    peripherals::Display::uoled.printlnf("BATT %0.2f", lipoSoc);
     peripherals::Display::uoled.display();
     return false;
 }
@@ -1084,6 +1149,25 @@ bool RenderOled(jet::evt::TriggerList& triggers, jet::evt::Datum& out) {
                 case peripherals::Joystick::JOYSTICK_DIRECTION::UP:
                     mode = DEBUG_RETICLE;
                     break;
+                }
+            } else if (trigger->event_id.equalsIgnoreCase(String("Accel Orientation"))) {
+                Serial.println("using accel");
+                switch ((sensors::Orientation)trigger->data.uin16) {
+                    case sensors::Orientation::ON_TOP:
+                        u8g2_SetDisplayRotation(peripherals::Display::u8g2, U8G2_R1);
+                        break;
+                    case sensors::Orientation::ON_BOTTOM:
+                        u8g2_SetDisplayRotation(peripherals::Display::u8g2, U8G2_R3);
+                        break;
+                    case sensors::Orientation::ON_LEFT_SIDE:
+                        u8g2_SetDisplayRotation(peripherals::Display::u8g2, U8G2_R0);
+                        break;
+                    case sensors::Orientation::ON_RIGHT_SIDE:
+                        u8g2_SetDisplayRotation(peripherals::Display::u8g2, U8G2_R2);
+                        break;
+                    case sensors::Orientation::FACE_UP:
+                    case sensors::Orientation::FACE_DOWN:
+                        break;
                 }
             } else if (trigger->event_id.equalsIgnoreCase(String("GatherDataFired"))) {
                 // TODO: only update screen when there's a change?
@@ -1562,6 +1646,9 @@ namespace flow {
 
 // One Init To Rule Them All, And In The Setup, Bind Them
 void init() {
+    infrastructure::event_hub.add_event("BMA400 Raw", sensors::ReadBMA400, jet::evt::TRIGGER_TEMPORAL, sensors::accelReadInterval);
+    infrastructure::event_hub.add_event("Accel Orientation", sensors::ReduceBMA400ToOrientation, jet::evt::TRIGGER_ON_ANY);
+    infrastructure::event_hub.add_event_trigger("Accel Orientation", "BMA400 Raw");
     infrastructure::event_hub.add_event("LPS25HB Raw", sensors::ReadLPS25HB, jet::evt::TRIGGER_TEMPORAL, (uint32_t)1000); // pre-decimated output is at 1 Hz
     infrastructure::event_hub.add_event("SCD30 Raw", sensors::ReadSCD30, jet::evt::TRIGGER_TEMPORAL, sensors::co2SensorInterval*(uint32_t)1000);
     infrastructure::event_hub.add_event("AHT20 Relative Humidity %%", sensors::ReadAHT20, jet::evt::TRIGGER_TEMPORAL, (uint32_t)1000);
@@ -1575,6 +1662,7 @@ void init() {
     infrastructure::event_hub.add_event("SGP30 Update Absolute Humidity", sensors::SetSGP30AbsoluteHumidity, jet::evt::TRIGGER_ON_ANY);
     infrastructure::event_hub.add_event_trigger("SGP30 Update Absolute Humidity", "Absolute Humidity 8.8 g/m^3");
     infrastructure::event_hub.add_event("GatherDataFired", Data::GatherData, jet::evt::TRIGGER_ON_ANY);
+    infrastructure::event_hub.add_event_trigger("GatherDataFired", "BMA400 Raw");
     infrastructure::event_hub.add_event_trigger("GatherDataFired", "LPS25HB Pressure hPa");
     infrastructure::event_hub.add_event_trigger("GatherDataFired", "LPS25HB Altitude m");
     infrastructure::event_hub.add_event_trigger("GatherDataFired", "LPS25HB Temp C");
@@ -1591,6 +1679,7 @@ void init() {
     infrastructure::event_hub.add_event("RenderOledEvent", UX::RenderOled, jet::evt::TRIGGER_ON_ANY);
     infrastructure::event_hub.add_event_trigger("RenderOledEvent", "GatherDataFired");
     infrastructure::event_hub.add_event_trigger("RenderOledEvent", "Joystick Direction Change");
+    infrastructure::event_hub.add_event_trigger("RenderOledEvent", "Accel Orientation");
     infrastructure::event_hub.add_event("PaintOled", peripherals::Display::Paint, jet::evt::TRIGGER_TEMPORAL, (uint32_t)1200); // long enough for the longest loop to prevent delta clock recursion
     infrastructure::event_hub.add_event("RenderCloud", UX::RenderCloud, jet::evt::TRIGGER_TEMPORAL, UX::RenderCloudInterval_ms);
     infrastructure::event_hub.add_event("RenderMqtt", UX::RenderMqtt, jet::evt::TRIGGER_TEMPORAL, UX::RenderCloudInterval_ms);
