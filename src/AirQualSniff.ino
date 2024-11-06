@@ -1034,9 +1034,11 @@ bool RenderTestToSerial(jet::evt::TriggerList& triggers, jet::evt::Datum& out) {
     Serial.printlnf("Hello World - eeprom %d", peripherals::NvStorage::externalEepromPresent);
     peripherals::lipo.quickStart();
     float lipoSoc = peripherals::lipo.getSOC();
+    float lipoV = peripherals::lipo.getVoltage();
     Serial.printlnf("lipo: %d %f%% %fV", peripherals::lipoShieldPresent, lipoSoc, peripherals::lipo.getVoltage());
     peripherals::Display::uoled.setCursor(0, 0);
-    peripherals::Display::uoled.printlnf("BATT %0.2f", lipoSoc);
+    peripherals::Display::uoled.printlnf("BATT %0.2f%%", lipoSoc);
+    peripherals::Display::uoled.printlnf("BATT %0.2fV", lipoV);
     switch (sensors::currentOrientation) {
         case sensors::Orientation::FACE_UP:
         case sensors::Orientation::FACE_DOWN:
