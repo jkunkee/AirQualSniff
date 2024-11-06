@@ -517,16 +517,17 @@ static bool ReadBMA400(jet::evt::TriggerList& triggers, jet::evt::Datum& out) {
 
 enum Orientation {
     FACE_UP,
+    FACE_DOWN,
     ON_LEFT_SIDE,
     ON_RIGHT_SIDE,
     ON_TOP,
     ON_BOTTOM,
-    FACE_DOWN,
 };
+
+Orientation currentOrientation = ON_BOTTOM;
 
 static bool ReduceBMA400ToOrientation(jet::evt::TriggerList& triggers, jet::evt::Datum& out);
 static bool ReduceBMA400ToOrientation(jet::evt::TriggerList& triggers, jet::evt::Datum& out) {
-    static Orientation currentOrientation = ON_BOTTOM;
     Orientation newOrientation = currentOrientation;
     bool hasChanged = false;
     if (triggers.size() == 1) {
@@ -1036,6 +1037,20 @@ bool RenderTestToSerial(jet::evt::TriggerList& triggers, jet::evt::Datum& out) {
     Serial.printlnf("lipo: %d %f%% %fV", peripherals::lipoShieldPresent, lipoSoc, peripherals::lipo.getVoltage());
     peripherals::Display::uoled.setCursor(0, 0);
     peripherals::Display::uoled.printlnf("BATT %0.2f", lipoSoc);
+    switch (sensors::currentOrientation) {
+        case sensors::Orientation::FACE_UP:
+        case sensors::Orientation::FACE_DOWN:
+        case sensors::Orientation::ON_TOP:
+        case sensors::Orientation::ON_BOTTOM:
+        case sensors::Orientation::ON_RIGHT_SIDE:
+            peripherals::Display::uoled.flipHorizontal(false);
+            peripherals::Display::uoled.flipVertical(false);
+            break;
+        case sensors::Orientation::ON_LEFT_SIDE:
+            peripherals::Display::uoled.flipHorizontal(true);
+            peripherals::Display::uoled.flipVertical(true);
+            break;
+    }
     peripherals::Display::uoled.display();
     return false;
 }
