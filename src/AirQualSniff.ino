@@ -291,6 +291,7 @@ namespace Display {
     }
 
     MicroOLED uoled;
+    bool uoledPresent = false;
 
     void init() {
         // FUll U8G2, SSD1327 controller, Midas 128x128 display, full framebuffer, First Arduino Hardware I2C, rotated so USB is on left
@@ -315,11 +316,15 @@ namespace Display {
         u8g2_ssd1327_lock();
 
         // shield defaults to SPI config
+        Serial.println("init'in' display");
         uoled.begin();
+        // ...well, it would appear there's no other way
+        uoledPresent = true;
         uoled.clear(ALL);
-        uoled.display();
-        delay(100);
         uoled.clear(PAGE);
+        uoled.invert(false);
+        uoled.display();
+        uoled.setFontType(0);
     }
 } // namespace Display
 
@@ -960,6 +965,13 @@ bool RenderTestToSerial(jet::evt::TriggerList& triggers, jet::evt::Datum& out) {
         peripherals::accel.data.accelX,
         peripherals::accel.data.accelY,
         peripherals::accel.data.accelZ);
+    peripherals::Display::uoled.setColor(BLACK);
+    peripherals::Display::uoled.circle(16, 16, 8);
+    peripherals::Display::uoled.circle(32, 32, 8);
+    peripherals::Display::uoled.setColor(WHITE);
+    peripherals::Display::uoled.setCursor(0, 0);
+    peripherals::Display::uoled.printlnf("EHLOL %f", peripherals::accel.data.accelX);
+    peripherals::Display::uoled.display();
     return false;
 }
 
