@@ -1030,33 +1030,6 @@ namespace UX {
 
 using namespace Data;
 
-bool RenderTestToSerial(jet::evt::TriggerList& triggers, jet::evt::Datum& out) {
-    Serial.printlnf("Hello World - eeprom %d", peripherals::NvStorage::externalEepromPresent);
-    peripherals::lipo.quickStart();
-    float lipoSoc = peripherals::lipo.getSOC();
-    float lipoV = peripherals::lipo.getVoltage();
-    Serial.printlnf("lipo: %d %f%% %fV", peripherals::lipoShieldPresent, lipoSoc, peripherals::lipo.getVoltage());
-    peripherals::Display::uoled.setCursor(0, 0);
-    peripherals::Display::uoled.printlnf("BATT %0.2f%%", lipoSoc);
-    peripherals::Display::uoled.printlnf("BATT %0.2fV", lipoV);
-    switch (sensors::currentOrientation) {
-        case sensors::Orientation::FACE_UP:
-        case sensors::Orientation::FACE_DOWN:
-        case sensors::Orientation::ON_TOP:
-        case sensors::Orientation::ON_BOTTOM:
-        case sensors::Orientation::ON_RIGHT_SIDE:
-            peripherals::Display::uoled.flipHorizontal(false);
-            peripherals::Display::uoled.flipVertical(false);
-            break;
-        case sensors::Orientation::ON_LEFT_SIDE:
-            peripherals::Display::uoled.flipHorizontal(true);
-            peripherals::Display::uoled.flipVertical(true);
-            break;
-    }
-    peripherals::Display::uoled.display();
-    return false;
-}
-
 bool RenderSerial(jet::evt::TriggerList& triggers, jet::evt::Datum& out) {
     static system_tick_t lastFire = 0;
     system_tick_t currentFire = millis();
@@ -1512,6 +1485,7 @@ namespace networking {
             }
             return client.publish(subtopic.c_str(), data.c_str());
         }
+        MQTT5_REASON_CODE mostRecentReason = 255; // 255 is not currently a valid value
         void FailureCallback(MQTT5_REASON_CODE Code);
         void FailureCallback(MQTT5_REASON_CODE Code) {
             Serial.printlnf("MQTT5 failure w/code %d", (int)Code);
@@ -1614,6 +1588,83 @@ bool RenderMqtt(jet::evt::TriggerList& triggers, jet::evt::Datum& out) {
     networking::mqtt::Publish("AirQualSniff/status/error", buf);
 
     free(buf);
+    return false;
+}
+
+bool RenderTestToSerial(jet::evt::TriggerList& triggers, jet::evt::Datum& out) {
+    Serial.printlnf("Hello World - eeprom %d", peripherals::NvStorage::externalEepromPresent);
+    peripherals::lipo.quickStart();
+    float lipoSoc = peripherals::lipo.getSOC();
+    float lipoV = peripherals::lipo.getVoltage();
+    Serial.printlnf("lipo: %d %f%% %fV", peripherals::lipoShieldPresent, lipoSoc, peripherals::lipo.getVoltage());
+    static uint8_t count = 0;
+    static bool invert = false;
+    count = (count + 1) % 4;
+    if (count == 0) {
+        peripherals::Display::uoled.setCursor(0, 0);
+        peripherals::Display::uoled.clear(PAGE);
+        invert = !invert;
+        peripherals::Display::uoled.invert(invert);
+        peripherals::Display::uoled.printlnf("BAT%% %3.0f", lipoSoc);
+        peripherals::Display::uoled.printlnf("BATV %0.2f", lipoV);
+        if (WiFi.ready()) {
+            peripherals::Display::uoled.printlnf("WiFi OK");
+        } else if (WiFi.connecting()) {
+            peripherals::Display::uoled.printlnf("WiFi try"); // 'tries' fits but triggers newline
+        } else {
+            peripherals::Display::uoled.printlnf("WiFi ded");
+        }
+        if (Particle.connected()) {
+            peripherals::Display::uoled.printlnf("PartCl OK");
+        } else {
+            peripherals::Display::uoled.printlnf("PartCl no"); // 'ded' fits but triggers newline
+        }
+        if (networking::resolver.lastResult == E_MDNS_OK) {
+            peripherals::Display::uoled.printlnf("mDNS OK");
+        } else {
+            peripherals::Display::uoled.printlnf("mDNS %X", networking::resolver.lastResult);
+        }
+        if (UX::networking::mqtt::mostRecentReason == MQTT5_REASON_CODE::SUCCESS) {
+            peripherals::Display::uoled.printlnf("mqtt OK");
+        } else {
+            peripherals::Display::uoled.printlnf("mqtt %d", networking::mqtt::mostRecentReason);
+        }
+        const uint8_t height = peripherals::Display::uoled.getLCDHeight(); // 48
+        const uint8_t width = peripherals::Display::uoled.getLCDWidth(); // 64
+        for (int idx = 0; idx < max(height, width); idx++) {
+            if ((idx % 2) == 1) {
+                peripherals::Display::uoled.pixel(idx, height-1);
+                peripherals::Display::uoled.pixel(width-1, idx);
+            }
+            if ((idx % 5) == 4) {
+                peripherals::Display::uoled.pixel(idx, height-2);
+                peripherals::Display::uoled.pixel(width-2, idx);
+            }
+            if ((idx % 10) == 9) {
+                peripherals::Display::uoled.pixel(idx, height-3);
+                peripherals::Display::uoled.pixel(width-3, idx);
+            }
+        }
+        switch (sensors::currentOrientation) {
+            case sensors::Orientation::FACE_UP:
+            case sensors::Orientation::FACE_DOWN:
+            case sensors::Orientation::ON_TOP:
+            case sensors::Orientation::ON_BOTTOM:
+            case sensors::Orientation::ON_RIGHT_SIDE:
+                peripherals::Display::uoled.flipHorizontal(false);
+                peripherals::Display::uoled.flipVertical(false);
+                break;
+            case sensors::Orientation::ON_LEFT_SIDE:
+                peripherals::Display::uoled.flipHorizontal(true);
+                peripherals::Display::uoled.flipVertical(true);
+                break;
+        }
+        peripherals::Display::uoled.display();
+    } else {
+        peripherals::Display::uoled.clear(PAGE);
+        peripherals::Display::uoled.invert(false);
+        peripherals::Display::uoled.display();
+    }
     return false;
 }
 
