@@ -1404,7 +1404,7 @@ namespace networking {
         return Particle.connected();
     }
 
-    // mDNS facilities
+    // mDNS facility
     UDP udp;
     mDNSResolver::Resolver resolver(udp);
     bool LookUpMdnsName(String name, IPAddress &address); // because Wiring preprocessing
@@ -1412,15 +1412,13 @@ namespace networking {
         address = resolver.search(name.c_str());
         return !address.toString().equalsIgnoreCase(INADDR_NONE.toString());
     }
-    //int MdnsLookupFunction(String name) {
-    //    IPAddress addr = resolver.search(name.c_str());
-    //    return addr.raw().ipv4;
-    //}
 
     namespace mqtt {
         constexpr size_t BUFFER_LENGTH = 3*1024;
         IPAddress mqttServerAddress = INADDR_NONE;
         MQTT5 client(BUFFER_LENGTH + 64); // allow for MQTT packet header and topic data
+        MQTT5_REASON_CODE connectReason = MQTT5_REASON_CODE::UNSPECIFIED_ERROR;
+        MQTT5_REASON_CODE publishReason = MQTT5_REASON_CODE::UNSPECIFIED_ERROR;
         bool Connect() {
             // mDNS from the MQTT server is flaky, so be a little resilient.
             // do a fresh lookup
@@ -1453,7 +1451,7 @@ namespace networking {
 
             // Initiate the connection; this is only the start of the connection
             if (!client.connect(&addrAsBytes[0], 1883, nullptr, mqttOpts)) {
-                Serial.println("MQTT5 socket setup failed (getting a reason is like pulling teeth)");
+                Serial.printlnf("MQTT5 socket setup failed (getting a reason (%d) is like pulling teeth)", connectReason);
                 return false;
             }
             return true;
@@ -1483,15 +1481,27 @@ namespace networking {
                 Serial.println("MQTT5 connection failed");
                 return false;
             }
+            publishReason = MQTT5_REASON_CODE::SUCCESS;
             return client.publish(subtopic.c_str(), data.c_str());
         }
-        MQTT5_REASON_CODE mostRecentReason = 255; // 255 is not currently a valid value
-        void FailureCallback(MQTT5_REASON_CODE Code);
-        void FailureCallback(MQTT5_REASON_CODE Code) {
-            Serial.printlnf("MQTT5 failure w/code %d", (int)Code);
+        void ConnectSuccessCallback(bool sessionPresent);
+        void ConnectSuccessCallback(bool sessionPresent) {
+            connectReason = MQTT5_REASON_CODE::SUCCESS;
+        }
+        void ConnectFailureCallback(MQTT5_REASON_CODE Code);
+        void ConnectFailureCallback(MQTT5_REASON_CODE Code) {
+            connectReason = Code;
+            Serial.printlnf("MQTT5 connect failure w/code %d", (int)Code);
+        }
+        void PublishFailureCallback(MQTT5_REASON_CODE Code);
+        void PublishFailureCallback(MQTT5_REASON_CODE Code) {
+            publishReason = Code;
+            Serial.printlnf("MQTT5 publish failure w/code %d", (int)Code);
         }
         void init() {
-            client.onConnectFailed(FailureCallback);
+            client.onConnectSuccess(ConnectSuccessCallback);
+            client.onConnectFailed(ConnectFailureCallback);
+            client.onPublishFailed(PublishFailureCallback);
         }
     }
     bool TryConnect() {
@@ -1624,10 +1634,12 @@ bool RenderTestToSerial(jet::evt::TriggerList& triggers, jet::evt::Datum& out) {
         } else {
             peripherals::Display::uoled.printlnf("mDNS %X", networking::resolver.lastResult);
         }
-        if (UX::networking::mqtt::mostRecentReason == MQTT5_REASON_CODE::SUCCESS) {
-            peripherals::Display::uoled.printlnf("mqtt OK");
+        if (networking::mqtt::connectReason != MQTT5_REASON_CODE::SUCCESS) {
+            peripherals::Display::uoled.printlnf("mqttc %d", (uint8_t)networking::mqtt::connectReason);
+        } else if (networking::mqtt::publishReason != MQTT5_REASON_CODE::SUCCESS) {
+            peripherals::Display::uoled.printlnf("mqttp %d", (uint8_t)networking::mqtt::connectReason);
         } else {
-            peripherals::Display::uoled.printlnf("mqtt %d", networking::mqtt::mostRecentReason);
+            peripherals::Display::uoled.printlnf("mqtt OK");
         }
         const uint8_t height = peripherals::Display::uoled.getLCDHeight(); // 48
         const uint8_t width = peripherals::Display::uoled.getLCDWidth(); // 64
