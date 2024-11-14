@@ -1401,7 +1401,7 @@ int RemoteJoystick(String s) {
 
 namespace networking {
     bool IsNetworkConnected() {
-        return Particle.connected();
+        return WiFi.ready() && Particle.connected();
     }
 
     // mDNS facility
