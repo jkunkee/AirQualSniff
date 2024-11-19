@@ -1609,12 +1609,18 @@ bool RenderTestToSerial(jet::evt::TriggerList& triggers, jet::evt::Datum& out) {
     float lipoV = peripherals::lipo.getVoltage();
     Serial.printlnf("lipo: %d %f%% %fV", peripherals::lipoShieldPresent, lipoSoc, peripherals::lipo.getVoltage());
     static uint8_t count = 0;
-    static bool invert = false;
-    count = (count + 1) % 4;
-    if (count == 0) {
+    bool invert;
+    bool screenOn;
+
+    count++;
+    uint8_t tick = count % 20;
+
+    screenOn = tick <= 7;
+    invert = 6 <= tick && tick <= 7;
+
+    if (screenOn != false) {
         peripherals::Display::uoled.setCursor(0, 0);
         peripherals::Display::uoled.clear(PAGE);
-        invert = !invert;
         peripherals::Display::uoled.invert(invert);
         peripherals::Display::uoled.printlnf("BAT%% %3.0f", lipoSoc);
         peripherals::Display::uoled.printlnf("BATV %0.2f", lipoV);
@@ -1754,7 +1760,7 @@ void init() {
     infrastructure::event_hub.add_event_trigger("GatherDataFired", "Absolute Humidity 8.8 g/m^3");
     infrastructure::event_hub.add_event_trigger("GatherDataFired", "SGP30 tVOC ppb");
     infrastructure::event_hub.add_event_trigger("GatherDataFired", "SGP30 eCO2 ppm");
-    infrastructure::event_hub.add_event("RenderTestToSerial", UX::RenderTestToSerial, jet::evt::TRIGGER_TEMPORAL, (uint32_t)3000);
+    infrastructure::event_hub.add_event("RenderTestToSerial", UX::RenderTestToSerial, jet::evt::TRIGGER_TEMPORAL, (uint32_t)500);
     //infrastructure::event_hub.add_event("RenderSerialEvent", UX::RenderSerial, jet::evt::TRIGGER_ON_ANY);
     //infrastructure::event_hub.add_event_trigger("RenderSerialEvent", "GatherDataFired");
     infrastructure::event_hub.add_event("RenderOledEvent", UX::RenderOled, jet::evt::TRIGGER_ON_ANY);
