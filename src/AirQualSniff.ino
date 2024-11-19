@@ -1602,7 +1602,7 @@ bool RenderMqtt(jet::evt::TriggerList& triggers, jet::evt::Datum& out) {
 }
 
 bool RenderTestToSerial(jet::evt::TriggerList& triggers, jet::evt::Datum& out) {
-    Serial.printlnf("Hello World - eeprom %d", peripherals::NvStorage::externalEepromPresent);
+    Serial.println("RenderTestToSerial");
     peripherals::lipo.quickStart();
     float lipoSoc = peripherals::lipo.getSOC();
     float lipoV = peripherals::lipo.getVoltage();
