@@ -323,6 +323,7 @@ namespace Display {
         uoled.clear(ALL);
         uoled.clear(PAGE);
         uoled.invert(false);
+        uoled.contrast(3 * 32);
         uoled.display();
         uoled.setFontType(0);
     }
